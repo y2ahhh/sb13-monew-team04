@@ -1,3 +1,6 @@
 spring:
   application:
     name: sb13-monew-team04
+
+test:
+  pr: "test-pr"
