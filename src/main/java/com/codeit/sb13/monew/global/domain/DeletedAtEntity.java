@@ -14,4 +14,11 @@ public abstract class DeletedAtEntity extends UpdatedAtEntity {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    public void softDelete() {
+        if (this.deletedAt == null) {
+            this.deletedAt = LocalDateTime.now();
+        }
+    }
+
 }
