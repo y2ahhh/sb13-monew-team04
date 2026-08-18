@@ -1,10 +1,10 @@
 package com.codeit.sb13.monew.comment.service.impl;
 
-import com.codeit.sb13.monew.comment.dto.CommentDto;
-import com.codeit.sb13.monew.comment.dto.CommentRegisterRequest;
-import com.codeit.sb13.monew.comment.entity.Comment;
+import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.comment.service.CommentService;
+import com.codeit.sb13.monew.comment.service.dto.CommentDto;
+import com.codeit.sb13.monew.comment.service.dto.CommentRegisterRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

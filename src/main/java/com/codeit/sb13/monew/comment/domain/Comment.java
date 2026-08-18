@@ -1,4 +1,4 @@
-package com.codeit.sb13.monew.comment.entity;
+package com.codeit.sb13.monew.comment.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

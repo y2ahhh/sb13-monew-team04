@@ -1,6 +1,6 @@
-package com.codeit.sb13.monew.comment.dto;
+package com.codeit.sb13.monew.comment.service.dto;
 
-import com.codeit.sb13.monew.comment.entity.Comment;
+import com.codeit.sb13.monew.comment.domain.Comment;
 import java.time.Instant;
 import java.util.UUID;
 

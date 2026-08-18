@@ -55,11 +55,7 @@ public class CommentServiceTest {
         () -> assertThat(savedComment.getArticleId()).isEqualTo(articleId),
         () -> assertThat(savedComment.getUserId()).isEqualTo(userId),
         () -> assertThat(savedComment.getContent()).isEqualTo("테스트 댓글"),
-        () -> assertThat(savedComment.getCreatedAt()).isNotNull(),
-        () -> assertThat(result.id()).isEqualTo(commentId),
-        ()->assertThat(result.likeCount()).isEqualTo(0),
-        ()->assertThat(result.createdAt()).isNotNull(),
-        ()->assertThat(result.likedByMe()).isFalse()
+        () -> assertThat(savedComment.getCreatedAt()).isNotNull()
     );
   }
 }

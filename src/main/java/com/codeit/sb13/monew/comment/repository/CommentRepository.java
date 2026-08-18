@@ -1,7 +1,7 @@
 package com.codeit.sb13.monew.comment.repository;
 
 
-import com.codeit.sb13.monew.comment.entity.Comment;
+import com.codeit.sb13.monew.comment.domain.Comment;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
