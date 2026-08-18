@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.codeit.sb13.monew.comment.service.CommentService;
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
+import com.codeit.sb13.monew.comment.service.dto.CommentRegisterRequest;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -28,14 +29,14 @@ public class CommentControllerTest {
   private CommentService commentService;
 
   @Test
-  @DisplayName("댓글 생성 성공 - RED")
+  @DisplayName("댓글 생성 성공 - GREEN")
   void 댓글_생성_성공() throws Exception {
     // given
     UUID articleId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
     CommentDto response=new CommentDto(UUID.randomUUID(), articleId, userId, "사용자 닉네임", "테스트 댓글", 0L, false, Instant.now());
-    given(commentService.create(any())).willReturn(response);
+    given(commentService.create(any(CommentRegisterRequest.class))).willReturn(response);
 
     mockMvc.perform(
         post("/api/comments")
@@ -53,10 +54,8 @@ public class CommentControllerTest {
         .andExpect(jsonPath("$.userId").value(userId.toString()))
         .andExpect(jsonPath("$.content").value("테스트 댓글"))
         .andExpect(jsonPath("$.createdAt").isNotEmpty())
-        .andExpect(jsonPath("$.nickname").value("사용자 닉네임"))
+        .andExpect(jsonPath("$.userNickname").value("사용자 닉네임"))
         .andExpect(jsonPath("$.likeCount").value(0))
-        .andExpect(jsonPath("$.liked").value(false));
-
-
+        .andExpect(jsonPath("$.likedByMe").value(false));
   }
 }
