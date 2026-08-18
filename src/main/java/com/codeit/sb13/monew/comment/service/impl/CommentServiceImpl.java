@@ -5,6 +5,7 @@ import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.comment.service.CommentService;
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
 import com.codeit.sb13.monew.comment.service.dto.CommentRegisterRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +19,7 @@ public class CommentServiceImpl implements CommentService {
 
   @Transactional
   @Override
-  public CommentDto create(CommentRegisterRequest request) {
+  public CommentDto create(@Valid CommentRegisterRequest request) {
     Comment comment=new Comment(request.articleId(), request.userId(), request.content());
     Comment saved = commentRepository.save(comment);
     return CommentDto.from(saved);
