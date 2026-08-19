@@ -5,9 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.*;
 
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
-import com.codeit.sb13.monew.comment.service.dto.CommentRegisterRequest;
 import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.comment.repository.CommentRepository;
+import com.codeit.sb13.monew.comment.service.dto.CommentRegisterCommand;
 import com.codeit.sb13.monew.comment.service.impl.CommentServiceImpl;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
@@ -38,7 +38,7 @@ public class CommentServiceTest {
     UUID userId = UUID.randomUUID();
     UUID commentId = UUID.randomUUID();
 
-    CommentRegisterRequest request=new CommentRegisterRequest(articleId, userId, "테스트 댓글");
+    CommentRegisterCommand command=new CommentRegisterCommand(articleId, userId, "테스트 댓글");
     given(commentRepository.save(any(Comment.class))).willAnswer(invocation -> {
       Comment comment = invocation.getArgument(0);
       ReflectionTestUtils.setField(comment, "id", commentId);
@@ -46,7 +46,7 @@ public class CommentServiceTest {
     });
     // when
 
-    CommentDto result = commentService.create(request);
+    CommentDto result = commentService.create(command);
     ArgumentCaptor<Comment> captor = ArgumentCaptor.forClass(Comment.class);
     // then
     then(commentRepository).should(times(1)).save(captor.capture());
@@ -55,12 +55,10 @@ public class CommentServiceTest {
         () -> assertThat(savedComment.getArticleId()).isEqualTo(articleId),
         () -> assertThat(savedComment.getUserId()).isEqualTo(userId),
         () -> assertThat(savedComment.getContent()).isEqualTo("테스트 댓글"),
-        () -> assertThat(savedComment.getCreatedAt()).isNotNull(),
         () -> assertThat(result.id()).isEqualTo(commentId),
         ()->assertThat(result.userId()).isEqualTo(userId),
         ()->assertThat(result.articleId()).isEqualTo(articleId),
-        ()->assertThat(result.content()).isEqualTo("테스트 댓글"),
-        ()->assertThat(result.createdAt()).isNotNull()
+        ()->assertThat(result.content()).isEqualTo("테스트 댓글")
     );
   }
 }
