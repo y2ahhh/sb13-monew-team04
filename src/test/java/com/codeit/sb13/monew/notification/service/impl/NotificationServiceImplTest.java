@@ -57,9 +57,15 @@ class NotificationServiceImplTest {
             List<Notification> saved = notificationsCaptor.getValue();
 
             assertThat(saved).hasSize(2);
-            assertThat(saved.get(0).getContent()).isEqualTo("[백엔드]와 관련된 기사가 3건 등록되었습니다.");
-            assertThat(saved.get(0).getResourceId()).isEqualTo(resourceId);
-            assertThat(saved.get(0).getResourceType()).isEqualTo(ResourceType.INTEREST);
+            assertThat(saved)
+                    .extracting(Notification::getUser)
+                    .containsExactly(user1, user2);
+
+            assertThat(saved).allSatisfy(n -> {
+                assertThat(n.getContent()).isEqualTo("[백엔드]와 관련된 기사가 3건 등록되었습니다.");
+                assertThat(n.getResourceId()).isEqualTo(resourceId);
+                assertThat(n.getResourceType()).isEqualTo(ResourceType.INTEREST);
+            });
         }
 
         @Test
