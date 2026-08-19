@@ -6,6 +6,7 @@ import com.codeit.sb13.monew.interest.domain.Interest;
 import com.codeit.sb13.monew.interest.repository.InterestRepository;
 import com.codeit.sb13.monew.interest.repository.SubscribeRepository;
 import com.codeit.sb13.monew.interest.service.dto.InterestCreateCommand;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -62,10 +63,15 @@ public class InterestServiceImpl implements InterestService{
      * 테스트에 쓰는 H2는 제약/인덱스 이름을 대문자로 돌려준다
      * (예: {@code "PUBLIC.UK_INTERESTS_NAME INDEX PUBLIC.UK_INTERESTS_NAME_INDEX_C ..."}).
      * DB마다 대소문자 표기가 달라질 수 있으므로, 메시지를 소문자로 바꾼 뒤
-     * 비교해 대소문자에 관계없이 판별되도록 한다.</p>
+     * 비교해 대소문자에 관계없이 판별되도록 한다. 이때 {@link String#toLowerCase()}를
+     * 로케일 없이 쓰면 JVM 기본 로케일이 튀르키예어일 경우 대문자 {@code I}가
+     * 점 없는 {@code ı}로 변환되어 {@code "INTERESTS"}가 {@code "interests"}가 아닌
+     * {@code "ınterests"}로 바뀌는 문제가 있어, 언어와 무관한 {@link Locale#ROOT}를
+     * 명시적으로 사용한다.</p>
      */
     private boolean isNameUniqueViolation(DataIntegrityViolationException e) {
         String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.toLowerCase().contains("uk_interests_name");
+        return message != null
+                && message.toLowerCase(Locale.ROOT).contains("uk_interests_name");
     }
 }
