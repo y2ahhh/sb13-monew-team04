@@ -2,14 +2,17 @@
 --
 -- 로컬 PostgreSQL DB에 Flyway migration을 적용한 뒤 실행합니다.
 --
--- .env.perf.local은 .env.example을 복사해서 만들고, MONEW_DB_PORT를 사용하지 않는 포트로 변경합니다.
+-- .env.perf.local은 .env.example을 복사해서 만들고, 성능 테스트용 DB가 개발 DB와 분리되도록 아래 값을 변경합니다.
 -- Windows: Copy-Item .env.example .env.perf.local
 -- macOS/Linux: cp .env.example .env.perf.local
+-- COMPOSE_PROJECT_NAME=monew-perf
+-- MONEW_POSTGRES_CONTAINER_NAME=monew-perf-postgres
+-- MONEW_DB_PORT=사용하지 않는 포트
 --
 -- 실행 예시:
--- docker compose --env-file .env.perf.local --profile perf-seed run --rm -e SEED_SCALE=100k postgres-seed
--- docker compose --env-file .env.perf.local --profile perf-seed run --rm -e SEED_SCALE=1m postgres-seed
--- docker compose --env-file .env.perf.local --profile perf-seed run --rm -e SEED_SCALE=10m postgres-seed
+-- docker compose -p monew-perf --env-file .env.perf.local --profile perf-seed run --rm -e SEED_SCALE=100k postgres-seed
+-- docker compose -p monew-perf --env-file .env.perf.local --profile perf-seed run --rm -e SEED_SCALE=1m postgres-seed
+-- docker compose -p monew-perf --env-file .env.perf.local --profile perf-seed run --rm -e SEED_SCALE=10m postgres-seed
 --
 -- 기준 사용자:
 -- SELECT perf_uuid(1, 1) AS target_user_id;
