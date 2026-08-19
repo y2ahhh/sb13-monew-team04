@@ -85,7 +85,7 @@ class UserControllerTest {
   }
 
   @ParameterizedTest
-  @DisplayName("필드 형식이 유효하지 않으면 400으로 응답한다")
+  @DisplayName("회원가입시에 필드 형식이 유효하지 않으면 400으로 응답한다")
   @CsvSource({
       "'',             닉네임, PassWord123!",
       "email,          닉네임, PassWord123!",
@@ -159,8 +159,17 @@ class UserControllerTest {
             "MoNew-Request-User-ID", result.userId().toString()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.userId").exists())
-        .andExpect(jsonPath("$.email").value(request.email()));
+        .andExpect(jsonPath("$.email").value(result.email()))
+        .andExpect(jsonPath("$.nickname").value(result.nickname()));
+
+    // Command 변환값 검증 추가
+    ArgumentCaptor<UserLoginCommand> commandCaptor = ArgumentCaptor.forClass(UserLoginCommand.class);
+    verify(userService).login(commandCaptor.capture());
+    UserLoginCommand capturedCommand = commandCaptor.getValue();
+    assertThat(capturedCommand.email()).isEqualTo(request.email());
+    assertThat(capturedCommand.password()).isEqualTo(request.password());
   }
+
 
   @Test
   @DisplayName("존재하지 않는 이메일로 로그인시 401로 응답")
@@ -200,5 +209,32 @@ class UserControllerTest {
         .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isUnauthorized());
   }
+
+  @ParameterizedTest
+  @DisplayName("로그인시에 필드 형식이 유효하지 않으면 400으로 응답한다")
+  @CsvSource({
+      "'',                PassWord123!",
+      "'email',           PassWord123!",
+      "'email@email.com', ''"
+  })
+  void 로그인_형식_검증_실패시_400을_반환한다 (String email, String password) throws Exception {
+    // given
+    UserLoginRequest request = new UserLoginRequest(email, password);
+
+    // when & then
+    mockMvc.perform(post("/api/users/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").exists());
+  }
+//  UserCreateRequest request = new UserCreateRequest(email, nickname, password);
+//
+//  // when & then
+//    mockMvc.perform(post("/api/users")
+//        .contentType(MediaType.APPLICATION_JSON)
+//        .content(objectMapper.writeValueAsString(request)))
+//      .andExpect(status().isBadRequest())
+//      .andExpect(jsonPath("$.code").exists());
 
 }

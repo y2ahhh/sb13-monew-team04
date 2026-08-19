@@ -54,6 +54,7 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
+  @Transactional(readOnly = true)
   public UserLoginResult login(UserLoginCommand command) {
     User user = userRepository.findByEmail(command.email())
         .orElseThrow(() -> new LoginUserNotFoundException(command.email()));
