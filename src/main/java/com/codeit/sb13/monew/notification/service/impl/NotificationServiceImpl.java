@@ -20,6 +20,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
 
     @Override
+    @Transactional
     public void notifyArticlesForInterest(ArticlesForInterestDto request) {
         if(request.recipients()==null || request.recipients().isEmpty()) {
             return;
@@ -34,6 +35,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Transactional
     public void notifyCommentLiked(CommentLikedDto request) {
         if(request.sender()==null) {
             return;
