@@ -9,6 +9,8 @@ import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.comment.service.dto.CommentRegisterCommand;
 import com.codeit.sb13.monew.comment.service.impl.CommentServiceImpl;
+import com.codeit.sb13.monew.user.domain.User;
+import com.codeit.sb13.monew.user.repository.UserRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +29,9 @@ public class CommentServiceTest {
   @Mock
   CommentRepository commentRepository;
 
+  @Mock
+  UserRepository userRepository;
+
   @InjectMocks
   private CommentServiceImpl commentService;
 
@@ -35,10 +40,16 @@ public class CommentServiceTest {
   void 댓글_생성_성공() {
     // given
     UUID articleId = UUID.randomUUID();
-    UUID userId = UUID.randomUUID();
+    User user = User.builder()
+        .email("test@test.com")
+        .nickname("테스트 사용자")
+        .password("Abcd!")
+        .build();
+    ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
     UUID commentId = UUID.randomUUID();
 
-    CommentRegisterCommand command=new CommentRegisterCommand(articleId, userId, "테스트 댓글");
+    CommentRegisterCommand command=new CommentRegisterCommand(articleId, user.getId(), "테스트 댓글");
+    given(userRepository.findById(user.getId())).willReturn(java.util.Optional.of(user));
     given(commentRepository.save(any(Comment.class))).willAnswer(invocation -> {
       Comment comment = invocation.getArgument(0);
       ReflectionTestUtils.setField(comment, "id", commentId);
@@ -53,10 +64,10 @@ public class CommentServiceTest {
     Comment savedComment = captor.getValue();
     Assertions.assertAll(
         () -> assertThat(savedComment.getArticleId()).isEqualTo(articleId),
-        () -> assertThat(savedComment.getUserId()).isEqualTo(userId),
+        () -> assertThat(savedComment.getUser().getId()).isEqualTo(user.getId()),
         () -> assertThat(savedComment.getContent()).isEqualTo("테스트 댓글"),
         () -> assertThat(result.id()).isEqualTo(commentId),
-        ()->assertThat(result.userId()).isEqualTo(userId),
+        ()->assertThat(result.userId()).isEqualTo(user.getId()),
         ()->assertThat(result.articleId()).isEqualTo(articleId),
         ()->assertThat(result.content()).isEqualTo("테스트 댓글")
     );
