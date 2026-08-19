@@ -1,8 +1,12 @@
 package com.codeit.sb13.monew.comment.domain;
 
 import com.codeit.sb13.monew.global.domain.DeletedAtEntity;
+import com.codeit.sb13.monew.user.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -18,15 +22,16 @@ public class Comment extends DeletedAtEntity { // DeletedAtEntity를 상속받�
   @Column(name = "article_id", nullable = false)
   private UUID articleId;
 
-  @Column(name = "user_id", nullable = false)
-  private UUID userId;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_id", nullable = false)
+  private User user;
 
   @Column(nullable = false, length = 500)
   private String content;
 
-  public Comment(UUID articleId, UUID userId, String content) {
+  public Comment(UUID articleId, User user, String content) {
     this.articleId = articleId;
-    this.userId = userId;
+    this.user = user;
     this.content = content;
   }
 }

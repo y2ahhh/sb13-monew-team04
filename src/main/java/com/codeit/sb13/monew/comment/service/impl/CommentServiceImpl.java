@@ -5,6 +5,8 @@ import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.comment.service.CommentService;
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
 import com.codeit.sb13.monew.comment.service.dto.CommentRegisterCommand;
+import com.codeit.sb13.monew.user.domain.User;
+import com.codeit.sb13.monew.user.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,11 +20,13 @@ import org.springframework.validation.annotation.Validated;
 public class CommentServiceImpl implements CommentService {
 
   private final CommentRepository commentRepository;
+  private final UserRepository userRepository;
 
   @Transactional
   @Override
   public CommentDto create(@Valid CommentRegisterCommand command) { // 서비스 전용객체를 사용
-    Comment comment=new Comment(command.articleId(), command.userId(), command.content());
+    User user = userRepository.findById(command.userId()).orElseThrow();
+    Comment comment=new Comment(command.articleId(), user, command.content());
     Comment saved = commentRepository.save(comment);
     return CommentDto.from(saved);
   }

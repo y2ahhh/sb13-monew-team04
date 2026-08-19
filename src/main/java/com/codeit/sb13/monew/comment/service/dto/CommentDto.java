@@ -18,8 +18,8 @@ public record CommentDto(
     return new CommentDto(
         comment.getId(),
         comment.getArticleId(),
-        comment.getUserId(),
-        "사용자 닉네임", // Todo: 추후 사용자 도메인과 연동 후 실제 사용자 이름 조회
+        comment.getUser().getId(),
+        comment.getUser().getNickname(), // 사용자 도메인과 연동 후 실제 사용자 이름 조회
         comment.getContent(),
         0L, // Todo: 좋아요 기능 구현 후 수정
         false, // Todo: 좋아요 기능 구현 후 수정

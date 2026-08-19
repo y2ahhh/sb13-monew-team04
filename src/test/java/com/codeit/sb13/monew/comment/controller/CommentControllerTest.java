@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.codeit.sb13.monew.comment.service.CommentService;
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
+import com.codeit.sb13.monew.user.domain.User;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(CommentController.class)
@@ -32,13 +34,18 @@ public class CommentControllerTest {
   void 댓글_생성_성공() throws Exception {
     // given
     UUID articleId = UUID.randomUUID();
-    UUID userId = UUID.randomUUID();
+    User user = User.builder()
+        .email("test@test.com")
+        .nickname("테스트 사용자")
+        .password("Abcd!")
+        .build();
     String content = "테스트 댓글";
+    ReflectionTestUtils.setField(user, "id", UUID.randomUUID()); // user 객체에 id 필드 설정
 
-    CommentDto response=new CommentDto(UUID.randomUUID(), articleId, userId, "사용자 닉네임", content, 0L, false, LocalDateTime.now());
+    CommentDto response=new CommentDto(UUID.randomUUID(), articleId, user.getId(), "사용자 닉네임", content, 0L, false, LocalDateTime.now());
     given(commentService.create(argThat(command->command != null
         && articleId.equals(command.articleId())
-        && userId.equals(command.userId())
+        && user.getId().equals(command.userId())
         && content.equals(command.content())))).willReturn(response); // 값이 정확히 일치하는 방향만 통과하도록 테스트 수정
 
     mockMvc.perform(
@@ -50,11 +57,11 @@ public class CommentControllerTest {
                   "userId": "%s",
                   "content": "%s"
                 }
-                """.formatted(articleId, userId, content)))
+                """.formatted(articleId, user.getId(), content)))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(response.id().toString()))
         .andExpect(jsonPath("$.articleId").value(articleId.toString()))
-        .andExpect(jsonPath("$.userId").value(userId.toString()))
+        .andExpect(jsonPath("$.userId").value(user.getId().toString()))
         .andExpect(jsonPath("$.content").value(content))
         .andExpect(jsonPath("$.createdAt").isNotEmpty())
         .andExpect(jsonPath("$.userNickname").value("사용자 닉네임"))
