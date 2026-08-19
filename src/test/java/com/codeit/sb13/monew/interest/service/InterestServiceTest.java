@@ -171,4 +171,21 @@ class InterestServiceTest {
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .isNotInstanceOf(InterestNameDuplicatedException.class);
     }
+
+    @Test
+    @DisplayName("원인 예외 메시지가 null이면 이름 중복이 아닌 것으로 판별해 원래 예외를 그대로 던진다")
+    void create_uniqueViolationWithNullMessage_rethrowsOriginalException() {
+        // given
+        InterestCreateCommand command = new InterestCreateCommand("스포츠", List.of("축구"));
+
+        DataIntegrityViolationException original = new DataIntegrityViolationException(null);
+
+        when(interestRepository.existsByName(command.name())).thenReturn(false);
+        when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
+
+        // when & then
+        assertThatThrownBy(() -> interestServiceImpl.create(command))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .isNotInstanceOf(InterestNameDuplicatedException.class);
+    }
 }
