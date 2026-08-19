@@ -82,6 +82,24 @@ class InterestServiceTest {
     }
 
     @Test
+    @DisplayName("기존 이름과 유사도가 정확히 80%(임계값)인 이름이면 InterestNameDuplicatedException을 던지고 저장하지 않는다")
+    void create_nameExactlyAtSimilarityThreshold_throwsException() {
+        // given
+        InterestCreateCommand command = new InterestCreateCommand("게임소식판", List.of("게임"));
+
+        when(interestRepository.existsByName(command.name())).thenReturn(false);
+        // "게임소식란"과 "게임소식판"은 둘 다 길이 5, 마지막 글자 하나만 달라 편집 거리 1이고,
+        // 유사도는 1 - 1/5 = 0.8로 임계값과 정확히 같다. >= 비교가 > 로 바뀌는 회귀를 잡기 위한 경계값 테스트.
+        when(interestRepository.findAllNames()).thenReturn(List.of("게임소식란"));
+
+        // when & then
+        assertThatThrownBy(() -> interestServiceImpl.create(command))
+                .isInstanceOf(InterestNameDuplicatedException.class);
+
+        verify(interestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     @DisplayName("기존 이름들과 유사도가 80% 미만이면 정상적으로 등록된다")
     void create_nameNotSimilarEnough_savesSuccessfully() {
         // given
