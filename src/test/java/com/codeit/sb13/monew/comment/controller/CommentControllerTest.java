@@ -36,13 +36,13 @@ public class CommentControllerTest {
     UUID articleId = UUID.randomUUID();
     User user = User.builder()
         .email("test@test.com")
-        .nickname("테스트 사용자")
+        .nickname("사용자 닉네임")
         .password("Abcd!")
         .build();
     String content = "테스트 댓글";
     ReflectionTestUtils.setField(user, "id", UUID.randomUUID()); // user 객체에 id 필드 설정
 
-    CommentDto response=new CommentDto(UUID.randomUUID(), articleId, user.getId(), "사용자 닉네임", content, 0L, false, LocalDateTime.now());
+    CommentDto response=new CommentDto(UUID.randomUUID(), articleId, user.getId(), user.getNickname(), content, 0L, false, LocalDateTime.now());
     given(commentService.create(argThat(command->command != null
         && articleId.equals(command.articleId())
         && user.getId().equals(command.userId())
