@@ -1,7 +1,6 @@
 services:
   postgres:
     image: 'postgres:16'
-    container_name: ${MONEW_POSTGRES_CONTAINER_NAME:-monew-postgres}
     environment:
       POSTGRES_DB: ${MONEW_DB_NAME:-monew}
       POSTGRES_USER: ${MONEW_DB_USERNAME:-monew}
