@@ -38,7 +38,6 @@ public class ArticleServiceImpl implements ArticleService {
             throw new IllegalArgumentException("이미 등록된 기사입니다.");
         }
 
-        // ✅ 5개 필드 생성자 사용
         Article article = new Article(
                 request.getTitle(),
                 request.getSummary(),
@@ -47,7 +46,12 @@ public class ArticleServiceImpl implements ArticleService {
                 request.getSource()
         );
 
-        return articleRepository.save(article);
+        // DataIntegrityViolationException 처리 추가 (동시성 문제 대응)
+        try {
+            return articleRepository.save(article);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("이미 등록된 기사입니다.");
+        }
     }
 
     @Override

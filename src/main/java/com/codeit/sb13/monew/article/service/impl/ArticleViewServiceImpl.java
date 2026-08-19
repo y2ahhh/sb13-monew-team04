@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,20 +24,24 @@ public class ArticleViewServiceImpl implements ArticleViewService {
     @Override
     @Transactional
     public void recordView(UUID articleId, UUID userId) {
-        // 기사 확인
+        // 기사 존재 확인
         articleRepository.findByIdAndDeletedAtIsNull(articleId)
                 .orElseThrow(() -> new ArticleNotFoundException(articleId));
 
         // 기존 조회 기록 확인
         articleViewRepository.findByArticleIdAndUserId(articleId, userId)
                 .ifPresentOrElse(
-                        view -> articleViewRepository.save(view),  // 업데이트
+                        view -> {
+                            // ✅ 명시적으로 viewedAt 업데이트
+                            view.updateViewedAt(LocalDateTime.now());
+                            articleViewRepository.save(view);
+                        },
                         () -> {
-                            // ✅ 3개 필드 생성자 사용
+                            // 새로운 기록 생성
                             ArticleView newView = new ArticleView(
                                     articleId,
                                     userId,
-                                    null  // viewedAt는 @PrePersist에서 자동 설정
+                                    null
                             );
                             articleViewRepository.save(newView);
                         }

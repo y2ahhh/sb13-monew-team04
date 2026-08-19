@@ -47,4 +47,12 @@ public class ArticleView extends CreatedAtEntity {
     protected void onUpdate() {
         this.viewedAt = LocalDateTime.now();
     }
+
+    /**
+     * 조회 시간 업데이트
+     * @param viewedAt : 새로운 조회 시간
+     */
+    public void updateViewedAt(LocalDateTime viewedAt) {
+        this.viewedAt = viewedAt;
+    }
 }
