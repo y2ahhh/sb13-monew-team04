@@ -23,6 +23,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,7 +42,7 @@ class InterestServiceTest {
     InterestServiceImpl interestServiceImpl;
 
     @Test
-    @DisplayName("이름이 이미 존재하면 InterestNameDuplicatedException을 던지고 저장하지 않는다")
+    @DisplayName("사전 검사에서 이름이 이미 존재하면 InterestNameDuplicatedException을 던지고 저장하지 않는다")
     void create_duplicateName_throwsException() {
         // given
         InterestCreateCommand command = new InterestCreateCommand("스포츠", List.of("축구"));
@@ -51,7 +52,7 @@ class InterestServiceTest {
         assertThatThrownBy(() -> interestServiceImpl.create(command))
                 .isInstanceOf(InterestNameDuplicatedException.class);
 
-        verify(interestRepository, never()).save(any());
+        verify(interestRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -62,7 +63,7 @@ class InterestServiceTest {
         UUID generatedId = UUID.randomUUID();
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
-        when(interestRepository.save(any(Interest.class))).thenAnswer(invocation -> {
+        when(interestRepository.saveAndFlush(any(Interest.class))).thenAnswer(invocation -> {
             Interest saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", generatedId);
             return saved;
@@ -78,9 +79,44 @@ class InterestServiceTest {
         assertThat(response.subscriberCount()).isEqualTo(0L);
         assertThat(response.subscribedByMe()).isFalse();
 
-        verify(interestRepository).save(interestCaptor.capture());
+        verify(interestRepository).saveAndFlush(interestCaptor.capture());
         Interest captured = interestCaptor.getValue();
         assertThat(captured.getName()).isEqualTo("스포츠");
         assertThat(captured.getKeywords()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("사전 검사를 통과했지만 저장 시점에 이름 중복 제약 위반이 발생하면 InterestNameDuplicatedException을 던진다")
+    void create_uniqueViolationDetectedAtSaveTime_throwsException() {
+        // given
+        InterestCreateCommand command = new InterestCreateCommand("스포츠", List.of("축구"));
+
+        when(interestRepository.existsByName(command.name())).thenReturn(false);
+        when(interestRepository.saveAndFlush(any(Interest.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "duplicate key value violates unique constraint \"uk_interests_name\""));
+
+        // when & then
+        assertThatThrownBy(() -> interestServiceImpl.create(command))
+                .isInstanceOf(InterestNameDuplicatedException.class);
+
+        verify(interestRepository).existsByName(command.name());
+    }
+
+    @Test
+    @DisplayName("이름과 무관한 제약 위반이면 원래 예외를 그대로 던진다")
+    void create_unrelatedConstraintViolation_rethrowsOriginalException() {
+        // given
+        InterestCreateCommand command = new InterestCreateCommand("스포츠", List.of("축구"));
+
+        when(interestRepository.existsByName(command.name())).thenReturn(false);
+        when(interestRepository.saveAndFlush(any(Interest.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "null value in column \"name\" violates not-null constraint"));
+
+        // when & then
+        assertThatThrownBy(() -> interestServiceImpl.create(command))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .isNotInstanceOf(InterestNameDuplicatedException.class);
     }
 }
