@@ -1,12 +1,9 @@
 package com.codeit.sb13.monew.comment.domain;
 
+import com.codeit.sb13.monew.global.domain.DeletedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -16,11 +13,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "comments")
-public class Comment {
-
-  @Id
-  @GeneratedValue(strategy = GenerationType.UUID)
-  private UUID id;
+public class Comment extends DeletedAtEntity { // DeletedAtEntity를 상속받아 공통 필드 사용하도록 수정
 
   @Column(name = "article_id", nullable = false)
   private UUID articleId;
@@ -31,19 +24,9 @@ public class Comment {
   @Column(nullable = false, length = 500)
   private String content;
 
-  @Column(name = "created_at", nullable = false)
-  private Instant createdAt;
-
-  @Column(name = "updated_at")
-  private Instant updatedAt;
-
-  @Column(name = "deleted_at")
-  private Instant deletedAt;
-
   public Comment(UUID articleId, UUID userId, String content) {
     this.articleId = articleId;
     this.userId = userId;
     this.content = content;
-    this.createdAt = Instant.now();
   }
 }

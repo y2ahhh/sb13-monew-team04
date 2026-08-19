@@ -1,8 +1,7 @@
-package com.codeit.sb13.monew.comment.entity;
+package com.codeit.sb13.monew.comment.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.codeit.sb13.monew.comment.domain.Comment;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
@@ -28,8 +27,7 @@ public class CommentTest {
     Assertions.assertAll(
         ()->assertThat(comment.getArticleId()).isEqualTo(articleId),
         ()->assertThat(comment.getUserId()).isEqualTo(userId),
-        ()->assertThat(comment.getContent()).isEqualTo("테스트 댓글"),
-        ()->assertThat(comment.getCreatedAt()).isNotNull()
+        ()->assertThat(comment.getContent()).isEqualTo("테스트 댓글")
     );
   }
 }
