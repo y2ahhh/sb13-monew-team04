@@ -21,6 +21,7 @@ public class CommentServiceImpl implements CommentService {
 
   private final CommentRepository commentRepository;
   private final UserRepository userRepository;
+  // TODO: 추후 UserService나 사용자 조회 전용 컴포넌트에 조회 메서드를 두고 해당 서비스를 통해 사용자 정보 가져오도록 변경
 
   @Transactional
   @Override
