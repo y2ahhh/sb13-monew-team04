@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.codeit.sb13.monew.comment.service.CommentService;
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
-import com.codeit.sb13.monew.comment.service.dto.CommentRegisterCommand;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -34,9 +33,13 @@ public class CommentControllerTest {
     // given
     UUID articleId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
+    String content = "테스트 댓글";
 
-    CommentDto response=new CommentDto(UUID.randomUUID(), articleId, userId, "사용자 닉네임", "테스트 댓글", 0L, false, LocalDateTime.now());
-    given(commentService.create(any(CommentRegisterCommand.class))).willReturn(response);
+    CommentDto response=new CommentDto(UUID.randomUUID(), articleId, userId, "사용자 닉네임", content, 0L, false, LocalDateTime.now());
+    given(commentService.create(argThat(command->command != null
+        && articleId.equals(command.articleId())
+        && userId.equals(command.userId())
+        && content.equals(command.content())))).willReturn(response); // 값이 정확히 일치하는 방향만 통과하도록 테스트 수정
 
     mockMvc.perform(
         post("/api/comments")
@@ -45,14 +48,14 @@ public class CommentControllerTest {
                 {
                   "articleId": "%s",
                   "userId": "%s",
-                  "content": "테스트 댓글"
+                  "content": "%s"
                 }
-                """.formatted(articleId, userId)))
+                """.formatted(articleId, userId, content)))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(response.id().toString()))
         .andExpect(jsonPath("$.articleId").value(articleId.toString()))
         .andExpect(jsonPath("$.userId").value(userId.toString()))
-        .andExpect(jsonPath("$.content").value("테스트 댓글"))
+        .andExpect(jsonPath("$.content").value(content))
         .andExpect(jsonPath("$.createdAt").isNotEmpty())
         .andExpect(jsonPath("$.userNickname").value("사용자 닉네임"))
         .andExpect(jsonPath("$.likeCount").value(0))
