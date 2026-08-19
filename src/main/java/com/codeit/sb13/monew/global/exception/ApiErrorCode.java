@@ -8,12 +8,16 @@ public enum ApiErrorCode {
 
     // USER USR
     USER_NOT_FOUND("USR_001", HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    DUPLICATE_EMAIL("USR_002", HttpStatus.CONFLICT,"이미 사용 중인 이메일입니다."),
 
     // ARTICLE ART
     ARTICLE_NOT_FOUND("ART_001", HttpStatus.NOT_FOUND, "뉴스를 찾을 수 없습니다."),
 
     // INTEREST INT
     INTEREST_NOT_FOUND("INT_001", HttpStatus.NOT_FOUND, "관심사를 찾을 수 없습니다."),
+    INTEREST_NAME_INVALID("INT_002", HttpStatus.BAD_REQUEST, "이름은 비어있을 수 없고 50자를 넘을 수 없습니다."),
+    INTEREST_KEYWORD_REQUIRED("INT_003", HttpStatus.BAD_REQUEST, "관심사에는 최소 1개의 키워드가 있어야 합니다."),
+    INTEREST_KEYWORD_INVALID("INT_004", HttpStatus.BAD_REQUEST, "키워드는 비어있을 수 없고 50자를 넘을 수 없습니다."),
 
     // NOTIFICATION NTF
     NOTIFICATION_NOT_FOUND("NTF_001", HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
