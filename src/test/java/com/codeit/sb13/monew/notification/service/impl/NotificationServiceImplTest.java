@@ -80,6 +80,19 @@ class NotificationServiceImplTest {
             // then
             verify(notificationRepository, never()).saveAll(any());
         }
+
+        @Test
+        @DisplayName("구독자가 null이면 알림을 생성하지 않는다.")
+        void 구독자_null이면_알림_미생성() {
+            // given
+            ArticlesForInterestDto request = new ArticlesForInterestDto(null, UUID.randomUUID(), "백엔드", 3);
+
+            // when
+            notificationServiceImpl.notifyArticlesForInterest(request);
+
+            // then
+            verify(notificationRepository, never()).saveAll(any());
+        }
     }
 
     @Nested
