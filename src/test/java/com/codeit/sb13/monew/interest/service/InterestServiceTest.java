@@ -65,6 +65,47 @@ class InterestServiceTest {
     }
 
     @Test
+    @DisplayName("기존 이름과 80% 이상 유사한 이름이면 InterestNameDuplicatedException을 던지고 저장하지 않는다")
+    void create_nameTooSimilarToExisting_throwsException() {
+        // given
+        InterestCreateCommand command = new InterestCreateCommand("스포츠뉴스판", List.of("축구"));
+
+        when(interestRepository.existsByName(command.name())).thenReturn(false);
+        // "스포츠뉴스"(5자)와 "스포츠뉴스판"(6자)은 편집 거리 1로 유사도 1 - 1/6 ≈ 0.833(83.3%)
+        when(interestRepository.findAllNames()).thenReturn(List.of("스포츠뉴스"));
+
+        // when & then
+        assertThatThrownBy(() -> interestServiceImpl.create(command))
+                .isInstanceOf(InterestNameDuplicatedException.class);
+
+        verify(interestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("기존 이름들과 유사도가 80% 미만이면 정상적으로 등록된다")
+    void create_nameNotSimilarEnough_savesSuccessfully() {
+        // given
+        InterestCreateCommand command = new InterestCreateCommand("스포츠", List.of("축구", "야구"));
+        UUID generatedId = UUID.randomUUID();
+
+        when(interestRepository.existsByName(command.name())).thenReturn(false);
+        // "음악"과는 완전히 다른 문자열이라 유사도 0
+        when(interestRepository.findAllNames()).thenReturn(List.of("음악"));
+        when(interestRepository.saveAndFlush(any(Interest.class))).thenAnswer(invocation -> {
+            Interest saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", generatedId);
+            return saved;
+        });
+
+        // when
+        InterestResponse response = interestServiceImpl.create(command);
+
+        // then
+        assertThat(response.id()).isEqualTo(generatedId);
+        verify(interestRepository).saveAndFlush(any(Interest.class));
+    }
+
+    @Test
     @DisplayName("정상 요청이면 관심사와 키워드를 저장하고, 구독자 0명/미구독 상태로 응답한다")
     void create_validRequest_savesAndReturnsResponse() {
         // given
@@ -72,6 +113,7 @@ class InterestServiceTest {
         UUID generatedId = UUID.randomUUID();
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
+        when(interestRepository.findAllNames()).thenReturn(List.of());
         when(interestRepository.saveAndFlush(any(Interest.class))).thenAnswer(invocation -> {
             Interest saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", generatedId);
@@ -104,6 +146,7 @@ class InterestServiceTest {
                 "duplicate key value violates unique constraint \"uk_interests_name\"");
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
+        when(interestRepository.findAllNames()).thenReturn(List.of());
         when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
 
         // when & then
@@ -127,6 +170,7 @@ class InterestServiceTest {
                         + "ON PUBLIC.INTERESTS(NAME NULLS FIRST) VALUES ( /* 1 */ '스포츠' )\"");
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
+        when(interestRepository.findAllNames()).thenReturn(List.of());
         when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
 
         // when & then
@@ -152,6 +196,7 @@ class InterestServiceTest {
                             + "ON PUBLIC.INTERESTS(NAME NULLS FIRST) VALUES ( /* 1 */ '스포츠' )\"");
 
             when(interestRepository.existsByName(command.name())).thenReturn(false);
+            when(interestRepository.findAllNames()).thenReturn(List.of());
             when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
 
             // when & then
@@ -170,6 +215,7 @@ class InterestServiceTest {
         InterestCreateCommand command = new InterestCreateCommand("스포츠", List.of("축구"));
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
+        when(interestRepository.findAllNames()).thenReturn(List.of());
         when(interestRepository.saveAndFlush(any(Interest.class)))
                 .thenThrow(new DataIntegrityViolationException(
                         "null value in column \"name\" violates not-null constraint"));
@@ -189,6 +235,7 @@ class InterestServiceTest {
         DataIntegrityViolationException original = new DataIntegrityViolationException(null);
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
+        when(interestRepository.findAllNames()).thenReturn(List.of());
         when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
 
         // when & then
