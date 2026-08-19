@@ -33,12 +33,12 @@ class NotificationServiceImplTest {
     @InjectMocks
     NotificationServiceImpl notificationServiceImpl;
 
+    @Captor
+    ArgumentCaptor<List<Notification>> notificationsCaptor;
+
     @Nested
     @DisplayName("notifyArticlesForInterest")
     class NotifyArticlesForInterest {
-
-        @Captor
-        ArgumentCaptor<List<Notification>> notificationsCaptor;
 
         @Test
         @DisplayName("구독자 수만큼 관심사 알림이 생성된다.")
@@ -99,9 +99,6 @@ class NotificationServiceImplTest {
     @DisplayName("notifyCommentLiked")
     class NotifyCommentLiked {
 
-        @Captor
-        ArgumentCaptor<Notification> notificationCaptor;
-
         @Test
         @DisplayName("좋아요를 누르면 댓글 작성자에게 알림이 생성된다.")
         void 댓글_좋아요_알림_생성() {
@@ -115,13 +112,16 @@ class NotificationServiceImplTest {
             notificationServiceImpl.notifyCommentLiked(request);
 
             // then
-            verify(notificationRepository).save(notificationCaptor.capture());
-            Notification saved = notificationCaptor.getValue();
+            verify(notificationRepository).saveAll(notificationsCaptor.capture());
+            List<Notification> saved = notificationsCaptor.getValue();
 
-            assertThat(saved.getUser()).isEqualTo(recipient);
-            assertThat(saved.getContent()).isEqualTo("[좋아요보낸사람]님이 나의 댓글을 좋아합니다.");
-            assertThat(saved.getResourceId()).isEqualTo(resourceId);
-            assertThat(saved.getResourceType()).isEqualTo(ResourceType.COMMENT);
+            assertThat(saved).hasSize(1);
+            Notification notification = saved.get(0);
+            assertThat(notification.getUser()).isEqualTo(recipient);
+            assertThat(notification.getContent()).isEqualTo("[좋아요보낸사람]님이 나의 댓글을 좋아합니다.");
+            assertThat(notification.getResourceId()).isEqualTo(resourceId);
+            assertThat(notification.getResourceType()).isEqualTo(ResourceType.COMMENT);
+
         }
 
         @Test
@@ -135,7 +135,7 @@ class NotificationServiceImplTest {
             notificationServiceImpl.notifyCommentLiked(request);
 
             // then
-            verify(notificationRepository, never()).save(any());
+            verify(notificationRepository, never()).saveAll(any());
         }
     }
 }

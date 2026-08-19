@@ -8,11 +8,13 @@ import com.codeit.sb13.monew.notification.service.dto.ArticlesForInterestDto;
 import com.codeit.sb13.monew.notification.service.dto.CommentLikedDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
@@ -39,6 +41,6 @@ public class NotificationServiceImpl implements NotificationService {
         String content = "[" + request.sender().getNickname() + "]님이 나의 댓글을 좋아합니다.";
 
         Notification notification = Notification.create(request.recipient(), content, request.resourceId(), ResourceType.COMMENT);
-        notificationRepository.save(notification);
+        notificationRepository.saveAll(List.of(notification));
     }
 }
