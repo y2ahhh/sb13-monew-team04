@@ -5,8 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
-
-public record CommentRegisterRequest(
+public record CommentRegisterCommand(
     @NotNull(message = "댓글이 달릴 게시글 ID는 필수입니다.")
     UUID articleId,
 

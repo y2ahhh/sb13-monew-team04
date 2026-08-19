@@ -7,8 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.codeit.sb13.monew.comment.service.CommentService;
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
-import com.codeit.sb13.monew.comment.service.dto.CommentRegisterRequest;
-import java.time.Instant;
+import com.codeit.sb13.monew.comment.service.dto.CommentRegisterCommand;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,8 +35,8 @@ public class CommentControllerTest {
     UUID articleId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
-    CommentDto response=new CommentDto(UUID.randomUUID(), articleId, userId, "사용자 닉네임", "테스트 댓글", 0L, false, Instant.now());
-    given(commentService.create(any(CommentRegisterRequest.class))).willReturn(response);
+    CommentDto response=new CommentDto(UUID.randomUUID(), articleId, userId, "사용자 닉네임", "테스트 댓글", 0L, false, LocalDateTime.now());
+    given(commentService.create(any(CommentRegisterCommand.class))).willReturn(response);
 
     mockMvc.perform(
         post("/api/comments")

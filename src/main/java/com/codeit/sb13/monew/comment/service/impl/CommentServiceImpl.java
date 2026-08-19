@@ -4,12 +4,14 @@ import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.comment.service.CommentService;
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
-import com.codeit.sb13.monew.comment.service.dto.CommentRegisterRequest;
+import com.codeit.sb13.monew.comment.service.dto.CommentRegisterCommand;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 
+@Validated // 서비스 계층에서도 Bean validation 적용하기 위해 추가
 @RequiredArgsConstructor
 @Service
 @Transactional(readOnly = true)
@@ -19,8 +21,8 @@ public class CommentServiceImpl implements CommentService {
 
   @Transactional
   @Override
-  public CommentDto create(@Valid CommentRegisterRequest request) {
-    Comment comment=new Comment(request.articleId(), request.userId(), request.content());
+  public CommentDto create(@Valid CommentRegisterCommand command) { // 서비스 전용객체를 사용
+    Comment comment=new Comment(command.articleId(), command.userId(), command.content());
     Comment saved = commentRepository.save(comment);
     return CommentDto.from(saved);
   }
