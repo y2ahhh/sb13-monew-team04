@@ -91,14 +91,16 @@ class InterestServiceTest {
         // given
         InterestCreateCommand command = new InterestCreateCommand("스포츠", List.of("축구"));
 
+        DataIntegrityViolationException original = new DataIntegrityViolationException(
+                "duplicate key value violates unique constraint \"uk_interests_name\"");
+
         when(interestRepository.existsByName(command.name())).thenReturn(false);
-        when(interestRepository.saveAndFlush(any(Interest.class)))
-                .thenThrow(new DataIntegrityViolationException(
-                        "duplicate key value violates unique constraint \"uk_interests_name\""));
+        when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
 
         // when & then
         assertThatThrownBy(() -> interestServiceImpl.create(command))
-                .isInstanceOf(InterestNameDuplicatedException.class);
+                .isInstanceOf(InterestNameDuplicatedException.class)
+                .hasCause(original);
 
         verify(interestRepository).existsByName(command.name());
     }
