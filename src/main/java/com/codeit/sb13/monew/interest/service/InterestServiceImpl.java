@@ -54,8 +54,18 @@ public class InterestServiceImpl implements InterestService{
         }
     }
 
+    /**
+     * 저장 시점에 발생한 무결성 위반이 {@code interests.name}의 유니크 제약
+     * ({@code uk_interests_name}) 때문인지 판별한다.
+     *
+     * <p>운영 DB(Postgres)는 따옴표로 감싸지 않은 식별자를 소문자로 저장하지만,
+     * 테스트에 쓰는 H2는 제약/인덱스 이름을 대문자로 돌려준다
+     * (예: {@code "PUBLIC.UK_INTERESTS_NAME INDEX PUBLIC.UK_INTERESTS_NAME_INDEX_C ..."}).
+     * DB마다 대소문자 표기가 달라질 수 있으므로, 메시지를 소문자로 바꾼 뒤
+     * 비교해 대소문자에 관계없이 판별되도록 한다.</p>
+     */
     private boolean isNameUniqueViolation(DataIntegrityViolationException e) {
         String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains("uk_interests_name");
+        return message != null && message.toLowerCase().contains("uk_interests_name");
     }
 }
