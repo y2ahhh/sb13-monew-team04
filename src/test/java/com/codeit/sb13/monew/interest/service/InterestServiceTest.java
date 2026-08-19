@@ -14,6 +14,7 @@ import com.codeit.sb13.monew.interest.repository.InterestRepository;
 import com.codeit.sb13.monew.interest.repository.SubscribeRepository;
 import com.codeit.sb13.monew.interest.service.dto.InterestCreateCommand;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -124,6 +125,34 @@ class InterestServiceTest {
         assertThatThrownBy(() -> interestServiceImpl.create(command))
                 .isInstanceOf(InterestNameDuplicatedException.class)
                 .hasCause(original);
+    }
+
+    @Test
+    @DisplayName("JVM 기본 로케일이 튀르키예어여도 대문자 I가 포함된 제약 이름을 이름 중복으로 판별한다")
+    void create_uniqueViolationUnderTurkishDefaultLocale_throwsException() {
+        Locale originalDefault = Locale.getDefault();
+        try {
+            // given: toLowerCase()를 로케일 없이 쓰면 튀르키예어 로케일에서
+            // "INTERESTS"의 I가 점 없는 ı로 바뀌어 매칭에 실패할 수 있다.
+            Locale.setDefault(new Locale("tr", "TR"));
+
+            InterestCreateCommand command = new InterestCreateCommand("스포츠", List.of("축구"));
+
+            DataIntegrityViolationException original = new DataIntegrityViolationException(
+                    "Unique index or primary key violation: "
+                            + "\"PUBLIC.UK_INTERESTS_NAME INDEX PUBLIC.UK_INTERESTS_NAME_INDEX_C "
+                            + "ON PUBLIC.INTERESTS(NAME NULLS FIRST) VALUES ( /* 1 */ '스포츠' )\"");
+
+            when(interestRepository.existsByName(command.name())).thenReturn(false);
+            when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
+
+            // when & then
+            assertThatThrownBy(() -> interestServiceImpl.create(command))
+                    .isInstanceOf(InterestNameDuplicatedException.class)
+                    .hasCause(original);
+        } finally {
+            Locale.setDefault(originalDefault);
+        }
     }
 
     @Test
