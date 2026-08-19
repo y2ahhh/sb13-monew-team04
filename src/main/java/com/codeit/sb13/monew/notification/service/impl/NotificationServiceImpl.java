@@ -6,8 +6,6 @@ import com.codeit.sb13.monew.notification.repository.NotificationRepository;
 import com.codeit.sb13.monew.notification.service.NotificationService;
 import com.codeit.sb13.monew.notification.service.dto.ArticlesForInterestDto;
 import com.codeit.sb13.monew.notification.service.dto.CommentLikedDto;
-import com.codeit.sb13.monew.user.domain.User;
-import com.codeit.sb13.monew.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
