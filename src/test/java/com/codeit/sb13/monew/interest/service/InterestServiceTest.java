@@ -106,6 +106,27 @@ class InterestServiceTest {
     }
 
     @Test
+    @DisplayName("H2처럼 제약 이름을 대문자로 돌려주는 DB에서도 이름 중복으로 판별한다")
+    void create_uniqueViolationWithUppercaseConstraintName_throwsException() {
+        // given
+        InterestCreateCommand command = new InterestCreateCommand("스포츠", List.of("축구"));
+
+        // 실제 H2(test 프로파일)가 던지는 메시지 형태를 그대로 옮긴 것
+        DataIntegrityViolationException original = new DataIntegrityViolationException(
+                "Unique index or primary key violation: "
+                        + "\"PUBLIC.UK_INTERESTS_NAME INDEX PUBLIC.UK_INTERESTS_NAME_INDEX_C "
+                        + "ON PUBLIC.INTERESTS(NAME NULLS FIRST) VALUES ( /* 1 */ '스포츠' )\"");
+
+        when(interestRepository.existsByName(command.name())).thenReturn(false);
+        when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
+
+        // when & then
+        assertThatThrownBy(() -> interestServiceImpl.create(command))
+                .isInstanceOf(InterestNameDuplicatedException.class)
+                .hasCause(original);
+    }
+
+    @Test
     @DisplayName("이름과 무관한 제약 위반이면 원래 예외를 그대로 던진다")
     void create_unrelatedConstraintViolation_rethrowsOriginalException() {
         // given
