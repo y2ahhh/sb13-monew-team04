@@ -9,8 +9,12 @@ import com.codeit.sb13.monew.interest.service.dto.InterestCreateCommand;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.text.similarity.LevenshteinDistance;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -43,16 +47,26 @@ public class InterestServiceImpl implements InterestService{
      * 전체를 불러와 하나하나 비교해야 하는 무거운 연산이라 정확 일치를 먼저 걸러낸
      * 뒤에만 실행하도록 순서를 나눴다.</p>
      *
-     * <p>사전 중복 확인과 실제 저장 사이에는 경쟁 구간이 존재할 수 있다. 두 요청이
-     * 동시에 같은 이름으로 등록을 시도하면 둘 다 사전 확인을 통과할 수 있는데,
-     * {@code interests.name}에 걸린 유니크 제약이 마지막 방어선 역할을 한다.
-     * 저장을 {@code saveAndFlush}로 즉시 반영해 제약 위반을 이 메서드 안에서
-     * 곧바로 잡아내고, {@link #isNameUniqueViolation}으로 원인이 이름 중복인지
-     * 확인해 {@link InterestNameDuplicatedException}으로 변환한다. 다만 유사 이름
-     * 판별은 DB 제약으로 표현할 수 없는 조건이라, 이 방어선은 정확히 같은 이름에
-     * 대해서만 작동하고 유사 이름의 동시 등록까지는 막지 못한다.</p>
+     * <p>사전 중복 확인과 실제 저장 사이에는 경쟁 구간이 존재한다. 두 요청이 동시에
+     * 같은 이름 또는 서로 유사한 이름으로 등록을 시도하면 둘 다 사전 확인을 통과할
+     * 수 있다. 완전히 같은 이름은 {@code interests.name}에 걸린 유니크 제약이 최후
+     * 방어선 역할을 하지만({@code saveAndFlush}로 즉시 반영해 이 메서드 안에서 곧바로
+     * 잡아낸다), 유사 이름 판별은 DB 제약으로 표현할 수 없는 조건이라 그 방어선이
+     * 통하지 않는다. 그래서 이 메서드 전체를 {@link Isolation#SERIALIZABLE} 격리
+     * 수준으로 실행해, 서로 다른 두 트랜잭션이 겹치는 이름 집합을 동시에 읽고 각자
+     * 다른 이름을 저장하는 이상 현상 자체를 DB가 감지해 한쪽을 직렬화 실패로
+     * 되돌리게 한다. 되돌려진 트랜잭션은 {@link #create}를 다시 호출해도 사전 확인부터
+     * 다시 하므로 결과적으로 안전하게 재시도할 수 있는데, 이 재시도는
+     * {@link Retryable @Retryable}로 처리한다. 재시도 어드바이저가 트랜잭션 어드바이저
+     * 바깥에서 감싸도록 {@code RetryConfig}에서 순서를 명시적으로 고정해뒀기 때문에,
+     * 재시도할 때마다 새 트랜잭션이 열린다.</p>
      */
     @Override
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Retryable(
+            retryFor = ConcurrencyFailureException.class,
+            backoff = @Backoff(delay = 50, maxDelay = 200, random = true)
+    )
     public InterestResponse create(InterestCreateCommand command) {
         if (interestRepository.existsByName(command.name())) {
             throw new InterestNameDuplicatedException(command.name());
