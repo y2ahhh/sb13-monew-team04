@@ -48,7 +48,7 @@ public class InterestServiceImpl implements InterestService{
             return InterestResponse.of(saved, 0L, false);
         } catch (DataIntegrityViolationException e) {
             if (isNameUniqueViolation(e)) {
-                throw new InterestNameDuplicatedException(command.name());
+                throw new InterestNameDuplicatedException(command.name(), e);
             }
             throw e;
         }

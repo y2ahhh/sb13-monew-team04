@@ -25,4 +25,9 @@ public class InterestNameDuplicatedException extends InterestException {
     public InterestNameDuplicatedException(String name) {
         super(ApiErrorCode.INTEREST_NAME_DUPLICATED, Map.of("name", name));
     }
+
+    public InterestNameDuplicatedException(String name, Throwable cause) {
+        super(ApiErrorCode.INTEREST_NAME_DUPLICATED, Map.of("name", name));
+        initCause(cause);
+    }
 }
