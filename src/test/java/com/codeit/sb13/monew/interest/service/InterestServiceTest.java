@@ -19,6 +19,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -27,6 +28,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
+/**
+ * {@code create_uniqueViolationUnderTurkishDefaultLocale_throwsException}가
+ * {@link Locale#setDefault}로 JVM 전역 상태를 일시적으로 바꾸므로,
+ * 지금은 JUnit 병렬 실행이 꺼져 있어 문제가 없지만 나중에 켜지더라도
+ * 다른 테스트 클래스와 동시에 실행되지 않도록 {@link Isolated}를 붙여둔다.
+ */
+@Isolated
 @ExtendWith(MockitoExtension.class)
 class InterestServiceTest {
 
