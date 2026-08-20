@@ -23,7 +23,6 @@ class CommentRepositoryTest {
     @Test
     @DisplayName("작성한 댓글이 없으면 빈 목록 반환")
     void returns_empty_list_when_user_has_no_comments() {
-
         // given
         UUID userId = UUID.randomUUID();
         Pageable pageable = PageRequest.of(0, 10);
@@ -31,10 +30,8 @@ class CommentRepositoryTest {
         // when
         List<RecentCommentActivityProjection> projections = commentRepository.findRecentCommentActivities(userId, pageable);
 
-
         // then
         assertThat(projections).isEmpty();
-
     }
 
     @Test

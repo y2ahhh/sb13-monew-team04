@@ -26,10 +26,10 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
           c.createdAt
       )
       FROM Comment c
-          JOIN c.article a
           JOIN c.user u
+          JOIN c.article a
       WHERE
-          c.user.id = :userId
+          u.id = :userId
           AND u.deletedAt IS NULL
           AND c.deletedAt IS NULL
           AND a.deletedAt IS NULL
