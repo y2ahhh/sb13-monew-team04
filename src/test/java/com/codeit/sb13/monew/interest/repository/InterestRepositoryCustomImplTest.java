@@ -238,7 +238,7 @@ class InterestRepositoryCustomImplTest {
         UUID userA = persistUser();
         UUID userB = persistUser();
 
-        Interest zeroSubscribers = persistInterest("A", "키워드");
+        persistInterest("A", "키워드");
         Interest oneSubscriber = persistInterest("B", "키워드");
         Interest twoSubscribers = persistInterest("C", "키워드");
         em.flush();
@@ -274,7 +274,7 @@ class InterestRepositoryCustomImplTest {
         UUID userA = persistUser();
         UUID userB = persistUser();
 
-        Interest zeroSubscribers = persistInterest("A", "키워드");
+        persistInterest("A", "키워드");
         Interest oneSubscriber = persistInterest("B", "키워드");
         Interest twoSubscribers = persistInterest("C", "키워드");
         em.flush();
