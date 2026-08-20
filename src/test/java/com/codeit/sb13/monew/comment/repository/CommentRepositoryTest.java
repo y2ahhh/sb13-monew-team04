@@ -86,7 +86,7 @@ class CommentRepositoryTest {
 
     @Test
     @DisplayName("10건 초과 시 최신 10건만 반환")
-    void _10건_초과_시_최신_10건만_반환() {
+    void returns_latest_10_user_comments_when_more_than_10_comments_exist() {
         // given
         User targetUser = new User("test@eamil.com", "testNickname", "testPassword");
         User otherUser = new User("otherTest@email.com", "otherTestNickname", "otherTestPassword");
@@ -94,31 +94,14 @@ class CommentRepositoryTest {
         userRepository.saveAndFlush(otherUser);
 
         Article article = articleRepository.saveAndFlush(new Article("testTitle", "testContent", "link", LocalDateTime.now(), "source"));
-        Comment firstComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment1"));
-        Comment secondComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment2"));
-        Comment thirdComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment3"));
-        Comment fourComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment4"));
-        Comment fiveComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment5"));
-        Comment sixComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment6"));
-        Comment sevenComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment7"));
-        Comment eightComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment8"));
-        Comment nineComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment9"));
-        Comment tenComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment10"));
-        Comment elevenComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment11"));
-        commentRepository.saveAndFlush(new Comment(article.getId(), otherUser, "otherTestComment"));
-
         LocalDateTime baseTime = LocalDateTime.of(2026, 8, 20, 10, 0);
-        updateCommentCreatedAt(firstComment.getId(), baseTime.minusMinutes(10));
-        updateCommentCreatedAt(secondComment.getId(), baseTime.minusMinutes(9));
-        updateCommentCreatedAt(thirdComment.getId(), baseTime.minusMinutes(8));
-        updateCommentCreatedAt(fourComment.getId(), baseTime.minusMinutes(7));
-        updateCommentCreatedAt(fiveComment.getId(), baseTime.minusMinutes(6));
-        updateCommentCreatedAt(sixComment.getId(), baseTime.minusMinutes(5));
-        updateCommentCreatedAt(sevenComment.getId(), baseTime.minusMinutes(4));
-        updateCommentCreatedAt(eightComment.getId(), baseTime.minusMinutes(3));
-        updateCommentCreatedAt(nineComment.getId(), baseTime.minusMinutes(2));
-        updateCommentCreatedAt(tenComment.getId(), baseTime.minusMinutes(1));
-        updateCommentCreatedAt(elevenComment.getId(), baseTime);
+        for (int index = 1; index <= 11; index++) {
+            Comment comment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment" + index));
+            updateCommentCreatedAt(comment.getId(), baseTime.minusMinutes(11L - index));
+        }
+
+        Comment otherUserComment = commentRepository.saveAndFlush(new Comment(article.getId(), otherUser, "otherTestComment"));
+        updateCommentCreatedAt(otherUserComment.getId(), baseTime.plusMinutes(1));
 
         em.clear();
 
@@ -127,10 +110,9 @@ class CommentRepositoryTest {
 
         // then
         assertThat(recentCommentActivities)
+                .hasSize(10)
                 .extracting(RecentCommentActivityProjection::content)
                 .containsExactly("testComment11", "testComment10", "testComment9", "testComment8", "testComment7", "testComment6", "testComment5", "testComment4", "testComment3", "testComment2");
-
-
     }
 
     @Test
@@ -182,6 +164,4 @@ class CommentRepositoryTest {
                 .setParameter(2, commentId)
                 .executeUpdate();
     }
-
-
 }
