@@ -169,33 +169,34 @@ class CommentRepositoryTest {
     }
 
     @Test
-    @DisplayName("삭제된 기사 댓글 제외")
-    void 삭제된_기사_댓글_제외() {
+    @DisplayName("삭제된 기사의 댓글은 최근 작성 댓글에서 제외")
+    void excludes_comments_on_soft_deleted_articles_from_recent_comment_activities() {
         // given
         User targetUser = new User("test@eamil.com", "testNickname", "testPassword");
         userRepository.saveAndFlush(targetUser);
 
-        Article article = articleRepository.saveAndFlush(new Article("testTitle", "testContent", "link", LocalDateTime.now(), "source"));
-        Comment oldestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment1"));
-        Comment middleComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment2"));
-        Comment newestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment3"));
+        Article activeArticle = articleRepository.saveAndFlush(new Article("activeTitle", "activeContent", "activeLink", LocalDateTime.now(), "source"));
+        Article deletedArticle = articleRepository.saveAndFlush(new Article("deletedTitle", "deletedContent", "deletedLink", LocalDateTime.now(), "source"));
+
+        Comment activeArticleComment = commentRepository.saveAndFlush(new Comment(activeArticle.getId(), targetUser, "activeArticleComment"));
+        Comment deletedArticleComment = commentRepository.saveAndFlush(new Comment(deletedArticle.getId(), targetUser, "deletedArticleComment"));
 
         LocalDateTime baseTime = LocalDateTime.of(2026, 8, 20, 10, 0);
-        updateCommentCreatedAt(oldestComment.getId(), baseTime.minusMinutes(2));
-        updateCommentCreatedAt(middleComment.getId(), baseTime.minusMinutes(1));
-        updateCommentCreatedAt(newestComment.getId(), baseTime);
+        updateCommentCreatedAt(activeArticleComment.getId(), baseTime);
+        updateCommentCreatedAt(deletedArticleComment.getId(), baseTime.plusMinutes(1));
 
-        article.softDelete();
-        articleRepository.saveAndFlush(article);
+        deletedArticle.softDelete();
+        articleRepository.saveAndFlush(deletedArticle);
 
         em.clear();
+
         // when
         List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId(), PageRequest.of(0, 10));
 
-
         // then
-        assertThat(recentCommentActivities).isEmpty();
-
+        assertThat(recentCommentActivities)
+                .extracting(RecentCommentActivityProjection::content)
+                .containsExactly("activeArticleComment");
     }
 
     private void updateCommentCreatedAt(UUID commentId, LocalDateTime createdAt) {
