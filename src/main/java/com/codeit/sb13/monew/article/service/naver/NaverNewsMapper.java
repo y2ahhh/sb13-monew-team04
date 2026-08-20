@@ -4,12 +4,14 @@ import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.dto.CollectedArticle;
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchParseException;
 import org.apache.commons.text.StringEscapeUtils;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+@Component
 public class NaverNewsMapper {
 
     private static final DateTimeFormatter RFC_1123_DATE_FORMATTER = DateTimeFormatter.RFC_1123_DATE_TIME;
