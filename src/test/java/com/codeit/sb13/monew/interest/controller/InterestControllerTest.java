@@ -196,4 +196,27 @@ class InterestControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").exists());
     }
+
+    @Test
+    @DisplayName("숫자가 아닌 구독자 수 커서로 리포지토리가 InvalidDataAccessApiUsageException을 던져도 400으로 응답한다")
+    void search_invalidSubscriberCountCursorTranslatedByRepository_returns400() throws Exception {
+        // InterestRepositoryCustomImpl이 던지는 IllegalArgumentException은 Spring Data JPA
+        // 리포지토리 프록시를 거치면서 InvalidDataAccessApiUsageException으로 감싸진다.
+        // 서비스 계층에서 이 예외가 그대로 올라온다고 가정하고, 컨트롤러까지 도달했을 때도
+        // GlobalExceptionHandler가 400으로 응답하는지 확인한다.
+        when(interestService.search(any(InterestSearchCommand.class)))
+                .thenThrow(new org.springframework.dao.InvalidDataAccessApiUsageException(
+                        "구독자 수 기준 커서 값이 올바르지 않습니다: 숫자아님",
+                        new IllegalArgumentException("구독자 수 기준 커서 값이 올바르지 않습니다: 숫자아님")));
+
+        mockMvc.perform(get("/api/interests")
+                        .header("Monew-Request-User-ID", UUID.randomUUID().toString())
+                        .param("orderBy", "subscriberCount")
+                        .param("direction", "DESC")
+                        .param("cursor", "숫자아님")
+                        .param("after", LocalDateTime.now().toString())
+                        .param("limit", "10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").exists());
+    }
 }

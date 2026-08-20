@@ -1,6 +1,7 @@
 package com.codeit.sb13.monew.interest.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;
 import com.codeit.sb13.monew.global.config.QueryDslConfig;
@@ -18,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -201,5 +203,142 @@ class InterestRepositoryCustomImplTest {
         assertThat(page.interests().get(0).getKeywords())
                 .extracting(k -> k.getKeyword())
                 .containsExactlyInAnyOrder("축구", "야구");
+    }
+
+    @Test
+    @DisplayName("이름 내림차순 정렬에서도 커서를 넘기면 다음 페이지로 이어진다")
+    void search_orderByNameDescending_withCursor_continuesFromPreviousPage() {
+        persistInterest("가", "키워드");
+        persistInterest("나", "키워드");
+        persistInterest("다", "키워드");
+        em.flush();
+        em.clear();
+
+        InterestSearchPage firstPage = interestRepository.search(
+                null, InterestOrderBy.NAME, Sort.Direction.DESC, null, null, 2, null);
+
+        assertThat(firstPage.interests()).extracting(Interest::getName)
+                .containsExactly("다", "나");
+        assertThat(firstPage.hasNext()).isTrue();
+
+        Interest lastOfFirstPage = firstPage.interests().get(firstPage.interests().size() - 1);
+
+        InterestSearchPage secondPage = interestRepository.search(
+                null, InterestOrderBy.NAME, Sort.Direction.DESC,
+                lastOfFirstPage.getName(), lastOfFirstPage.getCreatedAt(), 2, null);
+
+        assertThat(secondPage.interests()).extracting(Interest::getName)
+                .containsExactly("가");
+        assertThat(secondPage.hasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("구독자 수 오름차순 정렬에서 커서를 넘기면 다음 페이지로 이어진다")
+    void search_orderBySubscriberCountAscending_withCursor_continuesFromPreviousPage() {
+        UUID userA = persistUser();
+        UUID userB = persistUser();
+
+        Interest zeroSubscribers = persistInterest("A", "키워드");
+        Interest oneSubscriber = persistInterest("B", "키워드");
+        Interest twoSubscribers = persistInterest("C", "키워드");
+        em.flush();
+
+        subscribe(oneSubscriber, userA);
+        subscribe(twoSubscribers, userA);
+        subscribe(twoSubscribers, userB);
+        em.flush();
+        em.clear();
+
+        InterestSearchPage firstPage = interestRepository.search(
+                null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.ASC, null, null, 2, null);
+
+        assertThat(firstPage.interests()).extracting(Interest::getName)
+                .containsExactly("A", "B");
+        assertThat(firstPage.hasNext()).isTrue();
+
+        Interest lastOfFirstPage = firstPage.interests().get(firstPage.interests().size() - 1);
+        String cursor = String.valueOf(firstPage.subscriberCounts().getOrDefault(lastOfFirstPage.getId(), 0L));
+
+        InterestSearchPage secondPage = interestRepository.search(
+                null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.ASC,
+                cursor, lastOfFirstPage.getCreatedAt(), 2, null);
+
+        assertThat(secondPage.interests()).extracting(Interest::getName)
+                .containsExactly("C");
+        assertThat(secondPage.hasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("구독자 수 내림차순 정렬에서 커서를 넘기면 다음 페이지로 이어진다")
+    void search_orderBySubscriberCountDescending_withCursor_continuesFromPreviousPage() {
+        UUID userA = persistUser();
+        UUID userB = persistUser();
+
+        Interest zeroSubscribers = persistInterest("A", "키워드");
+        Interest oneSubscriber = persistInterest("B", "키워드");
+        Interest twoSubscribers = persistInterest("C", "키워드");
+        em.flush();
+
+        subscribe(oneSubscriber, userA);
+        subscribe(twoSubscribers, userA);
+        subscribe(twoSubscribers, userB);
+        em.flush();
+        em.clear();
+
+        InterestSearchPage firstPage = interestRepository.search(
+                null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC, null, null, 2, null);
+
+        assertThat(firstPage.interests()).extracting(Interest::getName)
+                .containsExactly("C", "B");
+        assertThat(firstPage.hasNext()).isTrue();
+
+        Interest lastOfFirstPage = firstPage.interests().get(firstPage.interests().size() - 1);
+        String cursor = String.valueOf(firstPage.subscriberCounts().getOrDefault(lastOfFirstPage.getId(), 0L));
+
+        InterestSearchPage secondPage = interestRepository.search(
+                null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC,
+                cursor, lastOfFirstPage.getCreatedAt(), 2, null);
+
+        assertThat(secondPage.interests()).extracting(Interest::getName)
+                .containsExactly("A");
+        assertThat(secondPage.hasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("구독자 수 기준 커서 값이 숫자가 아니면 예외를 던진다")
+    void search_invalidSubscriberCountCursor_throwsException() {
+        persistInterest("스포츠", "키워드");
+        em.flush();
+        em.clear();
+
+        // InterestRepositoryCustomImpl은 IllegalArgumentException을 던지지만, 이 메서드는
+        // Spring Data JPA가 만든 리포지토리 프록시를 통해 호출되므로, PersistenceExceptionTranslator가
+        // 가로채 InvalidDataAccessApiUsageException으로 감싸 다시 던진다
+        // (EntityManagerFactoryUtils.convertJpaAccessExceptionIfPossible). 원인 예외까지 확인해
+        // "숫자가 아닌 커서"라는 실제 오류 상황이 맞는지 함께 검증한다.
+        assertThatThrownBy(() -> interestRepository.search(
+                null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC,
+                "숫자아님", LocalDateTime.now(), 10, null))
+                .isInstanceOf(InvalidDataAccessApiUsageException.class)
+                .hasCauseInstanceOf(IllegalArgumentException.class)
+                .cause().hasMessageContaining("숫자아님");
+    }
+
+    @Test
+    @DisplayName("검색 결과가 없으면 빈 목록과 함께 구독 정보 조회도 건너뛴다")
+    void search_noResults_returnsEmptyPage() {
+        UUID requester = persistUser();
+        persistInterest("스포츠", "축구");
+        em.flush();
+        em.clear();
+
+        InterestSearchPage page = interestRepository.search(
+                "존재하지않는검색어", InterestOrderBy.NAME, Sort.Direction.ASC, null, null, 10, requester);
+
+        assertThat(page.interests()).isEmpty();
+        assertThat(page.hasNext()).isFalse();
+        assertThat(page.totalElements()).isEqualTo(0);
+        assertThat(page.subscribedInterestIds()).isEmpty();
+        assertThat(page.subscriberCounts()).isEmpty();
     }
 }
