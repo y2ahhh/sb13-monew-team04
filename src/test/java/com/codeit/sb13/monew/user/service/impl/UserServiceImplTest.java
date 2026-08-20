@@ -236,6 +236,7 @@ public class UserServiceImplTest {
     assertThatThrownBy(() -> userServiceImpl.updateNickname(command))
         .isInstanceOf(UserNotFoundException.class);
     verify(userMapper, never()).toUpdateNicknameResult(any());
+
   }
 
   @Test
