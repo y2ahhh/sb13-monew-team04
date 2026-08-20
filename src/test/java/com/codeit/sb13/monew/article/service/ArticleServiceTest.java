@@ -5,6 +5,7 @@ import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.article.service.dto.ArticleRequest;
 import com.codeit.sb13.monew.article.service.impl.ArticleServiceImpl;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
+import com.codeit.sb13.monew.global.exception.article.ArticleDuplicateException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,7 +41,7 @@ class ArticleServiceTest {
     @BeforeEach
     void setUp() {
         testArticleId = UUID.randomUUID();
-        testArticle = new Article(
+        testArticle = Article.create(
                 "Test Article",
                 "Test Summary",
                 "https://example.com/article",
@@ -62,8 +63,8 @@ class ArticleServiceTest {
     void testFindAll() {
         // given
         List<Article> articles = Arrays.asList(
-                new Article("title 1", "summary 1", "link1", LocalDateTime.now(), "source1"),
-                new Article("title 2", "summary 2", "link2", LocalDateTime.now(), "source2")
+                Article.create("title 1", "summary 1", "link1", LocalDateTime.now(), "source1"),
+                Article.create("title 2", "summary 2", "link2", LocalDateTime.now(), "source2")
         );
         when(articleRepository.findAllByDeletedAtIsNullOrderByDateDesc())
                 .thenReturn(articles);
@@ -108,51 +109,66 @@ class ArticleServiceTest {
     }
 
     @Test
-    @DisplayName("기사 저장 성공")
-    void testSaveSuccess() {
+    @DisplayName("엔티티 저장 성공")
+    void testSaveEntitySuccess() {
+        // given
+        when(articleRepository.save(any(Article.class)))
+                .thenReturn(testArticle);
+
+        // when
+        Article result = articleService.save(testArticle);
+
+        // then
+        assertThat(result).isNotNull();
+        assertThat(result.getTitle()).isEqualTo("Test Article");
+        verify(articleRepository, times(1)).save(any(Article.class));
+    }
+
+    @Test
+    @DisplayName("DTO로 기사 생성 성공")
+    void testCreateSuccess() {
         // given
         when(articleRepository.findByLink(articleRequest.getLink()))
                 .thenReturn(Optional.empty());
 
-        Article savedArticle = new Article(
+        Article savedArticle = Article.create(
                 articleRequest.getTitle(),
                 articleRequest.getSummary(),
                 articleRequest.getLink(),
                 articleRequest.getDate(),
                 articleRequest.getSource()
         );
-        when(articleRepository.save(any(Article.class)))
+        when(articleRepository.saveAndFlush(any(Article.class)))
                 .thenReturn(savedArticle);
 
         // when
-        Article result = articleService.save(articleRequest);
+        Article result = articleService.create(articleRequest);
 
         // then
         assertThat(result).isNotNull();
         assertThat(result.getTitle()).isEqualTo(articleRequest.getTitle());
         assertThat(result.getLink()).isEqualTo(articleRequest.getLink());
         verify(articleRepository, times(1)).findByLink(articleRequest.getLink());
-        verify(articleRepository, times(1)).save(any(Article.class));
+        verify(articleRepository, times(1)).saveAndFlush(any(Article.class));
     }
 
     @Test
-    @DisplayName("기사 저장 실패 - 중복된 링크")
-    void testSaveDuplicateLink() {
+    @DisplayName("기사 생성 실패 - 중복된 링크")
+    void testCreateDuplicateLink() {
         // given
         when(articleRepository.findByLink(articleRequest.getLink()))
                 .thenReturn(Optional.of(testArticle));
 
         // when & then
-        assertThatThrownBy(() -> articleService.save(articleRequest))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("이미 등록된 기사입니다.");
+        assertThatThrownBy(() -> articleService.create(articleRequest))
+                .isInstanceOf(ArticleDuplicateException.class);
         verify(articleRepository, times(1)).findByLink(articleRequest.getLink());
-        verify(articleRepository, never()).save(any(Article.class));
+        verify(articleRepository, never()).saveAndFlush(any(Article.class));
     }
 
     @Test
     @DisplayName("기사 삭제 (논리 삭제)")
-    void testDeleteSuccess() {
+    void testSoftDeleteSuccess() {
         // given
         when(articleRepository.findByIdAndDeletedAtIsNull(testArticleId))
                 .thenReturn(Optional.of(testArticle));
@@ -160,7 +176,7 @@ class ArticleServiceTest {
                 .thenReturn(testArticle);
 
         // when
-        articleService.delete(testArticleId);
+        articleService.softDelete(testArticleId);
 
         // then
         verify(articleRepository, times(1)).findByIdAndDeletedAtIsNull(testArticleId);
@@ -169,13 +185,13 @@ class ArticleServiceTest {
 
     @Test
     @DisplayName("기사 삭제 실패 - 기사 없음")
-    void testDeleteNotFound() {
+    void testSoftDeleteNotFound() {
         // given
         when(articleRepository.findByIdAndDeletedAtIsNull(testArticleId))
                 .thenReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> articleService.delete(testArticleId))
+        assertThatThrownBy(() -> articleService.softDelete(testArticleId))
                 .isInstanceOf(ArticleNotFoundException.class);
         verify(articleRepository, times(1)).findByIdAndDeletedAtIsNull(testArticleId);
         verify(articleRepository, never()).save(any(Article.class));

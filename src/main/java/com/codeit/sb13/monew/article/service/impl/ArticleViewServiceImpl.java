@@ -1,10 +1,13 @@
 package com.codeit.sb13.monew.article.service.impl;
 
+import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleView;
-import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.article.repository.ArticleViewRepository;
+import com.codeit.sb13.monew.article.service.ArticleService;
 import com.codeit.sb13.monew.article.service.ArticleViewService;
-import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
+import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
+import com.codeit.sb13.monew.user.domain.User;
+import com.codeit.sb13.monew.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,47 +22,48 @@ import java.util.UUID;
 public class ArticleViewServiceImpl implements ArticleViewService {
 
     private final ArticleViewRepository articleViewRepository;
-    private final ArticleRepository articleRepository;
+    private final ArticleService articleService;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
-    public void recordView(UUID articleId, UUID userId) {
-        // 기사 존재 확인
-        articleRepository.findByIdAndDeletedAtIsNull(articleId)
-                .orElseThrow(() -> new ArticleNotFoundException(articleId));
+    public ArticleView recordView(UUID articleId, UUID userId) {
+        // Article, User 조회
+        Article article = articleService.findById(articleId);
+        User user = getUserOrThrow(userId);
 
         // 기존 조회 기록 확인
-        articleViewRepository.findByArticleIdAndUserId(articleId, userId)
-                .ifPresentOrElse(
-                        view -> {
-                            // ✅ 명시적으로 viewedAt 업데이트
-                            view.updateViewedAt(LocalDateTime.now());
-                            articleViewRepository.save(view);
-                        },
-                        () -> {
-                            // 새로운 기록 생성
-                            ArticleView newView = new ArticleView(
-                                    articleId,
-                                    userId,
-                                    null
-                            );
-                            articleViewRepository.save(newView);
-                        }
-                );
+        return articleViewRepository.findByArticleAndUser(article, user)
+                .map(view -> {
+                    view.updateViewedAt(LocalDateTime.now());
+                    return articleViewRepository.save(view);
+                })
+                .orElseGet(() -> {
+                    ArticleView newView = ArticleView.create(article, user, LocalDateTime.now());
+                    return articleViewRepository.save(newView);
+                });
     }
 
     @Override
     public long getViewCount(UUID articleId) {
-        return articleViewRepository.countByArticleId(articleId);
+        Article article = articleService.findById(articleId);
+        return articleViewRepository.countByArticle(article);
     }
 
     @Override
     public List<ArticleView> getUserArticleViews(UUID userId) {
-        return articleViewRepository.findByUserIdOrderByViewedAtDesc(userId);
+        User user = getUserOrThrow(userId);
+        return articleViewRepository.findByUserOrderByViewedAtDesc(user);
     }
 
     @Override
     public List<ArticleView> getArticleViews(UUID articleId) {
-        return articleViewRepository.findByArticleIdOrderByViewedAtDesc(articleId);
+        Article article = articleService.findById(articleId);
+        return articleViewRepository.findByArticleOrderByViewedAtDesc(article);
+    }
+
+    private User getUserOrThrow(UUID userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
     }
 }

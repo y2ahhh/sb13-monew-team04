@@ -2,14 +2,17 @@ package com.codeit.sb13.monew.article.service;
 
 import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleView;
-import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.article.repository.ArticleViewRepository;
 import com.codeit.sb13.monew.article.service.impl.ArticleViewServiceImpl;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
+import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
+import com.codeit.sb13.monew.user.domain.User;
+import com.codeit.sb13.monew.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -32,7 +35,10 @@ class ArticleViewServiceTest {
     private ArticleViewRepository articleViewRepository;
 
     @Mock
-    private ArticleRepository articleRepository;
+    private ArticleService articleService;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private ArticleViewServiceImpl articleViewService;
@@ -40,14 +46,14 @@ class ArticleViewServiceTest {
     private UUID testArticleId;
     private UUID testUserId;
     private Article testArticle;
-    private ArticleView testArticleView;
+    private User testUser;
 
     @BeforeEach
     void setUp() {
         testArticleId = UUID.randomUUID();
         testUserId = UUID.randomUUID();
 
-        testArticle = new Article(
+        testArticle = Article.create(
                 "Test Article",
                 "Test Summary",
                 "https://example.com/article",
@@ -55,21 +61,45 @@ class ArticleViewServiceTest {
                 "NAVER"
         );
 
-        testArticleView = new ArticleView(
-                testArticleId,
-                testUserId,
-                LocalDateTime.now()
-        );
+        testUser = User.builder()
+                .email("test@example.com")
+                .nickname("tester")
+                .password("encoded-password")
+                .build();
     }
 
     @Test
     @DisplayName("기사 조회 기록 생성 - 새로운 기록")
     void testRecordViewNewRecord() {
         // given
-        when(articleRepository.findByIdAndDeletedAtIsNull(testArticleId))
-                .thenReturn(Optional.of(testArticle));
-        when(articleViewRepository.findByArticleIdAndUserId(testArticleId, testUserId))
+        when(articleService.findById(testArticleId)).thenReturn(testArticle);
+        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
+        when(articleViewRepository.findByArticleAndUser(testArticle, testUser))
                 .thenReturn(Optional.empty());
+        when(articleViewRepository.save(any(ArticleView.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        ArticleView result = articleViewService.recordView(testArticleId, testUserId);
+
+        // then
+        assertThat(result.getArticle()).isEqualTo(testArticle);
+        assertThat(result.getUser()).isEqualTo(testUser);
+        assertThat(result.getViewedAt()).isNotNull();
+        verify(articleViewRepository, times(1)).save(any(ArticleView.class));
+    }
+
+    @Test
+    @DisplayName("기사 조회 기록 갱신 - viewedAt이 이전보다 최신으로 변경된다")
+    void testRecordViewExistingRecord() {
+        // given
+        LocalDateTime previousViewedAt = LocalDateTime.now().minusDays(1);
+        ArticleView existingView = ArticleView.create(testArticle, testUser, previousViewedAt);
+
+        when(articleService.findById(testArticleId)).thenReturn(testArticle);
+        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
+        when(articleViewRepository.findByArticleAndUser(testArticle, testUser))
+                .thenReturn(Optional.of(existingView));
         when(articleViewRepository.save(any(ArticleView.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -77,42 +107,35 @@ class ArticleViewServiceTest {
         articleViewService.recordView(testArticleId, testUserId);
 
         // then
-        verify(articleRepository, times(1)).findByIdAndDeletedAtIsNull(testArticleId);
-        verify(articleViewRepository, times(1)).findByArticleIdAndUserId(testArticleId, testUserId);
-        verify(articleViewRepository, times(1)).save(any(ArticleView.class));
-    }
-
-    @Test
-    @DisplayName("기사 조회 기록 생성 - 기존 기록 업데이트")
-    void testRecordViewExistingRecord() {
-        // given
-        when(articleRepository.findByIdAndDeletedAtIsNull(testArticleId))
-                .thenReturn(Optional.of(testArticle));
-        when(articleViewRepository.findByArticleIdAndUserId(testArticleId, testUserId))
-                .thenReturn(Optional.of(testArticleView));
-        when(articleViewRepository.save(any(ArticleView.class)))
-                .thenReturn(testArticleView);
-
-        // when
-        articleViewService.recordView(testArticleId, testUserId);
-
-        // then
-        verify(articleRepository, times(1)).findByIdAndDeletedAtIsNull(testArticleId);
-        verify(articleViewRepository, times(1)).findByArticleIdAndUserId(testArticleId, testUserId);
-        verify(articleViewRepository, times(1)).save(any(ArticleView.class));
+        ArgumentCaptor<ArticleView> captor = ArgumentCaptor.forClass(ArticleView.class);
+        verify(articleViewRepository, times(1)).save(captor.capture());
+        assertThat(captor.getValue().getViewedAt()).isAfter(previousViewedAt);
     }
 
     @Test
     @DisplayName("기사 조회 기록 생성 실패 - 기사 없음")
     void testRecordViewArticleNotFound() {
         // given
-        when(articleRepository.findByIdAndDeletedAtIsNull(testArticleId))
-                .thenReturn(Optional.empty());
+        when(articleService.findById(testArticleId))
+                .thenThrow(new ArticleNotFoundException(testArticleId));
 
         // when & then
         assertThatThrownBy(() -> articleViewService.recordView(testArticleId, testUserId))
                 .isInstanceOf(ArticleNotFoundException.class);
-        verify(articleRepository, times(1)).findByIdAndDeletedAtIsNull(testArticleId);
+        verify(userRepository, never()).findById(any(UUID.class));
+        verify(articleViewRepository, never()).save(any(ArticleView.class));
+    }
+
+    @Test
+    @DisplayName("기사 조회 기록 생성 실패 - 사용자 없음")
+    void testRecordViewUserNotFound() {
+        // given
+        when(articleService.findById(testArticleId)).thenReturn(testArticle);
+        when(userRepository.findById(testUserId)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> articleViewService.recordView(testArticleId, testUserId))
+                .isInstanceOf(UserNotFoundException.class);
         verify(articleViewRepository, never()).save(any(ArticleView.class));
     }
 
@@ -120,16 +143,26 @@ class ArticleViewServiceTest {
     @DisplayName("특정 기사의 조회수 조회")
     void testGetViewCount() {
         // given
-        long expectedCount = 10L;
-        when(articleViewRepository.countByArticleId(testArticleId))
-                .thenReturn(expectedCount);
+        when(articleService.findById(testArticleId)).thenReturn(testArticle);
+        when(articleViewRepository.countByArticle(testArticle)).thenReturn(10L);
 
         // when
         long count = articleViewService.getViewCount(testArticleId);
 
         // then
-        assertThat(count).isEqualTo(expectedCount);
-        verify(articleViewRepository, times(1)).countByArticleId(testArticleId);
+        assertThat(count).isEqualTo(10L);
+        verify(articleViewRepository, times(1)).countByArticle(testArticle);
+    }
+
+    @Test
+    @DisplayName("조회 기록이 없을 때 조회수 0 반환")
+    void testGetViewCountZero() {
+        // given
+        when(articleService.findById(testArticleId)).thenReturn(testArticle);
+        when(articleViewRepository.countByArticle(testArticle)).thenReturn(0L);
+
+        // when & then
+        assertThat(articleViewService.getViewCount(testArticleId)).isZero();
     }
 
     @Test
@@ -137,18 +170,40 @@ class ArticleViewServiceTest {
     void testGetUserArticleViews() {
         // given
         List<ArticleView> views = Arrays.asList(
-                new ArticleView(UUID.randomUUID(), testUserId, LocalDateTime.now()),
-                new ArticleView(UUID.randomUUID(), testUserId, LocalDateTime.now())
+                ArticleView.create(testArticle, testUser, LocalDateTime.now()),
+                ArticleView.create(testArticle, testUser, LocalDateTime.now().minusHours(1))
         );
-        when(articleViewRepository.findByUserIdOrderByViewedAtDesc(testUserId))
-                .thenReturn(views);
+        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
+        when(articleViewRepository.findByUserOrderByViewedAtDesc(testUser)).thenReturn(views);
 
         // when
         List<ArticleView> result = articleViewService.getUserArticleViews(testUserId);
 
         // then
         assertThat(result).hasSize(2);
-        verify(articleViewRepository, times(1)).findByUserIdOrderByViewedAtDesc(testUserId);
+        verify(articleViewRepository, times(1)).findByUserOrderByViewedAtDesc(testUser);
+    }
+
+    @Test
+    @DisplayName("사용자의 조회 기록이 없을 때 빈 리스트 반환")
+    void testGetUserArticleViewsEmpty() {
+        // given
+        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
+        when(articleViewRepository.findByUserOrderByViewedAtDesc(testUser)).thenReturn(List.of());
+
+        // when & then
+        assertThat(articleViewService.getUserArticleViews(testUserId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("사용자 조회 기록 조회 실패 - 사용자 없음")
+    void testGetUserArticleViewsUserNotFound() {
+        // given
+        when(userRepository.findById(testUserId)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> articleViewService.getUserArticleViews(testUserId))
+                .isInstanceOf(UserNotFoundException.class);
     }
 
     @Test
@@ -156,62 +211,25 @@ class ArticleViewServiceTest {
     void testGetArticleViews() {
         // given
         List<ArticleView> views = Arrays.asList(
-                new ArticleView(testArticleId, UUID.randomUUID(), LocalDateTime.now()),
-                new ArticleView(testArticleId, UUID.randomUUID(), LocalDateTime.now())
+                ArticleView.create(testArticle, testUser, LocalDateTime.now()),
+                ArticleView.create(testArticle, testUser, LocalDateTime.now().minusHours(1))
         );
-        when(articleViewRepository.findByArticleIdOrderByViewedAtDesc(testArticleId))
-                .thenReturn(views);
+        when(articleService.findById(testArticleId)).thenReturn(testArticle);
+        when(articleViewRepository.findByArticleOrderByViewedAtDesc(testArticle)).thenReturn(views);
 
-        // when
-        List<ArticleView> result = articleViewService.getArticleViews(testArticleId);
-
-        // then
-        assertThat(result).hasSize(2);
-        verify(articleViewRepository, times(1)).findByArticleIdOrderByViewedAtDesc(testArticleId);
-    }
-
-    @Test
-    @DisplayName("조회 기록이 없을 때 조회수 0 반환")
-    void testGetViewCountZero() {
-        // given
-        when(articleViewRepository.countByArticleId(testArticleId))
-                .thenReturn(0L);
-
-        // when
-        long count = articleViewService.getViewCount(testArticleId);
-
-        // then
-        assertThat(count).isZero();
-        verify(articleViewRepository, times(1)).countByArticleId(testArticleId);
-    }
-
-    @Test
-    @DisplayName("사용자의 조회 기록이 없을 때 빈 리스트 반환")
-    void testGetUserArticleViewsEmpty() {
-        // given
-        when(articleViewRepository.findByUserIdOrderByViewedAtDesc(testUserId))
-                .thenReturn(Arrays.asList());
-
-        // when
-        List<ArticleView> result = articleViewService.getUserArticleViews(testUserId);
-
-        // then
-        assertThat(result).isEmpty();
-        verify(articleViewRepository, times(1)).findByUserIdOrderByViewedAtDesc(testUserId);
+        // when & then
+        assertThat(articleViewService.getArticleViews(testArticleId)).hasSize(2);
+        verify(articleViewRepository, times(1)).findByArticleOrderByViewedAtDesc(testArticle);
     }
 
     @Test
     @DisplayName("기사의 조회 기록이 없을 때 빈 리스트 반환")
     void testGetArticleViewsEmpty() {
         // given
-        when(articleViewRepository.findByArticleIdOrderByViewedAtDesc(testArticleId))
-                .thenReturn(Arrays.asList());
+        when(articleService.findById(testArticleId)).thenReturn(testArticle);
+        when(articleViewRepository.findByArticleOrderByViewedAtDesc(testArticle)).thenReturn(List.of());
 
-        // when
-        List<ArticleView> result = articleViewService.getArticleViews(testArticleId);
-
-        // then
-        assertThat(result).isEmpty();
-        verify(articleViewRepository, times(1)).findByArticleIdOrderByViewedAtDesc(testArticleId);
+        // when & then
+        assertThat(articleViewService.getArticleViews(testArticleId)).isEmpty();
     }
 }

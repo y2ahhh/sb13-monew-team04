@@ -5,7 +5,9 @@ import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.article.service.ArticleService;
 import com.codeit.sb13.monew.article.service.dto.ArticleRequest;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
+import com.codeit.sb13.monew.global.exception.article.ArticleDuplicateException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,15 +32,28 @@ public class ArticleServiceImpl implements ArticleService {
                 .orElseThrow(() -> new ArticleNotFoundException(id));
     }
 
+    /**
+     * 엔티티 저장 (내부용)
+     */
     @Override
     @Transactional
-    public Article save(ArticleRequest request) {
+    public Article save(Article article) {
+        return articleRepository.save(article);
+    }
+
+    /**
+     * DTO로 새로운 기사 생성
+     */
+    @Override
+    @Transactional
+    public Article create(ArticleRequest request) {
         // link 중복 체크
         if (articleRepository.findByLink(request.getLink()).isPresent()) {
-            throw new IllegalArgumentException("이미 등록된 기사입니다.");
+            throw new ArticleDuplicateException();
         }
 
-        Article article = new Article(
+        // Article 생성
+        Article article = Article.create(
                 request.getTitle(),
                 request.getSummary(),
                 request.getLink(),
@@ -46,19 +61,27 @@ public class ArticleServiceImpl implements ArticleService {
                 request.getSource()
         );
 
-        // DataIntegrityViolationException 처리 추가 (동시성 문제 대응)
+        // DataIntegrityViolationException 처리 (동시성 문제 대응)
         try {
-            return articleRepository.save(article);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("이미 등록된 기사입니다.");
+            return articleRepository.saveAndFlush(article);
+        } catch (DataIntegrityViolationException e) {
+            if (isLinkUniqueViolation(e)) {
+                throw new ArticleDuplicateException();
+            }
+            throw e;
         }
     }
 
     @Override
     @Transactional
-    public void delete(UUID id) {
+    public void softDelete(UUID id) {
         Article article = findById(id);
         article.softDelete();
         articleRepository.save(article);
+    }
+
+    private boolean isLinkUniqueViolation(DataIntegrityViolationException e) {
+        String message = e.getMostSpecificCause().getMessage();
+        return message != null && message.contains("uk_articles_link");
     }
 }
