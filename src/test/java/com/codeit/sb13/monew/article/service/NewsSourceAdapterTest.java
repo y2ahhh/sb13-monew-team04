@@ -15,30 +15,35 @@ import static org.assertj.core.api.Assertions.assertThat;
 class NewsSourceAdapterTest {
 
     @Test
-    @DisplayName("어댑터는 출처와 수집 기사 후보 목록을 반환한다")
-    void returnsSourceAndCollectedArticles() {
+    @DisplayName("검색형 어댑터는 요청 조건을 적용하고 출처가 일치하는 기사 후보를 반환한다")
+    void searchAdapterAppliesRequestAndReturnsMatchingSourceArticles() {
         // given
-        NewsSourceAdapter adapter = new FakeNewsSourceAdapter();
-        NewsFetchRequest request = new NewsFetchRequest("economy", 10);
+        FakeSearchNewsSourceAdapter adapter = new FakeSearchNewsSourceAdapter();
+        NewsFetchRequest request = new NewsFetchRequest("economy", 2);
 
         // when
         List<CollectedArticle> articles = adapter.fetch(request);
 
         // then
         assertThat(adapter.source()).isEqualTo(ArticleSource.NAVER);
+        assertThat(adapter.lastRequest()).isEqualTo(request);
         assertThat(articles)
-                .hasSize(1)
+                .hasSize(request.limit())
+                .allSatisfy(article -> {
+                    assertThat(article.source()).isEqualTo(adapter.source());
+                    assertThat(article.title()).contains(request.keyword());
+                })
                 .first()
                 .satisfies(article -> {
-                    assertThat(article.source()).isEqualTo(ArticleSource.NAVER);
-                    assertThat(article.title()).isEqualTo("title");
+                    assertThat(article.title()).isEqualTo("economy title 1");
                     assertThat(article.summary()).isEqualTo("summary");
-                    assertThat(article.link()).isEqualTo("https://example.com/news");
+                    assertThat(article.link()).isEqualTo("https://example.com/news/1");
                     assertThat(article.publishedAt()).isEqualTo(LocalDateTime.of(2026, 8, 20, 10, 0));
                 });
     }
 
-    private static class FakeNewsSourceAdapter implements NewsSourceAdapter {
+    private static class FakeSearchNewsSourceAdapter implements NewsSourceAdapter {
+        private NewsFetchRequest lastRequest;
 
         @Override
         public ArticleSource source() {
@@ -47,13 +52,29 @@ class NewsSourceAdapterTest {
 
         @Override
         public List<CollectedArticle> fetch(NewsFetchRequest request) {
-            return List.of(new CollectedArticle(
+            lastRequest = request;
+            return List.of(
+                            article("economy title 1", "https://example.com/news/1"),
+                            article("economy title 2", "https://example.com/news/2"),
+                            article("sports title 1", "https://example.com/news/3")
+                    ).stream()
+                    .filter(article -> article.title().contains(request.keyword()))
+                    .limit(request.limit())
+                    .toList();
+        }
+
+        private NewsFetchRequest lastRequest() {
+            return lastRequest;
+        }
+
+        private CollectedArticle article(String title, String link) {
+            return new CollectedArticle(
                     source(),
-                    "title",
+                    title,
                     "summary",
-                    "https://example.com/news",
+                    link,
                     LocalDateTime.of(2026, 8, 20, 10, 0)
-            ));
+            );
         }
     }
 }
