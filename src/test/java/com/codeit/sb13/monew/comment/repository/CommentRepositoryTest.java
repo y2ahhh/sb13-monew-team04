@@ -15,8 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,10 +43,9 @@ class CommentRepositoryTest {
     void returns_empty_list_when_user_has_no_comments() {
         // given
         UUID userId = UUID.randomUUID();
-        Pageable pageable = PageRequest.of(0, 10);
 
         // when
-        List<RecentCommentActivityProjection> projections = commentRepository.findRecentCommentActivities(userId, pageable);
+        List<RecentCommentActivityProjection> projections = commentRepository.findRecentCommentActivities(userId);
 
         // then
         assertThat(projections).isEmpty();
@@ -77,7 +74,7 @@ class CommentRepositoryTest {
         em.clear();
 
         // when
-        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId(), PageRequest.of(0, 10));
+        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId());
 
         // then
         assertThat(recentCommentActivities)
@@ -107,7 +104,7 @@ class CommentRepositoryTest {
         em.clear();
 
         // when
-        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId(), PageRequest.of(0, 10));
+        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId());
 
         // then
         assertThat(recentCommentActivities)
@@ -131,7 +128,7 @@ class CommentRepositoryTest {
         em.clear();
 
         // when
-        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId(), PageRequest.of(0, 10));
+        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId());
 
         // then
         assertThat(recentCommentActivities).isEmpty();
@@ -160,7 +157,7 @@ class CommentRepositoryTest {
         em.clear();
 
         // when
-        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId(), PageRequest.of(0, 10));
+        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId());
 
         // then
         assertThat(recentCommentActivities)
@@ -192,7 +189,7 @@ class CommentRepositoryTest {
         em.clear();
 
         // when
-        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId(), PageRequest.of(0, 10));
+        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId());
 
         // then
         assertThat(recentCommentActivities)

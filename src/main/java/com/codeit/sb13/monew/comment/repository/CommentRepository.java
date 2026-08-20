@@ -5,7 +5,6 @@ import com.codeit.sb13.monew.comment.repository.dto.RecentCommentActivityProject
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -34,9 +33,7 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
           AND c.deletedAt IS NULL
           AND a.deletedAt IS NULL
       ORDER BY c.createdAt DESC
+      LIMIT 10
       """)
-  List<RecentCommentActivityProjection> findRecentCommentActivities(
-      @Param("userId") UUID userId,
-      Pageable pageable
-  );
+  List<RecentCommentActivityProjection> findRecentCommentActivities(@Param("userId") UUID userId);
 }
