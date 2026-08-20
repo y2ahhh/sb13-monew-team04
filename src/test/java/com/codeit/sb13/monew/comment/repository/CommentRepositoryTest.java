@@ -169,16 +169,32 @@ class CommentRepositoryTest {
     }
 
     @Test
-    @Disabled("TODO")
     @DisplayName("삭제된 기사 댓글 제외")
     void 삭제된_기사_댓글_제외() {
         // given
+        User targetUser = new User("test@eamil.com", "testNickname", "testPassword");
+        userRepository.saveAndFlush(targetUser);
 
+        Article article = articleRepository.saveAndFlush(new Article("testTitle", "testContent", "link", LocalDateTime.now(), "source"));
+        Comment oldestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment1"));
+        Comment middleComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment2"));
+        Comment newestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment3"));
+
+        LocalDateTime baseTime = LocalDateTime.of(2026, 8, 20, 10, 0);
+        updateCommentCreatedAt(oldestComment.getId(), baseTime.minusMinutes(2));
+        updateCommentCreatedAt(middleComment.getId(), baseTime.minusMinutes(1));
+        updateCommentCreatedAt(newestComment.getId(), baseTime);
+
+        article.softDelete();
+        articleRepository.saveAndFlush(article);
+
+        em.clear();
         // when
+        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId(), PageRequest.of(0, 10));
 
 
         // then
-
+        assertThat(recentCommentActivities).isEmpty();
 
     }
 
