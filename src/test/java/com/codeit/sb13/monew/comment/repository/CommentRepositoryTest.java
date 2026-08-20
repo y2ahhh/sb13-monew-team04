@@ -137,16 +137,36 @@ class CommentRepositoryTest {
     }
 
     @Test
-    @Disabled("TODO")
     @DisplayName("삭제된 댓글 제외")
     void 삭제된_댓글_제외() {
         // given
+        User targetUser = new User("test@eamil.com", "testNickname", "testPassword");
+        User otherUser = new User("otherTest@email.com", "otherTestNickname", "otherTestPassword");
+        userRepository.saveAndFlush(targetUser);
+        userRepository.saveAndFlush(otherUser);
 
+        Article article = articleRepository.saveAndFlush(new Article("testTitle", "testContent", "link", LocalDateTime.now(), "source"));
+        Comment oldestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment1"));
+        Comment middleComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment2"));
+        Comment newestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment3"));
+        commentRepository.saveAndFlush(new Comment(article.getId(), otherUser, "testComment4"));
+
+        LocalDateTime baseTime = LocalDateTime.of(2026, 8, 20, 10, 0);
+        updateCommentCreatedAt(oldestComment.getId(), baseTime.minusMinutes(2));
+        middleComment.softDelete();
+        commentRepository.saveAndFlush(middleComment);
+        updateCommentCreatedAt(newestComment.getId(), baseTime);
+
+        em.clear();
         // when
+        List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId(), PageRequest.of(0, 10));
 
 
         // then
-
+        assertThat(recentCommentActivities)
+                .hasSize(2)
+                .extracting(RecentCommentActivityProjection::content)
+                .containsExactly("testComment3", "testComment1");
 
     }
 
