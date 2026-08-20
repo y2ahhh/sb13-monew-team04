@@ -3,11 +3,13 @@ package com.codeit.sb13.monew.interest.domain;
 import com.codeit.sb13.monew.global.domain.UpdatedAtEntity;
 import com.codeit.sb13.monew.global.exception.interest.InterestKeywordRequiredException;
 import com.codeit.sb13.monew.global.exception.interest.InterestNameInvalidException;
-import jakarta.persistence.*;
-
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
-
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,12 +27,7 @@ import org.springframework.util.StringUtils;
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
-@Table(name = "interests",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_interests_name",
-                columnNames = {"name"}
-        )
-)
+@Table(name = "interests")
 public class Interest extends UpdatedAtEntity {
 
     @Column(nullable = false, length = 50)
@@ -57,17 +54,6 @@ public class Interest extends UpdatedAtEntity {
         return Interest.builder()
                 .name(name)
                 .build();
-    }
-
-    private static String validateName(String name) {
-        if (!StringUtils.hasText(name)) {
-            throw new InterestNameInvalidException(name);
-        }
-        if (name.length() > 50) {
-            throw new InterestNameInvalidException(name);
-        }
-
-        return name;
     }
 
     /**
@@ -97,7 +83,7 @@ public class Interest extends UpdatedAtEntity {
      *
      * @param keyword 제거할 키워드
      * @throws InterestKeywordRequiredException 제거하려는 키워드가
-     *                                          이 관심사에 남은 마지막 키워드인 경우
+     *         이 관심사에 남은 마지막 키워드인 경우
      */
     public void removeKeyword(Keyword keyword) {
         if (this.keywords.size() <= 1 && this.keywords.contains(keyword)) {
@@ -117,5 +103,16 @@ public class Interest extends UpdatedAtEntity {
      */
     public void changeName(String name) {
         this.name = validateName(name);
+    }
+
+    private static String validateName(String name) {
+        if (!StringUtils.hasText(name)) {
+            throw new InterestNameInvalidException(name);
+        }
+        if (name.length() > 50) {
+            throw new InterestNameInvalidException(name);
+        }
+
+        return name;
     }
 }
