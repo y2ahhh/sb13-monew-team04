@@ -117,27 +117,23 @@ class CommentRepositoryTest {
 
     @Test
     @DisplayName("삭제된 사용자 댓글 제외")
-    void 삭제된_사용자_댓글_제외() {
+    void returns_empty_when_user_is_soft_deleted() {
         // given
         User targetUser = new User("test@eamil.com", "testNickname", "testPassword");
-        User otherUser = new User("otherTest@email.com", "otherTestNickname", "otherTestPassword");
         userRepository.saveAndFlush(targetUser);
-        userRepository.saveAndFlush(otherUser);
 
         Article article = articleRepository.saveAndFlush(new Article("testTitle", "testContent", "link", LocalDateTime.now(), "source"));
         commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "deletedUserComment"));
-        commentRepository.saveAndFlush(new Comment(article.getId(), otherUser, "otherTestComment"));
 
         targetUser.softDelete();
         userRepository.saveAndFlush(targetUser);
         em.clear();
+
         // when
         List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId(), PageRequest.of(0, 10));
 
-
         // then
         assertThat(recentCommentActivities).isEmpty();
-
     }
 
     @Test
