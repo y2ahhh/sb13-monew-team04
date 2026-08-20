@@ -169,7 +169,7 @@ class NotificationServiceImplTest {
             Notification notification = Notification.create(user, "내용", UUID.randomUUID(), ResourceType.COMMENT);
 
             when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.existsById(userId)).thenReturn(true);
 
             NotificationResult expectedResult = new NotificationResult(
                     notification.getId(), userId, "내용", notification.getResourceId(),
@@ -193,7 +193,7 @@ class NotificationServiceImplTest {
             UUID notificationId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
 
-            when(userRepository.findById(userId)).thenReturn(Optional.of(User.builder().email("aaa@naver.com").nickname("유저").password("pw").build()));
+            when(userRepository.existsById(userId)).thenReturn(true);
             when(notificationRepository.findById(notificationId)).thenReturn(Optional.empty());
 
             // when & then
@@ -207,7 +207,7 @@ class NotificationServiceImplTest {
             // given
             UUID notificationId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
-            when(userRepository.findById(userId)).thenReturn(Optional.empty());
+            when(userRepository.existsById(userId)).thenReturn(false);
 
             // when & then
             assertThatThrownBy(() -> notificationServiceImpl.confirmNotification(notificationId, userId))
@@ -233,7 +233,7 @@ class NotificationServiceImplTest {
             Notification notification = Notification.create(owner, "내용", UUID.randomUUID(), ResourceType.COMMENT);
 
             when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
-            when(userRepository.findById(otherId)).thenReturn(Optional.of(other));
+            when(userRepository.existsById(otherId)).thenReturn(true);
 
             // when & then
             assertThatThrownBy(() -> notificationServiceImpl.confirmNotification(notificationId, otherId))
@@ -259,7 +259,7 @@ class NotificationServiceImplTest {
             Notification notification2 = Notification.create(user, "알림2", UUID.randomUUID(), ResourceType.INTEREST);
             List<Notification> notifications = List.of(notification1, notification2);
 
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(userRepository.existsById(userId)).thenReturn(true);
             when(notificationRepository.findByUser_IdAndConfirmedFalse(userId)).thenReturn(notifications);
 
             NotificationResult notificationResult = new NotificationResult(
@@ -284,7 +284,7 @@ class NotificationServiceImplTest {
         void 요청자_없으면_예외() {
             // given
             UUID userId = UUID.randomUUID();
-            when(userRepository.findById(userId)).thenReturn(Optional.empty());
+            when(userRepository.existsById(userId)).thenReturn(false);
 
             // when & then
             assertThatThrownBy(() -> notificationServiceImpl.confirmAllNotifications(userId))

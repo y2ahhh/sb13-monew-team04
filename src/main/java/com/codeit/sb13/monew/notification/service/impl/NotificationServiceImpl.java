@@ -59,8 +59,9 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public NotificationResult confirmNotification(UUID notificationId, UUID userId) {
-        userRepository.findById(userId)
-                .orElseThrow(()->new UserNotFoundException(userId));
+        if(!userRepository.existsById(userId)) {
+            throw new UserNotFoundException(userId);
+        }
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(()->new NotificationNotFoundException(notificationId));
 
@@ -77,8 +78,9 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public List<NotificationResult> confirmAllNotifications(UUID userId) {
-        userRepository.findById(userId)
-                .orElseThrow(()->new UserNotFoundException(userId));
+        if(!userRepository.existsById(userId)) {
+            throw new UserNotFoundException(userId);
+        }
 
         List<Notification> notifications = notificationRepository.findByUser_IdAndConfirmedFalse(userId);
         notifications.forEach(Notification::confirm);
