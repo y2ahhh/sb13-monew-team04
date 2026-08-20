@@ -1,11 +1,13 @@
 package com.codeit.sb13.monew.comment.repository;
 
+import com.codeit.sb13.monew.comment.repository.dto.RecentCommentActivityProjection;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.UUID;
@@ -24,10 +26,10 @@ class CommentRepositoryTest {
 
         // given
         UUID userId = UUID.randomUUID();
-        PageRequest pageRequest = PageRequest.of(0, 10);
+        Pageable pageable = PageRequest.of(0, 10);
 
         // when
-        List<RecentCommentActivityProjection> projections = commentRepository.findRecentCommentActivities(userId, pageRequest);
+        List<RecentCommentActivityProjection> projections = commentRepository.findRecentCommentActivities(userId, pageable);
 
 
         // then
