@@ -34,15 +34,25 @@ public class Article extends DeletedAtEntity {
     @Column(nullable = false)
     private LocalDateTime date;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    private String source;
+    private ArticleSource source;
 
-    private Article(String title, String summary, String link, LocalDateTime date, String source) {
+    @Column(name = "view_count", nullable = false)
+    private Integer viewCount = 0;
+
+    @Column(name = "comment_count", nullable = false)
+    private Integer commentCount = 0;
+
+    private Article(String title, String summary, String link,
+                    LocalDateTime date, ArticleSource source) {
         this.title = title;
         this.summary = summary;
         this.link = link;
         this.date = date;
         this.source = source;
+        this.viewCount = 0;
+        this.commentCount = 0;
     }
 
     /**
@@ -56,7 +66,7 @@ public class Article extends DeletedAtEntity {
      * @return 생성된 기사
      */
     public static Article create(String title, String summary, String link,
-                                 LocalDateTime date, String source) {
+                                 LocalDateTime date, ArticleSource source) {
         return new Article(title, summary, link, date, source);
     }
 
