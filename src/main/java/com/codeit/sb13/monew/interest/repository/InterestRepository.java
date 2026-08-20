@@ -3,6 +3,7 @@ package com.codeit.sb13.monew.interest.repository;
 import com.codeit.sb13.monew.interest.domain.Interest;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.UUID;
@@ -21,14 +22,24 @@ public interface InterestRepository extends JpaRepository<Interest, UUID> {
     boolean existsByName(String name);
 
     /**
-     * 모든 관심사의 이름만 조회한다.
+     * 길이가 {@code minLength}~{@code maxLength} 사이인 관심사 이름만 조회한다.
      *
-     * <p>관심사 등록 시 새 이름이 기존 이름과 유사한지 비교하는 데 사용된다.
-     * 키워드 등 나머지 필드가 필요 없는 비교이므로, 엔티티 전체를 불러오는
-     * {@link #findAll()} 대신 이름 컬럼만 조회한다.</p>
+     * <p>관심사 등록 시 새 이름이 기존 이름과 80% 이상 유사한지 비교하는 데
+     * 쓰인다. Levenshtein 유사도는 {@code 1 - 편집거리 / max(두 문자열 길이)}로
+     * 계산되는데, 편집 거리는 두 문자열의 길이 차이보다 작을 수 없다. 그래서
+     * 새 이름 길이가 {@code L}일 때 유사도가 0.8 이상이 되려면 비교 대상 이름의
+     * 길이가 반드시 {@code [ceil(0.8L), floor(L/0.8)]} 범위 안에 있어야 하고,
+     * 이 범위 밖의 이름은 계산해볼 필요도 없이 걸러낼 수 있다. 호출하는 쪽
+     * ({@link com.codeit.sb13.monew.interest.service.InterestServiceImpl})이
+     * 이 범위를 계산해 넘긴다.</p>
      *
-     * @return 저장된 모든 관심사의 이름 목록
+     * <p>관심사가 늘어나도 이 조회는 테이블 전체가 아니라 후보군만 스캔하므로,
+     * 매 등록 요청마다 전체 이름을 가져오던 이전 방식보다 확장성이 낫다.</p>
+     *
+     * @param minLength 조회할 이름 길이의 하한(포함)
+     * @param maxLength 조회할 이름 길이의 상한(포함)
+     * @return 길이 조건을 만족하는 관심사 이름 목록
      */
-    @Query("select i.name from Interest i")
-    List<String> findAllNames();
+    @Query("select i.name from Interest i where length(i.name) between :minLength and :maxLength")
+    List<String> findNamesByLengthBetween(@Param("minLength") int minLength, @Param("maxLength") int maxLength);
 }

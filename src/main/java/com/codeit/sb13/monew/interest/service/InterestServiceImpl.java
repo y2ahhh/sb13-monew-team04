@@ -9,12 +9,8 @@ import com.codeit.sb13.monew.interest.service.dto.InterestCreateCommand;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.text.similarity.LevenshteinDistance;
-import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -23,10 +19,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class InterestServiceImpl implements InterestService{
 
     /**
+     * 유사도 임계값의 분자/분모. 0.8을 정수 연산으로 다루기 위해
+     * {@code 4/5}로 표현해두고, {@link #SIMILAR_NAME_THRESHOLD}와
+     * {@link #minCandidateLength}, {@link #maxCandidateLength}가
+     * 이 값을 함께 참조하도록 해 두 계산이 어긋나지 않게 한다.
+     */
+    private static final int SIMILAR_NAME_THRESHOLD_NUMERATOR = 4;
+    private static final int SIMILAR_NAME_THRESHOLD_DENOMINATOR = 5;
+
+    /**
      * 새 이름과 기존 이름의 Levenshtein 유사도가 이 값 이상이면
      * "이미 존재하는 관심사"로 간주해 등록을 거부한다.
      */
-    private final static double SIMILAR_NAME_THRESHOLD = 0.8;
+    private static final double SIMILAR_NAME_THRESHOLD =
+            (double) SIMILAR_NAME_THRESHOLD_NUMERATOR / SIMILAR_NAME_THRESHOLD_DENOMINATOR;
 
     private final InterestRepository interestRepository;
     private final SubscribeRepository subscribeRepository;
@@ -43,30 +49,29 @@ public class InterestServiceImpl implements InterestService{
      * 이름이 있는지 확인한다. 인덱스를 타는 가벼운 조회라 대부분의 등록 요청은
      * 이 단계에서 곧바로 끝난다. 두 번째 단계는 {@link #isNameTooSimilarToExisting}로
      * 기존 이름들과 {@link #SIMILAR_NAME_THRESHOLD} 이상 유사한 이름이 있는지 확인한다.
-     * 완전히 같은 이름은 유사도가 항상 1.0이라 이 단계에서도 걸러지지만, 기존 이름
-     * 전체를 불러와 하나하나 비교해야 하는 무거운 연산이라 정확 일치를 먼저 걸러낸
-     * 뒤에만 실행하도록 순서를 나눴다.</p>
+     * 완전히 같은 이름은 유사도가 항상 1.0이라 이 단계에서도 걸러지지만, 후보
+     * 이름들을 불러와 하나하나 비교해야 하는 무거운 연산이라 정확 일치를 먼저
+     * 걸러낸 뒤에만 실행하도록 순서를 나눴다.</p>
      *
-     * <p>사전 중복 확인과 실제 저장 사이에는 경쟁 구간이 존재한다. 두 요청이 동시에
-     * 같은 이름 또는 서로 유사한 이름으로 등록을 시도하면 둘 다 사전 확인을 통과할
-     * 수 있다. 완전히 같은 이름은 {@code interests.name}에 걸린 유니크 제약이 최후
-     * 방어선 역할을 하지만({@code saveAndFlush}로 즉시 반영해 이 메서드 안에서 곧바로
-     * 잡아낸다), 유사 이름 판별은 DB 제약으로 표현할 수 없는 조건이라 그 방어선이
-     * 통하지 않는다. 그래서 이 메서드 전체를 {@link Isolation#SERIALIZABLE} 격리
-     * 수준으로 실행해, 서로 다른 두 트랜잭션이 겹치는 이름 집합을 동시에 읽고 각자
-     * 다른 이름을 저장하는 이상 현상 자체를 DB가 감지해 한쪽을 직렬화 실패로
-     * 되돌리게 한다. 되돌려진 트랜잭션은 {@link #create}를 다시 호출해도 사전 확인부터
-     * 다시 하므로 결과적으로 안전하게 재시도할 수 있는데, 이 재시도는
-     * {@link Retryable @Retryable}로 처리한다. 재시도 어드바이저가 트랜잭션 어드바이저
-     * 바깥에서 감싸도록 {@code RetryConfig}에서 순서를 명시적으로 고정해뒀기 때문에,
-     * 재시도할 때마다 새 트랜잭션이 열린다.</p>
+     * <p>사전 중복 확인과 실제 저장 사이에는 경쟁 구간이 존재한다. 두 요청이
+     * 동시에 같은 이름으로 등록을 시도하면 둘 다 사전 확인을 통과할 수 있는데,
+     * {@code interests.name}에 걸린 유니크 제약이 최후 방어선 역할을 한다.
+     * 저장을 {@code saveAndFlush}로 즉시 반영해 제약 위반을 이 메서드 안에서
+     * 곧바로 잡아내고, {@link #isNameUniqueViolation}으로 원인이 이름 중복인지
+     * 확인해 {@link InterestNameDuplicatedException}으로 변환한다.</p>
+     *
+     * <p>다만 유사 이름 판별은 DB 제약으로 표현할 수 없는 조건이라, 이 방어선은
+     * 정확히 같은 이름에 대해서만 작동하고 서로 다른 두 유사 이름이 동시에
+     * 등록되는 경우까지는 막지 못한다. 이걸 완전히 막으려면 등록 흐름 전체를
+     * 강하게 직렬화해야 하는데, 그 비용을 극히 드물게 발생하는 경쟁 조건 하나를
+     * 막기 위해 모든 등록 요청이 부담하게 되는 셈이라 이번 범위에서는 받아들이지
+     * 않기로 했다. 정확히 같은 이름은 DB 제약으로 완전히 보장되고, 유사 이름은
+     * 애플리케이션 레벨의 최선 노력(best-effort) 검사로 처리하는 것으로 동시성
+     * 보장 수준을 나눈 것이다. advisory lock이나 별도 잠금 테이블로 이 경쟁까지
+     * 막는 방법은 있지만, 실제 트래픽 규모와 성능 측정 없이 지금 들이기에는
+     * 범위가 크다고 판단해 알려진 한계로 남겨둔다.</p>
      */
     @Override
-    @Transactional(isolation = Isolation.SERIALIZABLE)
-    @Retryable(
-            retryFor = ConcurrencyFailureException.class,
-            backoff = @Backoff(delay = 50, maxDelay = 200, random = true)
-    )
     public InterestResponse create(InterestCreateCommand command) {
         if (interestRepository.existsByName(command.name())) {
             throw new InterestNameDuplicatedException(command.name());
@@ -114,20 +119,49 @@ public class InterestServiceImpl implements InterestService{
      * 새로 등록하려는 이름이 기존 관심사 이름 중 하나와
      * {@link #SIMILAR_NAME_THRESHOLD} 이상 유사한지 확인한다.
      *
-     * <p>{@link InterestRepository#findAllNames}로 기존 이름 전체를 가져와
-     * {@link #getLevenshteinMatchRate}로 하나씩 비교한다. 완전히 같은 이름은
-     * 유사도가 항상 1.0이므로 이 메서드만으로도 정확 일치를 포함한 모든 경우를
-     * 판별할 수 있지만, {@link #create}에서는 성능을 위해 정확 일치를
-     * {@link InterestRepository#existsByName}으로 먼저 걸러낸 뒤에만 이 메서드를
-     * 호출한다.</p>
+     * <p>기존 이름 전체를 불러와 비교하지 않고, 길이만으로 80% 유사도에
+     * 도달할 수 없는 이름을 먼저 걸러낸다. Levenshtein 편집 거리는 두 문자열의
+     * 길이 차이보다 작을 수 없으므로, 새 이름 길이가 {@code L}일 때 후보 이름의
+     * 길이는 {@code [ceil(0.8L), floor(L/0.8)]} 범위를 벗어나면 유사도가 절대
+     * 0.8 이상이 될 수 없다. 이 범위는 {@link #minCandidateLength}와
+     * {@link #maxCandidateLength}로 계산해
+     * {@link InterestRepository#findNamesByLengthBetween}에 넘긴다.</p>
      *
      * @param newName 새로 등록하려는 관심사 이름
-     * @return 기존 이름 중 하나라도 임계값 이상 유사하면 {@code true}
+     * @return 후보 이름 중 하나라도 임계값 이상 유사하면 {@code true}
      */
     private boolean isNameTooSimilarToExisting(String newName) {
-        return interestRepository.findAllNames().stream()
+        int length = newName.length();
+        int minLength = minCandidateLength(length);
+        int maxLength = maxCandidateLength(length);
+
+        return interestRepository.findNamesByLengthBetween(minLength, maxLength).stream()
                 .anyMatch(existingName ->
                         getLevenshteinMatchRate(newName, existingName) >= SIMILAR_NAME_THRESHOLD);
+    }
+
+    /**
+     * 유사도 {@link #SIMILAR_NAME_THRESHOLD} 이상이 되려면 후보 이름의 길이가
+     * 최소 얼마여야 하는지 계산한다.
+     *
+     * <p>{@code ceil(SIMILAR_NAME_THRESHOLD * length)}를 부동소수점 없이
+     * 정수 연산만으로 구한다. {@code ceil(a/b) = (a + b - 1) / b} 공식에
+     * {@code a = NUMERATOR * length}, {@code b = DENOMINATOR}를 대입한 것이다.</p>
+     */
+    private int minCandidateLength(int length) {
+        int numerator = SIMILAR_NAME_THRESHOLD_NUMERATOR * length;
+        return (numerator + SIMILAR_NAME_THRESHOLD_NUMERATOR) / SIMILAR_NAME_THRESHOLD_DENOMINATOR;
+    }
+
+    /**
+     * 유사도 {@link #SIMILAR_NAME_THRESHOLD} 이상이 되려면 후보 이름의 길이가
+     * 최대 얼마까지 가능한지 계산한다.
+     *
+     * <p>{@code floor(length / SIMILAR_NAME_THRESHOLD)}를 부동소수점 없이
+     * 정수 연산만으로 구한다({@code length * DENOMINATOR / NUMERATOR}).</p>
+     */
+    private int maxCandidateLength(int length) {
+        return (length * SIMILAR_NAME_THRESHOLD_DENOMINATOR) / SIMILAR_NAME_THRESHOLD_NUMERATOR;
     }
 
     /**
