@@ -1,6 +1,7 @@
 package com.codeit.sb13.monew.comment.repository;
 
 import com.codeit.sb13.monew.article.domain.Article;
+import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.comment.repository.dto.RecentCommentActivityProjection;
@@ -62,7 +63,7 @@ class CommentRepositoryTest {
         userRepository.saveAndFlush(targetUser);
         userRepository.saveAndFlush(otherUser);
 
-        Article article = articleRepository.saveAndFlush(new Article("testTitle", "testContent", "link", LocalDateTime.now(), "source"));
+        Article article = articleRepository.saveAndFlush(createArticle("testTitle", "testContent", "link"));
         Comment oldestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment1"));
         Comment middleComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment2"));
         Comment newestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment3"));
@@ -93,7 +94,7 @@ class CommentRepositoryTest {
         userRepository.saveAndFlush(targetUser);
         userRepository.saveAndFlush(otherUser);
 
-        Article article = articleRepository.saveAndFlush(new Article("testTitle", "testContent", "link", LocalDateTime.now(), "source"));
+        Article article = articleRepository.saveAndFlush(createArticle("testTitle", "testContent", "link"));
         LocalDateTime baseTime = LocalDateTime.of(2026, 8, 20, 10, 0);
         for (int index = 1; index <= 11; index++) {
             Comment comment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment" + index));
@@ -122,7 +123,7 @@ class CommentRepositoryTest {
         User targetUser = new User("test@eamil.com", "testNickname", "testPassword");
         userRepository.saveAndFlush(targetUser);
 
-        Article article = articleRepository.saveAndFlush(new Article("testTitle", "testContent", "link", LocalDateTime.now(), "source"));
+        Article article = articleRepository.saveAndFlush(createArticle("testTitle", "testContent", "link"));
         commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "deletedUserComment"));
 
         targetUser.softDelete();
@@ -143,7 +144,7 @@ class CommentRepositoryTest {
         User targetUser = new User("test@eamil.com", "testNickname", "testPassword");
         userRepository.saveAndFlush(targetUser);
 
-        Article article = articleRepository.saveAndFlush(new Article("testTitle", "testContent", "link", LocalDateTime.now(), "source"));
+        Article article = articleRepository.saveAndFlush(createArticle("testTitle", "testContent", "link"));
         Comment oldestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment1"));
         Comment middleComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment2"));
         Comment newestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment3"));
@@ -175,8 +176,8 @@ class CommentRepositoryTest {
         User targetUser = new User("test@eamil.com", "testNickname", "testPassword");
         userRepository.saveAndFlush(targetUser);
 
-        Article activeArticle = articleRepository.saveAndFlush(new Article("activeTitle", "activeContent", "activeLink", LocalDateTime.now(), "source"));
-        Article deletedArticle = articleRepository.saveAndFlush(new Article("deletedTitle", "deletedContent", "deletedLink", LocalDateTime.now(), "source"));
+        Article activeArticle = articleRepository.saveAndFlush(createArticle("activeTitle", "activeContent", "activeLink"));
+        Article deletedArticle = articleRepository.saveAndFlush(createArticle("deletedTitle", "deletedContent", "deletedLink"));
 
         Comment activeArticleComment = commentRepository.saveAndFlush(new Comment(activeArticle.getId(), targetUser, "activeArticleComment"));
         Comment deletedArticleComment = commentRepository.saveAndFlush(new Comment(deletedArticle.getId(), targetUser, "deletedArticleComment"));
@@ -205,5 +206,9 @@ class CommentRepositoryTest {
                 .setParameter(1, createdAt)
                 .setParameter(2, commentId)
                 .executeUpdate();
+    }
+
+    private Article createArticle(String title, String summary, String link) {
+        return Article.create(title, summary, link, LocalDateTime.now(), ArticleSource.NAVER);
     }
 }
