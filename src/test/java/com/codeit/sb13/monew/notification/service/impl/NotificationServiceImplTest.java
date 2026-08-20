@@ -184,6 +184,7 @@ class NotificationServiceImplTest {
             // then
             assertThat(notification.isConfirmed()).isTrue();
             assertThat(result).isEqualTo(expectedResult);
+            verify(notificationRepository).save(notification);
         }
 
         @Test
