@@ -15,8 +15,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.ResourceAccessException;
 import tools.jackson.databind.ObjectMapper;
 
+import java.net.SocketTimeoutException;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -55,7 +57,7 @@ class RestClientNaverNewsClientTest {
         server = MockRestServiceServer.bindTo(builder).build();
         client = new RestClientNaverNewsClient(
                 builder.build(),
-                new NaverNewsProperties(BASE_URL, PATH, CLIENT_ID, CLIENT_SECRET),
+                new NaverNewsProperties(BASE_URL, PATH, CLIENT_ID, CLIENT_SECRET, null, null),
                 new NaverNewsMapper(),
                 new ObjectMapper()
         );
@@ -164,6 +166,63 @@ class RestClientNaverNewsClientTest {
     }
 
     @Test
+    @DisplayName("응답 본문이 null이면 기사 수집 파싱 예외 발생")
+    void throwsParseExceptionWhenResponseBodyIsNullLiteral() {
+        // given
+        server.expect(requestTo(startsWith(BASE_URL + PATH)))
+                .andRespond(withSuccess("null", MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertThatThrownBy(() -> client.search(new NaverNewsSearchRequest("economy")))
+                .isInstanceOf(ArticleFetchParseException.class);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("items가 없으면 기사 수집 파싱 예외 발생")
+    void throwsParseExceptionWhenItemsAreMissing() {
+        // given
+        server.expect(requestTo(startsWith(BASE_URL + PATH)))
+                .andRespond(withSuccess(missingItemsJson(), MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertThatThrownBy(() -> client.search(new NaverNewsSearchRequest("economy")))
+                .isInstanceOf(ArticleFetchParseException.class);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("items가 null이면 기사 수집 파싱 예외 발생")
+    void throwsParseExceptionWhenItemsAreNull() {
+        // given
+        server.expect(requestTo(startsWith(BASE_URL + PATH)))
+                .andRespond(withSuccess(nullItemsJson(), MediaType.APPLICATION_JSON));
+
+        // when & then
+        assertThatThrownBy(() -> client.search(new NaverNewsSearchRequest("economy")))
+                .isInstanceOf(ArticleFetchParseException.class);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("요청 timeout이 발생하면 기사 수집 실패 예외 발생")
+    void throwsFetchFailedExceptionWhenTimeoutOccurs() {
+        // given
+        server.expect(requestTo(startsWith(BASE_URL + PATH)))
+                .andRespond(request -> {
+                    throw new ResourceAccessException(
+                            "Read timed out",
+                            new SocketTimeoutException("Read timed out")
+                    );
+                });
+
+        // when & then
+        assertThatThrownBy(() -> client.search(new NaverNewsSearchRequest("economy")))
+                .isInstanceOf(ArticleFetchFailedException.class);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("pubDate 파싱에 실패하면 기사 수집 파싱 예외 발생")
     void throwsParseExceptionWhenPubDateIsInvalid() {
         // given
@@ -204,6 +263,29 @@ class RestClientNaverNewsClientTest {
                   "start": 1,
                   "display": 10,
                   "items": []
+                }
+                """;
+    }
+
+    private String missingItemsJson() {
+        return """
+                {
+                  "lastBuildDate": "Thu, 20 Aug 2026 10:16:00 +0900",
+                  "total": 0,
+                  "start": 1,
+                  "display": 10
+                }
+                """;
+    }
+
+    private String nullItemsJson() {
+        return """
+                {
+                  "lastBuildDate": "Thu, 20 Aug 2026 10:16:00 +0900",
+                  "total": 0,
+                  "start": 1,
+                  "display": 10,
+                  "items": null
                 }
                 """;
     }

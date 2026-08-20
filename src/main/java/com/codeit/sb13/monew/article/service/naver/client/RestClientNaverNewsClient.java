@@ -43,7 +43,7 @@ public class RestClientNaverNewsClient implements NaverNewsClient {
                     .retrieve()
                     .body(String.class);
 
-            NaverNewsSearchResponse response = objectMapper.readValue(body, NaverNewsSearchResponse.class);
+            NaverNewsSearchResponse response = parseResponse(body);
 
             return mapper.toCollectedArticles(response);
         } catch (ArticleFetchParseException e) {
@@ -55,4 +55,23 @@ public class RestClientNaverNewsClient implements NaverNewsClient {
         }
     }
 
+    private NaverNewsSearchResponse parseResponse(String body) throws JacksonException {
+        if (body == null) {
+            throw invalidResponse();
+        }
+
+        NaverNewsSearchResponse response = objectMapper.readValue(body, NaverNewsSearchResponse.class);
+        if (response == null || response.items() == null) {
+            throw invalidResponse();
+        }
+
+        return response;
+    }
+
+    private ArticleFetchParseException invalidResponse() {
+        return new ArticleFetchParseException(
+                SOURCE,
+                new IllegalArgumentException("Invalid NAVER news response schema")
+        );
+    }
 }

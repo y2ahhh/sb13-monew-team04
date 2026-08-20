@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("NaverNewsConfig 단위 테스트")
@@ -16,7 +18,9 @@ class NaverNewsConfigTest {
                     "monew.news.naver.base-url=https://openapi.naver.com",
                     "monew.news.naver.path=/v1/search/news.json",
                     "monew.news.naver.client-id=client-id",
-                    "monew.news.naver.client-secret=client-secret"
+                    "monew.news.naver.client-secret=client-secret",
+                    "monew.news.naver.connect-timeout=2s",
+                    "monew.news.naver.read-timeout=4s"
             );
 
     @Test
@@ -31,7 +35,28 @@ class NaverNewsConfigTest {
             assertThat(properties.path()).isEqualTo("/v1/search/news.json");
             assertThat(properties.clientId()).isEqualTo("client-id");
             assertThat(properties.clientSecret()).isEqualTo("client-secret");
+            assertThat(properties.connectTimeout()).isEqualTo(Duration.ofSeconds(2));
+            assertThat(properties.readTimeout()).isEqualTo(Duration.ofSeconds(4));
         });
+    }
+
+    @Test
+    @DisplayName("NAVER 뉴스 timeout 설정이 없으면 기본값을 사용한다")
+    void usesDefaultTimeoutWhenTimeoutPropertiesAreMissing() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(NaverNewsConfig.class)
+                .withPropertyValues(
+                        "monew.news.naver.base-url=https://openapi.naver.com",
+                        "monew.news.naver.path=/v1/search/news.json",
+                        "monew.news.naver.client-id=client-id",
+                        "monew.news.naver.client-secret=client-secret"
+                )
+                .run(context -> {
+                    NaverNewsProperties properties = context.getBean(NaverNewsProperties.class);
+
+                    assertThat(properties.connectTimeout()).isEqualTo(Duration.ofSeconds(3));
+                    assertThat(properties.readTimeout()).isEqualTo(Duration.ofSeconds(5));
+                });
     }
 
     @Test

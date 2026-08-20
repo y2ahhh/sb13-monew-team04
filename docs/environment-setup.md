@@ -80,6 +80,8 @@ NAVER 뉴스 검색 API를 사용하려면 NAVER Developers에서 애플리케�
 ```properties
 MONEW_NAVER_CLIENT_ID=발급받은-client-id
 MONEW_NAVER_CLIENT_SECRET=발급받은-client-secret
+MONEW_NAVER_CONNECT_TIMEOUT=3s
+MONEW_NAVER_READ_TIMEOUT=5s
 ```
 
 공유 예시 파일인 `.env.example`에는 실제 인증 값을 넣지 않고 빈 값만 유지합니다.
@@ -94,6 +96,10 @@ monew:
       path: /v1/search/news.json
       client-id: ${MONEW_NAVER_CLIENT_ID:}
       client-secret: ${MONEW_NAVER_CLIENT_SECRET:}
+      connect-timeout: ${MONEW_NAVER_CONNECT_TIMEOUT:3s}
+      read-timeout: ${MONEW_NAVER_READ_TIMEOUT:5s}
 ```
+
+timeout 값은 선택 설정이며 지정하지 않으면 연결 timeout은 3초, 읽기 timeout은 5초를 사용합니다.
 
 `display`는 최대 100, `start`는 최대 1000까지 사용할 수 있습니다. `sort`는 정확도순 `sim` 또는 날짜순 `date`를 사용합니다.
