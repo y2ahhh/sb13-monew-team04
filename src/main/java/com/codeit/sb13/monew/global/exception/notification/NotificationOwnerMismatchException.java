@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public class NotificationOwnerMismatchException extends NotificationException{
 
-    public NotificationOwnerMismatchException(UUID notificationId, UUID userId) {
-        super(ApiErrorCode.NOTIFICATION_OWNER_MISMATCH, Map.of("notificationId", notificationId, "userId", userId));
+    public NotificationOwnerMismatchException(UUID notificationId) {
+        super(ApiErrorCode.NOTIFICATION_NOT_FOUND, Map.of("notificationId", notificationId));
     }
 }

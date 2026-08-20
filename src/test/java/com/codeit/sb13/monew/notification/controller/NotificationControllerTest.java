@@ -98,7 +98,8 @@ class NotificationControllerTest {
             mockMvc.perform(patch("/api/notifications/{notificationId}", notificationId)
                             .header(USER_ID_HEADER, userId.toString()))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.code").exists());
+                    .andExpect(jsonPath("$.code").exists())
+                    .andExpect(jsonPath("$.code").value("NTF_001"));
         }
 
         @Test
@@ -108,13 +109,14 @@ class NotificationControllerTest {
             UUID notificationId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             when(notificationService.confirmNotification(notificationId, userId))
-                    .thenThrow(new NotificationOwnerMismatchException(notificationId, userId));
+                    .thenThrow(new NotificationOwnerMismatchException(notificationId));
 
             // when & then
             mockMvc.perform(patch("/api/notifications/{notificationId}", notificationId)
                             .header(USER_ID_HEADER, userId.toString()))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.code").exists());
+                    .andExpect(jsonPath("$.code").exists())
+                    .andExpect(jsonPath("$.code").value("NTF_001"));
         }
     }
 
