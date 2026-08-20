@@ -241,6 +241,56 @@ class NotificationServiceImplTest {
 
             verify(notificationRepository, never()).save(any());
         }
+    }
 
+    @Nested
+    @DisplayName("confirmAllNotifications")
+    class confirmAllNotifications {
+
+        @Test
+        @DisplayName("요청자의 미확인 알림이 모두 확인 처리된다.")
+        void 전체_확인_성공() {
+            // given
+            UUID userId = UUID.randomUUID();
+            User user = User.builder().email("test@test.com").nickname("테스트").password("pw").build();
+            ReflectionTestUtils.setField(user, "id", userId);
+
+            Notification notification1 = Notification.create(user, "알림1", UUID.randomUUID(), ResourceType.COMMENT);
+            Notification notification2 = Notification.create(user, "알림2", UUID.randomUUID(), ResourceType.INTEREST);
+            List<Notification> notifications = List.of(notification1, notification2);
+
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+            when(notificationRepository.findByUser_IdAndConfirmedFalse(userId)).thenReturn(notifications);
+
+            NotificationResult notificationResult = new NotificationResult(
+                    UUID.randomUUID(), userId, "아무 내용", UUID.randomUUID(),
+                    ResourceType.COMMENT, true, null, null
+            );
+            when(mapper.toResult(any(Notification.class))).thenReturn(notificationResult);
+
+            // when
+            List<NotificationResult> result = notificationServiceImpl.confirmAllNotifications(userId);
+
+            // then
+            assertThat(notification1.isConfirmed()).isTrue();
+            assertThat(notification2.isConfirmed()).isTrue();
+
+            verify(notificationRepository).saveAll(notifications);
+            assertThat(result).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 요청자면 UserNotFoundException이 발생하고 알림 조회는 시도되지 않는다.")
+        void 요청자_없으면_예외() {
+            // given
+            UUID userId = UUID.randomUUID();
+            when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> notificationServiceImpl.confirmAllNotifications(userId))
+                    .isInstanceOf(UserNotFoundException.class);
+
+            verify(notificationRepository, never()).findByUser_IdAndConfirmedFalse(any());
+        }
     }
 }
