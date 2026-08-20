@@ -1,7 +1,6 @@
 package com.codeit.sb13.monew.notification.service.impl;
 
 import com.codeit.sb13.monew.global.exception.notification.NotificationNotFoundException;
-import com.codeit.sb13.monew.global.exception.notification.NotificationOwnerMismatchException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.notification.domain.Notification;
 import com.codeit.sb13.monew.notification.domain.ResourceType;
@@ -67,7 +66,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         if(!notification.getUser().getId().equals(userId)) {
             log.warn("본인 소유가 아닌 알림 확인 시도 - notificationId={}, userId={}", notificationId, userId);
-            throw new NotificationOwnerMismatchException(notificationId);
+            throw new NotificationNotFoundException(notificationId);
         }
 
         notification.confirm();

@@ -1,7 +1,6 @@
 package com.codeit.sb13.monew.notification.service.impl;
 
 import com.codeit.sb13.monew.global.exception.notification.NotificationNotFoundException;
-import com.codeit.sb13.monew.global.exception.notification.NotificationOwnerMismatchException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.notification.domain.Notification;
 import com.codeit.sb13.monew.notification.domain.ResourceType;
@@ -218,7 +217,7 @@ class NotificationServiceImplTest {
         }
 
         @Test
-        @DisplayName("본인 알림이 아니면 NotificationOwnerMismatchException이 발생한다.")
+        @DisplayName("본인 알림이 아니면 NotificationNotFoundException이 발생한다.")
         void 본인_알림_아니면_예외() {
             // given
             UUID ownerId = UUID.randomUUID();
@@ -238,7 +237,7 @@ class NotificationServiceImplTest {
 
             // when & then
             assertThatThrownBy(() -> notificationServiceImpl.confirmNotification(notificationId, otherId))
-                    .isInstanceOf(NotificationOwnerMismatchException.class);
+                    .isInstanceOf(NotificationNotFoundException.class);
 
             verify(notificationRepository, never()).save(any());
         }

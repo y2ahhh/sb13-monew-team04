@@ -1,7 +1,6 @@
 package com.codeit.sb13.monew.notification.controller;
 
 import com.codeit.sb13.monew.global.exception.notification.NotificationNotFoundException;
-import com.codeit.sb13.monew.global.exception.notification.NotificationOwnerMismatchException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.notification.controller.dto.NotificationResponse;
 import com.codeit.sb13.monew.notification.domain.ResourceType;
@@ -34,7 +33,6 @@ class NotificationControllerTest {
     @Autowired
     MockMvc mockMvc;
 
-    // NotificationController 생성자가 받는 두 의존성 — 이 둘이 없으면 컨트롤러 빈 자체가 안 만들어져요.
     @MockitoBean
     NotificationService notificationService;
 
@@ -99,7 +97,8 @@ class NotificationControllerTest {
                             .header(USER_ID_HEADER, userId.toString()))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").exists())
-                    .andExpect(jsonPath("$.code").value("NTF_001"));
+                    .andExpect(jsonPath("$.code").value("NTF_001"))
+                    .andExpect(jsonPath("$.exceptionType").value("NotificationNotFoundException"));
         }
 
         @Test
@@ -109,14 +108,15 @@ class NotificationControllerTest {
             UUID notificationId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             when(notificationService.confirmNotification(notificationId, userId))
-                    .thenThrow(new NotificationOwnerMismatchException(notificationId));
+                    .thenThrow(new NotificationNotFoundException(notificationId));
 
             // when & then
             mockMvc.perform(patch("/api/notifications/{notificationId}", notificationId)
                             .header(USER_ID_HEADER, userId.toString()))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").exists())
-                    .andExpect(jsonPath("$.code").value("NTF_001"));
+                    .andExpect(jsonPath("$.code").value("NTF_001"))
+                    .andExpect(jsonPath("$.exceptionType").value("NotificationNotFoundException"));
         }
     }
 
