@@ -7,7 +7,6 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
@@ -61,20 +60,12 @@ public class GlobalExceptionHandler {
 
     }
 
-    /**
-     * {@code IllegalArgumentException.class}는 컨트롤러에서 직접 던지는 경우도 있지만,
-     * Spring Data JPA 리포지토리 프록시를 통해 던져지면 {@code EntityManagerFactoryUtils}가
-     * {@link InvalidDataAccessApiUsageException}으로 감싸 다시 던진다. 두 형태 모두
-     * "요청 값이 올바르지 않다"는 같은 의미라 함께 400으로 처리한다.
-     */
     @ExceptionHandler({
             HttpMessageNotReadableException.class,
             MethodArgumentTypeMismatchException.class,
             MissingServletRequestParameterException.class,
             MissingRequestHeaderException.class,
-            ConstraintViolationException.class,
-            IllegalArgumentException.class,
-            InvalidDataAccessApiUsageException.class
+            ConstraintViolationException.class
     })
     public ResponseEntity<ApiErrorResponse> handleBadRequest(Exception e) {
         ApiErrorCode errorCode = ApiErrorCode.INVALID_REQUEST;

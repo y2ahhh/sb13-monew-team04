@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
 import com.codeit.sb13.monew.global.exception.interest.InterestNameDuplicatedException;
+import com.codeit.sb13.monew.global.exception.interest.InterestSearchConditionInvalidException;
 import com.codeit.sb13.monew.interest.controller.dto.InterestCreateRequest;
 import com.codeit.sb13.monew.interest.controller.dto.InterestResponse;
 import com.codeit.sb13.monew.interest.service.InterestService;
@@ -186,7 +187,7 @@ class InterestControllerTest {
     }
 
     @Test
-    @DisplayName("limit이 1보다 작으면 400으로 응답한다")
+    @DisplayName("limit이 1보다 작으면 400(INT_006)으로 응답한다")
     void search_limitLessThanOne_returns400() throws Exception {
         mockMvc.perform(get("/api/interests")
                         .header("Monew-Request-User-ID", UUID.randomUUID().toString())
@@ -194,20 +195,18 @@ class InterestControllerTest {
                         .param("direction", "ASC")
                         .param("limit", "0"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").exists());
+                .andExpect(jsonPath("$.code").value("INT_006"));
     }
 
     @Test
-    @DisplayName("숫자가 아닌 구독자 수 커서로 리포지토리가 InvalidDataAccessApiUsageException을 던져도 400으로 응답한다")
-    void search_invalidSubscriberCountCursorTranslatedByRepository_returns400() throws Exception {
-        // InterestRepositoryCustomImpl이 던지는 IllegalArgumentException은 Spring Data JPA
-        // 리포지토리 프록시를 거치면서 InvalidDataAccessApiUsageException으로 감싸진다.
-        // 서비스 계층에서 이 예외가 그대로 올라온다고 가정하고, 컨트롤러까지 도달했을 때도
-        // GlobalExceptionHandler가 400으로 응답하는지 확인한다.
+    @DisplayName("서비스 계층에서 조회 조건 오류가 올라오면 400(INT_006)으로 응답한다")
+    void search_searchConditionInvalidFromService_returns400() throws Exception {
+        // InterestRepositoryCustomImpl에서 구독자 수 기준 커서가 숫자가 아닐 때처럼,
+        // 서비스 계층에서 InterestSearchConditionInvalidException이 올라오는 경우를 가정하고
+        // 컨트롤러까지 도달했을 때 GlobalExceptionHandler가 400(INT_006)으로 응답하는지 확인한다.
         when(interestService.search(any(InterestSearchCommand.class)))
-                .thenThrow(new org.springframework.dao.InvalidDataAccessApiUsageException(
-                        "구독자 수 기준 커서 값이 올바르지 않습니다: 숫자아님",
-                        new IllegalArgumentException("구독자 수 기준 커서 값이 올바르지 않습니다: 숫자아님")));
+                .thenThrow(new InterestSearchConditionInvalidException(
+                        "구독자 수 기준 커서 값이 올바르지 않습니다: 숫자아님"));
 
         mockMvc.perform(get("/api/interests")
                         .header("Monew-Request-User-ID", UUID.randomUUID().toString())
@@ -217,6 +216,6 @@ class InterestControllerTest {
                         .param("after", LocalDateTime.now().toString())
                         .param("limit", "10"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").exists());
+                .andExpect(jsonPath("$.code").value("INT_006"));
     }
 }

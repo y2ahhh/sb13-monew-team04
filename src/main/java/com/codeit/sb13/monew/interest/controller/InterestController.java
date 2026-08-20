@@ -1,6 +1,7 @@
 package com.codeit.sb13.monew.interest.controller;
 
 import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
+import com.codeit.sb13.monew.global.exception.interest.InterestSearchConditionInvalidException;
 import com.codeit.sb13.monew.interest.controller.dto.InterestCreateRequest;
 import com.codeit.sb13.monew.interest.controller.dto.InterestResponse;
 import com.codeit.sb13.monew.interest.service.InterestService;
@@ -68,7 +69,7 @@ public class InterestController {
      * @param direction 정렬 방향({@code ASC} 또는 {@code DESC})
      * @param cursor 이전 페이지 마지막 항목의 정렬 기준 값. 첫 페이지 조회 시 생략
      * @param after 이전 페이지 마지막 항목의 생성 시각. 첫 페이지 조회 시 생략
-     * @param limit 조회할 최대 개수. 1 미만이면 400(GLB_001)으로 응답한다.
+     * @param limit 조회할 최대 개수. 1 미만이면 400(INT_006)으로 응답한다.
      * @param requestUserId 요청자 id
      * @return 200 상태코드와 조회된 관심사 목록, 다음 페이지를 위한 커서 정보
      */
@@ -83,7 +84,7 @@ public class InterestController {
             @RequestHeader("Monew-Request-User-ID") UUID requestUserId
     ) {
         if (limit < 1) {
-            throw new IllegalArgumentException("limit은 1 이상이어야 합니다: " + limit);
+            throw new InterestSearchConditionInvalidException("limit은 1 이상이어야 합니다: " + limit);
         }
 
         CursorPageResponseDto<InterestResponse> response = interestService.search(

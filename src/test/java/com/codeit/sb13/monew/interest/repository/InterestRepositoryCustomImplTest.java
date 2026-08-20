@@ -2,8 +2,11 @@ package com.codeit.sb13.monew.interest.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;
+import com.codeit.sb13.monew.global.exception.ApiErrorCode;
+import com.codeit.sb13.monew.global.exception.interest.InterestSearchConditionInvalidException;
 import com.codeit.sb13.monew.global.config.QueryDslConfig;
 import com.codeit.sb13.monew.interest.domain.Interest;
 import com.codeit.sb13.monew.interest.domain.Subscribe;
@@ -19,7 +22,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
-import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -305,23 +307,24 @@ class InterestRepositoryCustomImplTest {
     }
 
     @Test
-    @DisplayName("구독자 수 기준 커서 값이 숫자가 아니면 예외를 던진다")
+    @DisplayName("구독자 수 기준 커서 값이 숫자가 아니면 InterestSearchConditionInvalidException을 던진다")
     void search_invalidSubscriberCountCursor_throwsException() {
         persistInterest("스포츠", "키워드");
         em.flush();
         em.clear();
 
-        // InterestRepositoryCustomImpl은 IllegalArgumentException을 던지지만, 이 메서드는
-        // Spring Data JPA가 만든 리포지토리 프록시를 통해 호출되므로, PersistenceExceptionTranslator가
-        // 가로채 InvalidDataAccessApiUsageException으로 감싸 다시 던진다
-        // (EntityManagerFactoryUtils.convertJpaAccessExceptionIfPossible). 원인 예외까지 확인해
-        // "숫자가 아닌 커서"라는 실제 오류 상황이 맞는지 함께 검증한다.
-        assertThatThrownBy(() -> interestRepository.search(
-                null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC,
-                "숫자아님", LocalDateTime.now(), 10, null))
-                .isInstanceOf(InvalidDataAccessApiUsageException.class)
-                .hasCauseInstanceOf(IllegalArgumentException.class)
-                .cause().hasMessageContaining("숫자아님");
+        // IllegalArgumentException 대신 전용 예외를 쓰는 이유는 InterestSearchConditionInvalidException의
+        // javadoc 참고. 이 타입은 Spring이 인식하는 JPA 예외가 아니므로, 리포지토리 프록시를
+        // 거쳐도 InvalidDataAccessApiUsageException으로 감싸지지 않고 그대로 전달된다.
+        // MonewException의 메시지는 ApiErrorCode의 고정 메시지라, 실제 원인은 details에서 확인한다.
+        InterestSearchConditionInvalidException e = catchThrowableOfType(
+                () -> interestRepository.search(
+                        null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC,
+                        "숫자아님", LocalDateTime.now(), 10, null),
+                InterestSearchConditionInvalidException.class);
+
+        assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.INTEREST_SEARCH_CONDITION_INVALID);
+        assertThat(e.getDetails()).containsEntry("reason", "구독자 수 기준 커서 값이 올바르지 않습니다: 숫자아님");
     }
 
     @Test

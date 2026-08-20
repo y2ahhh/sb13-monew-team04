@@ -4,6 +4,7 @@ import static com.codeit.sb13.monew.interest.domain.QInterest.interest;
 import static com.codeit.sb13.monew.interest.domain.QSubscribe.subscribe;
 
 import com.codeit.sb13.monew.interest.domain.Interest;
+import com.codeit.sb13.monew.global.exception.interest.InterestSearchConditionInvalidException;
 import com.codeit.sb13.monew.interest.domain.QKeyword;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchPage;
 import com.codeit.sb13.monew.interest.service.dto.InterestOrderBy;
@@ -168,7 +169,7 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
         try {
             return Long.parseLong(cursor);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("구독자 수 기준 커서 값이 올바르지 않습니다: " + cursor, e);
+            throw new InterestSearchConditionInvalidException("구독자 수 기준 커서 값이 올바르지 않습니다: " + cursor);
         }
     }
 
