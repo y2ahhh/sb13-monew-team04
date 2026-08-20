@@ -256,6 +256,8 @@ public class UserServiceImplTest {
         .build();
     when(userRepository.findById(command.userId()))
         .thenReturn(Optional.of(user));
+    when(userRepository.saveAndFlush(user))
+        .thenReturn(user);
     when(userMapper.toUpdateNicknameResult(user))
         .thenReturn(expectedResult);
 
@@ -265,8 +267,6 @@ public class UserServiceImplTest {
     // then
     assertThat(actualResult).isEqualTo(expectedResult);
     assertThat(user.getNickname()).isEqualTo("닉네임2");
-
-
   }
 
 

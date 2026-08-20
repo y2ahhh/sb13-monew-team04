@@ -76,8 +76,8 @@ public class UserServiceImpl implements UserService {
     User user = userRepository.findById(command.userId())
         .orElseThrow(() -> new UserNotFoundException(command.userId()));
     user.updateNickname(command.nickname());
-
-    return userMapper.toUpdateNicknameResult(user);
+    User saveUser = userRepository.saveAndFlush(user);
+    return userMapper.toUpdateNicknameResult(saveUser);
   }
 
   private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
