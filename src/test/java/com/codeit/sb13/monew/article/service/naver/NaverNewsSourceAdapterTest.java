@@ -2,6 +2,9 @@ package com.codeit.sb13.monew.article.service.naver;
 
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.dto.CollectedArticle;
+import com.codeit.sb13.monew.article.service.naver.client.NaverNewsClient;
+import com.codeit.sb13.monew.article.service.naver.dto.NaverNewsSearchRequest;
+import com.codeit.sb13.monew.article.service.naver.provider.NaverNewsSearchRequestProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

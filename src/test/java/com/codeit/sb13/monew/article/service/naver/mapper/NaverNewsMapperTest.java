@@ -1,7 +1,9 @@
-package com.codeit.sb13.monew.article.service.naver;
+package com.codeit.sb13.monew.article.service.naver.mapper;
 
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.dto.CollectedArticle;
+import com.codeit.sb13.monew.article.service.naver.dto.NaverNewsItem;
+import com.codeit.sb13.monew.article.service.naver.dto.NaverNewsSearchResponse;
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchParseException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

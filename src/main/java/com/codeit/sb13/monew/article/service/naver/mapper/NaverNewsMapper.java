@@ -1,7 +1,9 @@
-package com.codeit.sb13.monew.article.service.naver;
+package com.codeit.sb13.monew.article.service.naver.mapper;
 
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.dto.CollectedArticle;
+import com.codeit.sb13.monew.article.service.naver.dto.NaverNewsItem;
+import com.codeit.sb13.monew.article.service.naver.dto.NaverNewsSearchResponse;
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchParseException;
 import org.apache.commons.text.StringEscapeUtils;
 import org.springframework.stereotype.Component;
@@ -17,7 +19,7 @@ public class NaverNewsMapper {
     private static final DateTimeFormatter RFC_1123_DATE_FORMATTER = DateTimeFormatter.RFC_1123_DATE_TIME;
     private static final String B_TAG_PATTERN = "(?i)</?b>";
 
-    List<CollectedArticle> toCollectedArticles(NaverNewsSearchResponse response) {
+    public List<CollectedArticle> toCollectedArticles(NaverNewsSearchResponse response) {
 
         return response.items()
                 .stream()

@@ -1,7 +1,11 @@
-package com.codeit.sb13.monew.article.service.naver;
+package com.codeit.sb13.monew.article.service.naver.client;
 
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.dto.CollectedArticle;
+import com.codeit.sb13.monew.article.service.naver.config.NaverNewsProperties;
+import com.codeit.sb13.monew.article.service.naver.dto.NaverNewsSearchRequest;
+import com.codeit.sb13.monew.article.service.naver.dto.NaverNewsSort;
+import com.codeit.sb13.monew.article.service.naver.mapper.NaverNewsMapper;
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchFailedException;
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchParseException;
 import org.junit.jupiter.api.BeforeEach;

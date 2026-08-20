@@ -1,4 +1,4 @@
-package com.codeit.sb13.monew.article.service.naver;
+package com.codeit.sb13.monew.article.service.naver.config;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

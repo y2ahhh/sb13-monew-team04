@@ -1,4 +1,4 @@
-package com.codeit.sb13.monew.article.service.naver;
+package com.codeit.sb13.monew.article.service.naver.dto;
 
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchRequestInvalidException;
 import org.springframework.util.StringUtils;

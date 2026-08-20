@@ -3,6 +3,9 @@ package com.codeit.sb13.monew.article.service.naver;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.NewsSourceAdapter;
 import com.codeit.sb13.monew.article.service.dto.CollectedArticle;
+import com.codeit.sb13.monew.article.service.naver.client.NaverNewsClient;
+import com.codeit.sb13.monew.article.service.naver.dto.NaverNewsSearchRequest;
+import com.codeit.sb13.monew.article.service.naver.provider.NaverNewsSearchRequestProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
