@@ -1,5 +1,6 @@
 package com.codeit.sb13.monew.user.service.impl;
 
+import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.exception.DuplicateEmailException;
 import com.codeit.sb13.monew.user.exception.InvalidPasswordException;
@@ -11,6 +12,8 @@ import com.codeit.sb13.monew.user.service.dto.UserCreateCommand;
 import com.codeit.sb13.monew.user.service.dto.UserCreateResult;
 import com.codeit.sb13.monew.user.service.dto.UserLoginCommand;
 import com.codeit.sb13.monew.user.service.dto.UserLoginResult;
+import com.codeit.sb13.monew.user.service.dto.UserUpdateNicknameCommand;
+import com.codeit.sb13.monew.user.service.dto.UserUpdateNicknameResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -65,6 +68,15 @@ public class UserServiceImpl implements UserService {
       throw new InvalidPasswordException(command.email());
     }
     return userMapper.toLoginResult(user);
+  }
+
+  @Override
+  public UserUpdateNicknameResult updateNickname(UserUpdateNicknameCommand command) {
+    User user = userRepository.findById(command.userId())
+        .orElseThrow(() -> new UserNotFoundException(command.userId()));
+    user.updateNickname(command.nickname());
+
+    return userMapper.toUpdateNicknameResult(user);
   }
 
   private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {

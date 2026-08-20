@@ -30,4 +30,8 @@ public class User extends DeletedAtEntity {
 
   @Column(name = "password", nullable = false, length = 225)
   private String password;
+
+  public void updateNickname(String nickname) {
+    this.nickname = nickname;
+  }
 }
