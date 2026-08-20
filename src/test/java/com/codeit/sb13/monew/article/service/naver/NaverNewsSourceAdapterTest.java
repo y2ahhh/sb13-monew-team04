@@ -20,7 +20,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("NaverNewsSourceAdapter unit test")
+@DisplayName("네이버 뉴스 소스 어댑터 단위 테스트")
 class NaverNewsSourceAdapterTest {
 
     @Mock
@@ -37,7 +37,7 @@ class NaverNewsSourceAdapterTest {
     }
 
     @Test
-    @DisplayName("source returns NAVER")
+    @DisplayName("출처가 NAVER로 반환된다")
     void sourceReturnsNaver() {
         // when
         ArticleSource source = adapter.source();
@@ -47,7 +47,7 @@ class NaverNewsSourceAdapterTest {
     }
 
     @Test
-    @DisplayName("empty provider requests return empty list without client call")
+    @DisplayName("요청 목록이 비어 있으면 클라이언트 호출 없이 빈 목록을 반환한다")
     void emptyProviderRequestsReturnEmptyListWithoutClientCall() {
         // given
         when(provider.getRequests()).thenReturn(List.of());
@@ -62,7 +62,7 @@ class NaverNewsSourceAdapterTest {
     }
 
     @Test
-    @DisplayName("fetch combines client results in request order")
+    @DisplayName("요청 순서대로 수집 결과를 합산한다")
     void fetchCombinesClientResultsInRequestOrder() {
         // given
         NaverNewsSearchRequest economyRequest = new NaverNewsSearchRequest("economy");
