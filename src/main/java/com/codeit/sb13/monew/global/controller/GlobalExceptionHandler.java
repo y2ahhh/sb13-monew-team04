@@ -65,7 +65,8 @@ public class GlobalExceptionHandler {
             MethodArgumentTypeMismatchException.class,
             MissingServletRequestParameterException.class,
             MissingRequestHeaderException.class,
-            ConstraintViolationException.class
+            ConstraintViolationException.class,
+            IllegalArgumentException.class
     })
     public ResponseEntity<ApiErrorResponse> handleBadRequest(Exception e) {
         ApiErrorCode errorCode = ApiErrorCode.INVALID_REQUEST;
