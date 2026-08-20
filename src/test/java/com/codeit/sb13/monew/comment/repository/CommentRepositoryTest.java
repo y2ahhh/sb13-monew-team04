@@ -55,7 +55,7 @@ class CommentRepositoryTest {
 
     @Test
     @DisplayName("사용자가 작성한 댓글을 최신 작성순으로 반환")
-    void returns_user_comments_ordered_by_created_at_desc() throws InterruptedException {
+    void returns_user_comments_ordered_by_created_at_desc() {
         // given
         User targetUser = new User("test@eamil.com", "testNickname", "testPassword");
         User otherUser = new User("otherTest@email.com", "otherTestNickname", "otherTestPassword");
@@ -63,25 +63,33 @@ class CommentRepositoryTest {
         userRepository.saveAndFlush(otherUser);
 
         Article article = articleRepository.saveAndFlush(new Article("testTitle", "testContent", "link", LocalDateTime.now(), "source"));
-        commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment1"));
-        Thread.sleep(100);
-        commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment2"));
-        Thread.sleep(100);
-        commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment3"));
+        Comment oldestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment1"));
+        Comment middleComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment2"));
+        Comment newestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment3"));
         commentRepository.saveAndFlush(new Comment(article.getId(), otherUser, "testComment4"));
 
+        LocalDateTime baseTime = LocalDateTime.of(2026, 8, 20, 10, 0);
+        updateCommentCreatedAt(oldestComment.getId(), baseTime.minusMinutes(2));
+        updateCommentCreatedAt(middleComment.getId(), baseTime.minusMinutes(1));
+        updateCommentCreatedAt(newestComment.getId(), baseTime);
+
         em.clear();
+
         // when
         List<RecentCommentActivityProjection> recentCommentActivities = commentRepository.findRecentCommentActivities(targetUser.getId(), PageRequest.of(0, 10));
 
-
-        recentCommentActivities.forEach(System.out::println);
         // then
         assertThat(recentCommentActivities)
                 .extracting(RecentCommentActivityProjection::content)
-                .containsExactly("testComment3", "testComment2", "testComment1")
-                .doesNotContain("testComment4");
+                .containsExactly("testComment3", "testComment2", "testComment1");
+    }
 
+    private void updateCommentCreatedAt(UUID commentId, LocalDateTime createdAt) {
+        em.getEntityManager()
+                .createNativeQuery("UPDATE comments SET created_at = ? WHERE id = ?")
+                .setParameter(1, createdAt)
+                .setParameter(2, commentId)
+                .executeUpdate();
     }
 
     @Test
