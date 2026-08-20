@@ -71,6 +71,7 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
+  @Transactional
   public UserUpdateNicknameResult updateNickname(UserUpdateNicknameCommand command) {
     User user = userRepository.findById(command.userId())
         .orElseThrow(() -> new UserNotFoundException(command.userId()));
