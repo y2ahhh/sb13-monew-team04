@@ -267,6 +267,7 @@ public class UserServiceImplTest {
     // then
     assertThat(actualResult).isEqualTo(expectedResult);
     assertThat(user.getNickname()).isEqualTo("닉네임2");
+    verify(userRepository).saveAndFlush(user);
   }
 
 
