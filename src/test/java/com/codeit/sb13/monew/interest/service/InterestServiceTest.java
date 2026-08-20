@@ -3,6 +3,7 @@ package com.codeit.sb13.monew.interest.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -71,8 +72,9 @@ class InterestServiceTest {
         InterestCreateCommand command = new InterestCreateCommand("스포츠뉴스판", List.of("축구"));
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
-        // "스포츠뉴스"(5자)와 "스포츠뉴스판"(6자)은 편집 거리 1로 유사도 1 - 1/6 ≈ 0.833(83.3%)
-        when(interestRepository.findAllNames()).thenReturn(List.of("스포츠뉴스"));
+        // "스포츠뉴스"(5자)와 "스포츠뉴스판"(6자)은 편집 거리 1로 유사도 1 - 1/6 ≈ 0.833(83.3%).
+        // 새 이름 길이 6이면 후보 길이 범위는 [5, 7]이라 길이 5인 "스포츠뉴스"가 후보에 포함된다.
+        when(interestRepository.findNamesByLengthBetween(5, 7)).thenReturn(List.of("스포츠뉴스"));
 
         // when & then
         assertThatThrownBy(() -> interestServiceImpl.create(command))
@@ -90,7 +92,8 @@ class InterestServiceTest {
         when(interestRepository.existsByName(command.name())).thenReturn(false);
         // "게임소식란"과 "게임소식판"은 둘 다 길이 5, 마지막 글자 하나만 달라 편집 거리 1이고,
         // 유사도는 1 - 1/5 = 0.8로 임계값과 정확히 같다. >= 비교가 > 로 바뀌는 회귀를 잡기 위한 경계값 테스트.
-        when(interestRepository.findAllNames()).thenReturn(List.of("게임소식란"));
+        // 새 이름 길이 5이면 후보 길이 범위는 [4, 6]이라 길이 5인 "게임소식란"이 후보에 포함된다.
+        when(interestRepository.findNamesByLengthBetween(4, 6)).thenReturn(List.of("게임소식란"));
 
         // when & then
         assertThatThrownBy(() -> interestServiceImpl.create(command))
@@ -107,8 +110,9 @@ class InterestServiceTest {
         UUID generatedId = UUID.randomUUID();
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
-        // "음악"과는 완전히 다른 문자열이라 유사도 0
-        when(interestRepository.findAllNames()).thenReturn(List.of("음악"));
+        // "스포츠"(길이 3)의 후보 길이 범위는 [3, 3]이다. "가나다"는 길이는 같지만 모든 글자가
+        // 달라 편집 거리 3, 유사도 0이라 후보로 조회되더라도 임계값 미만으로 걸러진다.
+        when(interestRepository.findNamesByLengthBetween(3, 3)).thenReturn(List.of("가나다"));
         when(interestRepository.saveAndFlush(any(Interest.class))).thenAnswer(invocation -> {
             Interest saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", generatedId);
@@ -131,7 +135,7 @@ class InterestServiceTest {
         UUID generatedId = UUID.randomUUID();
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
-        when(interestRepository.findAllNames()).thenReturn(List.of());
+        when(interestRepository.findNamesByLengthBetween(anyInt(), anyInt())).thenReturn(List.of());
         when(interestRepository.saveAndFlush(any(Interest.class))).thenAnswer(invocation -> {
             Interest saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", generatedId);
@@ -164,7 +168,7 @@ class InterestServiceTest {
                 "duplicate key value violates unique constraint \"uk_interests_name\"");
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
-        when(interestRepository.findAllNames()).thenReturn(List.of());
+        when(interestRepository.findNamesByLengthBetween(anyInt(), anyInt())).thenReturn(List.of());
         when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
 
         // when & then
@@ -188,7 +192,7 @@ class InterestServiceTest {
                         + "ON PUBLIC.INTERESTS(NAME NULLS FIRST) VALUES ( /* 1 */ '스포츠' )\"");
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
-        when(interestRepository.findAllNames()).thenReturn(List.of());
+        when(interestRepository.findNamesByLengthBetween(anyInt(), anyInt())).thenReturn(List.of());
         when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
 
         // when & then
@@ -214,7 +218,7 @@ class InterestServiceTest {
                             + "ON PUBLIC.INTERESTS(NAME NULLS FIRST) VALUES ( /* 1 */ '스포츠' )\"");
 
             when(interestRepository.existsByName(command.name())).thenReturn(false);
-            when(interestRepository.findAllNames()).thenReturn(List.of());
+            when(interestRepository.findNamesByLengthBetween(anyInt(), anyInt())).thenReturn(List.of());
             when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
 
             // when & then
@@ -233,7 +237,7 @@ class InterestServiceTest {
         InterestCreateCommand command = new InterestCreateCommand("스포츠", List.of("축구"));
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
-        when(interestRepository.findAllNames()).thenReturn(List.of());
+        when(interestRepository.findNamesByLengthBetween(anyInt(), anyInt())).thenReturn(List.of());
         when(interestRepository.saveAndFlush(any(Interest.class)))
                 .thenThrow(new DataIntegrityViolationException(
                         "null value in column \"name\" violates not-null constraint"));
@@ -253,7 +257,7 @@ class InterestServiceTest {
         DataIntegrityViolationException original = new DataIntegrityViolationException(null);
 
         when(interestRepository.existsByName(command.name())).thenReturn(false);
-        when(interestRepository.findAllNames()).thenReturn(List.of());
+        when(interestRepository.findNamesByLengthBetween(anyInt(), anyInt())).thenReturn(List.of());
         when(interestRepository.saveAndFlush(any(Interest.class))).thenThrow(original);
 
         // when & then
