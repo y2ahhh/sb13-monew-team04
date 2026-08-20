@@ -33,8 +33,12 @@ public interface InterestRepository extends JpaRepository<Interest, UUID> {
      * ({@link com.codeit.sb13.monew.interest.service.InterestServiceImpl})이
      * 이 범위를 계산해 넘긴다.</p>
      *
-     * <p>관심사가 늘어나도 이 조회는 테이블 전체가 아니라 후보군만 스캔하므로,
-     * 매 등록 요청마다 전체 이름을 가져오던 이전 방식보다 확장성이 낫다.</p>
+     * <p>{@code length(i.name)} 조건만으로 DB가 반드시 후보군만 스캔한다고
+     * 보장하지는 않는다. 인덱스 유무와 실행 계획에 따라 여전히 테이블 전체를
+     * 스캔할 수 있다. 이 조회가 확실히 보장하는 건 애플리케이션으로 돌아오는
+     * 이름의 개수와, 그로 인해 뒤에서 수행할 Levenshtein 비교 횟수를 줄인다는
+     * 점이다. DB 쪽 스캔 자체를 줄이려면 {@code length(name)}에 대한 별도
+     * 인덱스가 필요하다.</p>
      *
      * @param minLength 조회할 이름 길이의 하한(포함)
      * @param maxLength 조회할 이름 길이의 상한(포함)
