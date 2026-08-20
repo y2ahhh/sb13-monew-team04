@@ -38,12 +38,6 @@ public class Article extends DeletedAtEntity {
     @Column(nullable = false, length = 50)
     private ArticleSource source;
 
-    @Column(name = "view_count", nullable = false)
-    private Integer viewCount = 0;
-
-    @Column(name = "comment_count", nullable = false)
-    private Integer commentCount = 0;
-
     private Article(String title, String summary, String link,
                     LocalDateTime date, ArticleSource source) {
         this.title = title;
@@ -51,8 +45,6 @@ public class Article extends DeletedAtEntity {
         this.link = link;
         this.date = date;
         this.source = source;
-        this.viewCount = 0;
-        this.commentCount = 0;
     }
 
     /**

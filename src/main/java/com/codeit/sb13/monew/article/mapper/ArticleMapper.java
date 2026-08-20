@@ -12,16 +12,18 @@ public interface ArticleMapper {
 
     @Mapping(source = "article.link", target = "sourceUrl")
     @Mapping(source = "article.date", target = "publishDate")
-    ArticleDto toDto(Article article, boolean viewedByMe);
+    ArticleDto toDto(Article article, boolean viewedByMe,
+                     Integer commentCount, Integer viewCount);
 
-    @Mapping(source = "user.id", target = "viewedBy")
-    @Mapping(source = "article.id", target = "articleId")
-    @Mapping(source = "article.source", target = "source")
-    @Mapping(source = "article.link", target = "sourceUrl")
-    @Mapping(source = "article.title", target = "articleTitle")
-    @Mapping(source = "article.date", target = "articlePublishedDate")
-    @Mapping(source = "article.summary", target = "articleSummary")
-    @Mapping(source = "article.commentCount", target = "articleCommentCount")
-    @Mapping(source = "article.viewCount", target = "articleViewCount")
-    ArticleViewDto toViewDto(ArticleView articleView);
+    @Mapping(source = "articleView.user.id", target = "viewedBy")
+    @Mapping(source = "articleView.article.id", target = "articleId")
+    @Mapping(source = "articleView.article.source", target = "source")
+    @Mapping(source = "articleView.article.link", target = "sourceUrl")
+    @Mapping(source = "articleView.article.title", target = "articleTitle")
+    @Mapping(source = "articleView.article.date", target = "articlePublishedDate")
+    @Mapping(source = "articleView.article.summary", target = "articleSummary")
+    @Mapping(source = "commentCount", target = "articleCommentCount")
+    @Mapping(source = "viewCount", target = "articleViewCount")
+    ArticleViewDto toViewDto(ArticleView articleView,
+                             Integer commentCount, Integer viewCount);
 }

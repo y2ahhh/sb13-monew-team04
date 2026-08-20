@@ -54,7 +54,7 @@ class ArticleMapperTest {
     @DisplayName("Article을 ArticleDto로 변환한다")
     void testToDto() {
         // when
-        ArticleDto result = articleMapper.toDto(article, true);
+        ArticleDto result = articleMapper.toDto(article, true, 3, 7);
 
         // then
         assertThat(result.id()).isEqualTo(articleId);
@@ -63,15 +63,15 @@ class ArticleMapperTest {
         assertThat(result.title()).isEqualTo("Test Article");
         assertThat(result.publishDate()).isEqualTo(publishDate);
         assertThat(result.summary()).isEqualTo("Test Summary");
-        assertThat(result.commentCount()).isZero();
-        assertThat(result.viewCount()).isZero();
+        assertThat(result.commentCount()).isEqualTo(3);
+        assertThat(result.viewCount()).isEqualTo(7);
         assertThat(result.viewedByMe()).isTrue();
     }
 
     @Test
     @DisplayName("viewedByMe는 전달받은 값을 그대로 반영한다")
     void testToDtoViewedByMeFalse() {
-        assertThat(articleMapper.toDto(article, false).viewedByMe()).isFalse();
+        assertThat(articleMapper.toDto(article, false, 0, 0).viewedByMe()).isFalse();
     }
 
     @Test
@@ -82,7 +82,7 @@ class ArticleMapperTest {
         ArticleView articleView = ArticleView.create(article, user, viewedAt);
 
         // when
-        ArticleViewDto result = articleMapper.toViewDto(articleView);
+        ArticleViewDto result = articleMapper.toViewDto(articleView, 5, 11);
 
         // then
         assertThat(result.viewedBy()).isEqualTo(userId);
@@ -92,14 +92,14 @@ class ArticleMapperTest {
         assertThat(result.articleTitle()).isEqualTo("Test Article");
         assertThat(result.articlePublishedDate()).isEqualTo(publishDate);
         assertThat(result.articleSummary()).isEqualTo("Test Summary");
-        assertThat(result.articleCommentCount()).isZero();
-        assertThat(result.articleViewCount()).isZero();
+        assertThat(result.articleCommentCount()).isEqualTo(5);
+        assertThat(result.articleViewCount()).isEqualTo(11);
     }
 
     @Test
     @DisplayName("null 입력 시 null을 반환한다")
     void testNullInput() {
-        assertThat(articleMapper.toDto(null, true)).isNull();
-        assertThat(articleMapper.toViewDto(null)).isNull();
+        assertThat(articleMapper.toDto(null, true, null, null)).isNull();
+        assertThat(articleMapper.toViewDto(null, null, null)).isNull();
     }
 }
