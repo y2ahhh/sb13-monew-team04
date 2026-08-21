@@ -82,9 +82,43 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform {
-        excludeTags 'migration'
+        excludeTags 'migration', 'external'
     }
     finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.register('rssExternalTest', Test) {
+    description = 'Runs external RSS smoke tests against live RSS feeds.'
+    group = 'verification'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform {
+        includeTags 'external'
+    }
+    filter {
+        includeTestsMatching 'com.codeit.sb13.monew.article.service.rss.RssExternalSmokeTest'
+    }
+
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.register('naverExternalTest', Test) {
+    description = 'Runs external NAVER news smoke tests against the live NAVER API.'
+    group = 'verification'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform {
+        includeTags 'external'
+    }
+    filter {
+        includeTestsMatching 'com.codeit.sb13.monew.article.service.naver.NaverExternalSmokeTest'
+    }
+
+    shouldRunAfter tasks.named('test')
 }
 
 tasks.register('migrationTest', Test) {

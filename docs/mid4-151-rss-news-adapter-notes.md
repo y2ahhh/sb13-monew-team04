@@ -15,6 +15,15 @@
 - 뉴스 출처는 기존 `ArticleSource.HANKYUNG`, `ArticleSource.CHOSUN`, `ArticleSource.YEONHAP`을 사용합니다.
 - RSS URL은 코드 고정값이 아니라 설정값으로 분리합니다.
 
+## 현재 구현 기준
+
+- RSS 전용 어댑터는 `RssNewsSourceAdapter.fetch(List<String> categoryKeys)` 계약을 추가합니다.
+- 공통 어댑터는 `AbstractRssNewsSourceAdapter`에서 출처, 기본 카테고리 enum, `RssNewsClient`를 주입받아 처리합니다.
+- 기본 `fetch()`는 출처별 대표 카테고리 enum 1개만 호출합니다.
+- `fetch(List<String>)`는 상위 호출자가 전달한 카테고리 key만 enum으로 변환해 호출합니다.
+- 카테고리 key는 앞뒤 공백 제거 후 lowercase로 정규화하고, 그 외 문자열은 비교 대상으로 보지 않습니다.
+- XML 파싱은 Rome(`SyndFeedInput`)을 사용합니다.
+
 ## 제외 범위
 
 - 기사 저장
@@ -203,7 +212,7 @@
 
 연합뉴스TV 응답은 `description`이 대부분 제공되지만, RSS 공통 정책에 맞춰 비어 있으면 `content:encoded` fallback을 적용합니다.
 
-## 임시 매핑 기준
+## 매핑 기준
 
 ### 공통 매핑 기준
 
@@ -212,7 +221,7 @@
 | `title` | `title` | CDATA 또는 텍스트 값 사용 |
 | `link` | `link` | CDATA 또는 텍스트 값 사용 |
 | `description`, `content:encoded` | `summary` | RSS 공통 summary 정책 적용 |
-| `pubDate` | `publishedAt` | RFC 1123 계열 날짜 문자열 |
+| `pubDate` | `publishedAt` | Rome이 파싱한 `publishedDate` 사용 |
 | `author`, `dc:creator` | 사용하지 않음 | 현재 `CollectedArticle`에 대응 필드 없음 |
 | `guid`, `comments`, `category`, `enclosure`, `media:content` | 사용하지 않음 | 현재 `CollectedArticle`에 대응 필드 없음 |
 
@@ -235,6 +244,13 @@
 
 현재 확인 기준으로 한국경제 `all-news`는 `description`과 `content:encoded`가 모두 없어 `summary=null`이 됩니다. 조선일보와 연합뉴스TV는 `description`이 비어 있을 때 `content:encoded` fallback을 적용합니다.
 
+### 파싱 실패 정책
+
+- XML 자체가 파싱되지 않으면 `ArticleFetchParseException`으로 처리합니다.
+- `pubDate`가 없거나 Rome에서 `publishedDate`로 제공되지 않으면 `publishedAt=null`로 처리합니다.
+- raw XML의 `pubDate` 위치를 별도로 추적하지 않으므로, `invalid pubDate` 문자열만을 직접 검증하는 정책은 적용하지 않습니다.
+- HTTP 오류, timeout 등 RSS 호출 실패는 `ArticleFetchFailedException`으로 처리합니다.
+
 ## 구현 시 고려할 점
 
 - 한국경제는 작업자가 원하는 카테고리를 호출할 수 있는 구조가 필요합니다.
@@ -248,6 +264,24 @@
 - 링크 중복 방지는 MID4-151 범위 밖이므로, 이 티켓에서 제거할지 여부는 추가 결정이 필요합니다.
 - `description`이 없는 RSS item이 있으므로 `CollectedArticle.summary`는 `null`을 허용하는 방향으로 처리해야 합니다.
 - `content:encoded`는 HTML 조각일 수 있으므로 summary fallback으로 사용할 때 HTML 제거, entity decode, 공백 정규화가 필요합니다.
+
+## 검증 기준
+
+기본 테스트는 외부 네트워크 호출을 제외합니다.
+
+```powershell
+.\gradlew.bat test
+.\gradlew.bat --no-daemon clean build
+```
+
+실제 외부 endpoint 호출 smoke 테스트는 `@Tag("external")`로 분리합니다.
+
+```powershell
+.\gradlew.bat --no-daemon rssExternalTest
+.\gradlew.bat --no-daemon naverExternalTest
+```
+
+`rssExternalTest`는 한국경제, 조선일보, 연합뉴스TV 대표 RSS에서 실제 기사 목록이 반환되는지 확인합니다. `naverExternalTest`는 NAVER 인증 환경변수가 없으면 로컬 `.env.dev`를 읽고, 인증값이 없으면 테스트를 skip합니다.
 
 ## 미결 항목
 

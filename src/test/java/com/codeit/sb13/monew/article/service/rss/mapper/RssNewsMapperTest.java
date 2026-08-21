@@ -21,6 +21,14 @@ class RssNewsMapperTest {
     private final RssNewsMapper mapper = new RssNewsMapper();
 
     @Test
+    @DisplayName("빈 RSS feed는 빈 목록을 반환한다")
+    void returnsEmptyListWhenFeedHasNoItems() {
+        List<CollectedArticle> articles = mapper.toCollectedArticles(ArticleSource.HANKYUNG, rss(""));
+
+        assertThat(articles).isEmpty();
+    }
+
+    @Test
     @DisplayName("RSS item 필드를 수집 기사 후보로 변환한다")
     void mapsRssItemToCollectedArticle() {
         String xml = rss("""
