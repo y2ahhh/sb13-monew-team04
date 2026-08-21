@@ -1,5 +1,8 @@
 package com.codeit.sb13.monew.notification.service.impl;
 
+import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
+import com.codeit.sb13.monew.global.exception.notification.NotificationInvalidCursorException;
+import com.codeit.sb13.monew.global.exception.notification.NotificationInvalidLimitException;
 import com.codeit.sb13.monew.global.exception.notification.NotificationNotFoundException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.notification.domain.Notification;
@@ -9,6 +12,7 @@ import com.codeit.sb13.monew.notification.repository.NotificationRepository;
 import com.codeit.sb13.monew.notification.service.NotificationService;
 import com.codeit.sb13.monew.notification.service.dto.ArticlesForInterestDto;
 import com.codeit.sb13.monew.notification.service.dto.CommentLikedDto;
+import com.codeit.sb13.monew.notification.service.dto.NotificationFindDto;
 import com.codeit.sb13.monew.notification.service.dto.NotificationResult;
 import com.codeit.sb13.monew.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +59,51 @@ public class NotificationServiceImpl implements NotificationService {
         Notification notification = Notification.create(request.recipient(), content, request.resourceId(), ResourceType.COMMENT);
         notificationRepository.saveAll(List.of(notification));
     }
+
+    @Override
+    public CursorPageResponseDto<NotificationResult> findAllNotifications(NotificationFindDto request) {
+        if ((request.cursor() == null) != (request.after() == null)) {
+            throw new NotificationInvalidCursorException(request.cursor());
+        }
+        if(request.limit()<=0) {
+            throw new NotificationInvalidLimitException(request.limit());
+        }
+        if(!userRepository.existsById(request.userId())) {
+            throw new UserNotFoundException(request.userId());
+        }
+
+        UUID cursorId = null;
+        if(request.cursor()!=null) {
+            try {
+                cursorId = UUID.fromString(request.cursor());
+            } catch (IllegalArgumentException e) {
+                throw new NotificationInvalidCursorException(request.cursor());
+            }
+        }
+
+        List<Notification> fetched = notificationRepository.findUnconfirmedByUserWithCursor(
+                request.userId(), cursorId, request.after(), request.limit() + 1);
+
+        boolean hasNext = fetched.size() > request.limit();
+        List<Notification> content = hasNext ? fetched.subList(0, request.limit()) : fetched;
+
+        long totalElements = notificationRepository.countByUser_IdAndConfirmedFalse(request.userId());
+
+        String nextCursor = null;
+        String nextAfter = null;
+        if (hasNext) {
+            Notification last = content.get(content.size() - 1);
+            nextCursor = last.getId().toString();
+            nextAfter = last.getCreatedAt().toString();
+        }
+
+        List<NotificationResult> results = content.stream()
+                .map(mapper::toResult)
+                .toList();
+
+        return new CursorPageResponseDto<>(results, nextCursor, nextAfter, content.size(), totalElements, hasNext);
+    }
+
 
     @Override
     @Transactional
