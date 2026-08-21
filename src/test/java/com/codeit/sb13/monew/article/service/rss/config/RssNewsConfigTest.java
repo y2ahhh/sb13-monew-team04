@@ -18,7 +18,7 @@ class RssNewsConfigTest {
                     "monew.news.rss.connect-timeout=2s",
                     "monew.news.rss.read-timeout=4s",
                     "monew.news.rss.hankyung.base-url=https://www.hankyung.com/feed",
-                    "monew.news.rss.chosun.base-url=https://www.chosun.com/arc/outboundfeeds/rss/",
+                    "monew.news.rss.chosun.base-url=https://www.chosun.com/arc/outboundfeeds/rss",
                     "monew.news.rss.yonhap.base-url=https://www.yonhapnewstv.co.kr"
             );
 
@@ -31,7 +31,7 @@ class RssNewsConfigTest {
             assertThat(properties.connectTimeout()).isEqualTo(Duration.ofSeconds(2));
             assertThat(properties.readTimeout()).isEqualTo(Duration.ofSeconds(4));
             assertThat(properties.hankyung().baseUrl()).isEqualTo("https://www.hankyung.com/feed");
-            assertThat(properties.chosun().baseUrl()).isEqualTo("https://www.chosun.com/arc/outboundfeeds/rss/");
+            assertThat(properties.chosun().baseUrl()).isEqualTo("https://www.chosun.com/arc/outboundfeeds/rss");
             assertThat(properties.yonhap().baseUrl()).isEqualTo("https://www.yonhapnewstv.co.kr");
         });
     }

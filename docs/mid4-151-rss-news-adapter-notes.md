@@ -79,11 +79,11 @@
 ## 조선일보 RSS 확인 사항
 
 - RSS 목록 페이지: `https://rssplus.chosun.com/`
-- base URL: `https://www.chosun.com/arc/outboundfeeds/rss/`
+- base URL: `https://www.chosun.com/arc/outboundfeeds/rss`
 - 전체기사 RSS: `https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml`
 - 카테고리 URL 구조: `https://www.chosun.com/arc/outboundfeeds/rss/category/{category}/?outputType=xml`
 
-전체기사일 때만 `category/{category}/`를 붙이지 않고 base RSS URL에 `?outputType=xml`만 붙입니다.
+구현 설정의 RSS base URL은 trailing slash 없이 관리합니다. 전체기사일 때만 `category/{category}/`를 붙이지 않고 base RSS URL에 `/?outputType=xml`을 붙입니다.
 
 확인된 카테고리는 다음과 같습니다.
 
@@ -242,6 +242,7 @@
 - 연합뉴스TV도 작업자가 원하는 카테고리를 호출할 수 있는 구조가 필요합니다.
 - 조선일보 전체기사 카테고리는 URL 생성 규칙이 다르므로 별도 예외 처리가 필요합니다.
 - 연합뉴스TV 최신 카테고리는 URL 생성 규칙이 다르므로 별도 예외 처리가 필요합니다.
+- RSS base URL은 trailing slash 없이 관리하고, URL resolver에서 앞뒤 공백만 제거한 뒤 경로를 조합합니다.
 - 지원 카테고리는 enum으로 관리하고, 호출할 카테고리 key 목록은 상위 호출자가 넘기는 방식으로 처리합니다.
 - 여러 카테고리를 동시에 호출하면 동일 기사가 중복으로 반환될 수 있습니다.
 - 링크 중복 방지는 MID4-151 범위 밖이므로, 이 티켓에서 제거할지 여부는 추가 결정이 필요합니다.

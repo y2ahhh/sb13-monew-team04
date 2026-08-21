@@ -32,7 +32,7 @@ monew:
       hankyung:
         base-url: https://www.hankyung.com/feed
       chosun:
-        base-url: https://www.chosun.com/arc/outboundfeeds/rss/
+        base-url: https://www.chosun.com/arc/outboundfeeds/rss
       yonhap:
         base-url: https://www.yonhapnewstv.co.kr
 
