@@ -6,6 +6,7 @@ import com.codeit.sb13.monew.interest.controller.dto.InterestResponse;
 import com.codeit.sb13.monew.interest.domain.Interest;
 import com.codeit.sb13.monew.interest.repository.InterestRepository;
 import com.codeit.sb13.monew.interest.repository.SubscribeRepository;
+import com.codeit.sb13.monew.interest.repository.dto.InterestSearchCondition;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchPage;
 import com.codeit.sb13.monew.interest.service.dto.InterestCreateCommand;
 import com.codeit.sb13.monew.interest.service.dto.InterestOrderBy;
@@ -115,7 +116,7 @@ public class InterestServiceImpl implements InterestService{
      */
     @Override
     public CursorPageResponseDto<InterestResponse> search(InterestSearchCommand command) {
-        InterestSearchPage page = interestRepository.search(
+        InterestSearchPage page = interestRepository.search(new InterestSearchCondition(
                 command.keyword(),
                 command.orderBy(),
                 command.direction(),
@@ -123,7 +124,7 @@ public class InterestServiceImpl implements InterestService{
                 command.after(),
                 command.limit(),
                 command.requestUserId()
-        );
+        ));
 
         List<InterestResponse> content = page.interests().stream()
                 .map(interest -> InterestResponse.of(

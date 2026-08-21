@@ -6,6 +6,7 @@ import static com.codeit.sb13.monew.interest.domain.QSubscribe.subscribe;
 import com.codeit.sb13.monew.interest.domain.Interest;
 import com.codeit.sb13.monew.global.exception.interest.InterestSearchConditionInvalidException;
 import com.codeit.sb13.monew.interest.domain.QKeyword;
+import com.codeit.sb13.monew.interest.repository.dto.InterestSearchCondition;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchPage;
 import com.codeit.sb13.monew.interest.service.dto.InterestOrderBy;
 import com.querydsl.core.Tuple;
@@ -49,15 +50,15 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public InterestSearchPage search(
-            String keywordText,
-            InterestOrderBy orderBy,
-            Sort.Direction direction,
-            String cursor,
-            LocalDateTime after,
-            int limit,
-            UUID requestUserId
-    ) {
+    public InterestSearchPage search(InterestSearchCondition condition) {
+        String keywordText = condition.keyword();
+        InterestOrderBy orderBy = condition.orderBy();
+        Sort.Direction direction = condition.direction();
+        String cursor = condition.cursor();
+        LocalDateTime after = condition.after();
+        int limit = condition.limit();
+        UUID requestUserId = condition.requestUserId();
+
         NumberExpression<Long> subscriberCountExpr = subscriberCountExpression();
         BooleanExpression searchCondition = searchCondition(keywordText);
         BooleanExpression keysetCondition = keysetCondition(orderBy, direction, cursor, after, subscriberCountExpr);
