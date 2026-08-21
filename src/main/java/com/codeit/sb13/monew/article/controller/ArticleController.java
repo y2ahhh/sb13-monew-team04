@@ -36,7 +36,6 @@ public class ArticleController {
             @ApiResponse(responseCode = "404", description = "뉴스 기사 정보 없음"),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
-
     @GetMapping("/{articleId}")
     public ResponseEntity<ArticleDto> getArticle(
             @Parameter(description = "뉴스 기사 ID") @PathVariable UUID articleId,
@@ -68,7 +67,7 @@ public class ArticleController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
-    
+
     @GetMapping("/sources")
     public ResponseEntity<List<ArticleSource>> getSources() {
         return ResponseEntity.ok(articleService.getSources());
