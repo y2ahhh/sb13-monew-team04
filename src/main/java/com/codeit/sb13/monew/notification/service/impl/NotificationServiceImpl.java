@@ -70,9 +70,6 @@ public class NotificationServiceImpl implements NotificationService {
         if(request.limit()<=0 || request.limit() > MAX_LIMIT) {
             throw new NotificationInvalidLimitException(request.limit());
         }
-        if(!userRepository.existsById(request.userId())) {
-            throw new UserNotFoundException(request.userId());
-        }
 
         UUID cursorId = null;
         if(request.cursor()!=null) {
@@ -81,6 +78,9 @@ public class NotificationServiceImpl implements NotificationService {
             } catch (IllegalArgumentException e) {
                 throw new NotificationInvalidCursorException(request.cursor());
             }
+        }
+        if(!userRepository.existsById(request.userId())) {
+            throw new UserNotFoundException(request.userId());
         }
 
         List<Notification> fetched = notificationRepository.findUnconfirmedByUserWithCursor(

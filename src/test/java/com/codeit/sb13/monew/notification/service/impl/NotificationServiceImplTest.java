@@ -474,5 +474,18 @@ class NotificationServiceImplTest {
 
             verify(notificationRepository, never()).findUnconfirmedByUserWithCursor(any(), any(), any(), anyInt());
         }
+
+        @Test
+        @DisplayName("존재하지 않는 사용자와 잘못된 cursor 형식이 함께 오면 cursor 검증이 우선한다")
+        void 잘못된_cursor와_존재하지않는_사용자_동시() {
+            // given
+            NotificationFindDto request = new NotificationFindDto("not-a-uuid", LocalDateTime.now(), 10, UUID.randomUUID());
+
+            // when & then
+            assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
+                    .isInstanceOf(NotificationInvalidCursorException.class);
+
+            verify(userRepository, never()).existsById(any());
+        }
     }
 }
