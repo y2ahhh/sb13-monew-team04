@@ -52,7 +52,9 @@ class GlobalExceptionHandlerTest {
 
         // then
         assertErrorResponse(response, exception);
-        assertThat(output).doesNotContain("java.lang.IllegalStateException");
+        assertThat(output)
+                .contains("WARN")
+                .doesNotContain("GlobalExceptionHandlerTest$TestMonewException");
     }
 
     @Test
@@ -71,6 +73,7 @@ class GlobalExceptionHandlerTest {
 
         // then
         assertThat(output)
+                .contains("WARN")
                 .contains("비즈니스 예외가 발생했습니다")
                 .contains("java.lang.IllegalStateException: client root cause");
     }
@@ -91,7 +94,9 @@ class GlobalExceptionHandlerTest {
 
         // then
         assertErrorResponse(response, exception);
-        assertThat(output).contains("java.lang.IllegalArgumentException: server root cause");
+        assertThat(output)
+                .contains("ERROR")
+                .contains("java.lang.IllegalArgumentException: server root cause");
     }
 
     private static void assertErrorResponse(
