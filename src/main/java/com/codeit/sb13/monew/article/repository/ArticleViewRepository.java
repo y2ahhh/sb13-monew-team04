@@ -2,9 +2,12 @@ package com.codeit.sb13.monew.article.repository;
 
 import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleView;
+import com.codeit.sb13.monew.article.repository.dto.RecentArticleViewActivityProjection;
 import com.codeit.sb13.monew.user.domain.User;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -33,4 +36,38 @@ public interface ArticleViewRepository extends JpaRepository<ArticleView, UUID> 
 
     // 기사 조회수 집계
     long countByArticle_Id(UUID articleId);
+
+    @Query("""
+                SELECT new com.codeit.sb13.monew.article.repository.dto.RecentArticleViewActivityProjection(
+                    AT.id,
+                    U.id,
+                    AT.viewedAt,
+                    A.id,
+                    A.source,
+                    A.link,
+                    A.title,
+                    A.date,
+                    A.summary,
+                    (SELECT COUNT(C)
+                     FROM Comment C
+                     JOIN C.user U2
+                     WHERE C.articleId = A.id
+                          AND C.deletedAt IS NULL
+                          AND U2.deletedAt IS NULL),
+                    (SELECT COUNT(AT2)
+                     FROM ArticleView AT2
+                     JOIN AT2.user U2
+                     WHERE AT2.article.id = A.id
+                           AND U2.deletedAt IS NULL)
+                    )
+                FROM ArticleView AT
+                JOIN AT.article A
+                JOIN AT.user U
+                WHERE U.id = :userId
+                AND A.deletedAt IS NULL
+                AND U.deletedAt IS NULL
+                ORDER BY AT.viewedAt DESC
+                LIMIT 10
+            """)
+    List<RecentArticleViewActivityProjection> findRecentArticleViewActivities(@Param("userId") UUID userId);
 }
