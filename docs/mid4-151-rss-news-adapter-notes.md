@@ -20,7 +20,7 @@
 - RSS 전용 어댑터는 `RssNewsSourceAdapter.fetch(List<String> categoryKeys)` 계약을 추가합니다.
 - 공통 어댑터는 `AbstractRssNewsSourceAdapter`에서 출처, 기본 카테고리 enum, `RssNewsClient`를 주입받아 처리합니다.
 - 기본 `fetch()`는 출처별 대표 카테고리 enum 1개만 호출합니다.
-- `fetch(List<String>)`는 상위 호출자가 전달한 카테고리 key만 enum으로 변환해 호출합니다.
+- `fetch(List<String>)`는 작업자가 전달한 카테고리 key만 enum으로 변환해 호출합니다.
 - 카테고리 key는 앞뒤 공백 제거 후 lowercase로 정규화하고, 그 외 문자열은 비교 대상으로 보지 않습니다.
 - XML 파싱은 Rome(`SyndFeedInput`)을 사용합니다.
 
@@ -260,7 +260,7 @@
 - 조선일보 전체기사 카테고리는 URL 생성 규칙이 다르므로 별도 예외 처리가 필요합니다.
 - 연합뉴스TV 최신 카테고리는 URL 생성 규칙이 다르므로 별도 예외 처리가 필요합니다.
 - RSS base URL은 trailing slash 없이 관리하고, URL resolver에서 앞뒤 공백만 제거한 뒤 경로를 조합합니다.
-- 지원 카테고리는 enum으로 관리하고, 호출할 카테고리 key 목록은 상위 호출자가 넘기는 방식으로 처리합니다.
+- 지원 카테고리는 enum으로 관리하고, 호출할 카테고리 key 목록은 작업자가 넘기는 방식으로 처리합니다.
 - 여러 카테고리를 동시에 호출하면 동일 기사가 중복으로 반환될 수 있습니다.
 - 링크 중복 방지는 MID4-151 범위 밖이므로, 이 티켓에서 제거할지 여부는 추가 결정이 필요합니다.
 - `description`이 없는 RSS item이 있으므로 `CollectedArticle.summary`는 `null`을 허용하는 방향으로 처리해야 합니다.
