@@ -40,8 +40,11 @@ public abstract class AbstractRssNewsSourceAdapter implements RssNewsSourceAdapt
             return List.of();
         }
 
-        return categoryKeys.stream()
+        List<RssNewsCategory> categories = categoryKeys.stream()
                 .map(this::toCategory)
+                .toList();
+
+        return categories.stream()
                 .map(category -> client.fetch(source(), category))
                 .flatMap(Collection::stream)
                 .toList();

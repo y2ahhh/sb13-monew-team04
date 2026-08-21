@@ -41,10 +41,20 @@ class RssExternalSmokeTest {
     );
 
     @Test
-    @DisplayName("대표 RSS feed를 실제로 호출해 기사 목록을 반환한다")
-    void fetchesDefaultFeedsFromExternalSources() {
+    @DisplayName("한국경제 대표 RSS feed를 실제로 호출해 기사 목록을 반환한다")
+    void fetchesHankyungDefaultFeedFromExternalSource() {
         assertFeedReturnsArticles(ArticleSource.HANKYUNG, HankyungRssCategory.ALL_NEWS);
+    }
+
+    @Test
+    @DisplayName("조선일보 대표 RSS feed를 실제로 호출해 기사 목록을 반환한다")
+    void fetchesChosunDefaultFeedFromExternalSource() {
         assertFeedReturnsArticles(ArticleSource.CHOSUN, ChosunRssCategory.ALL);
+    }
+
+    @Test
+    @DisplayName("연합뉴스TV 대표 RSS feed를 실제로 호출해 기사 목록을 반환한다")
+    void fetchesYonhapDefaultFeedFromExternalSource() {
         assertFeedReturnsArticles(ArticleSource.YEONHAP, YonhapRssCategory.LATEST);
     }
 

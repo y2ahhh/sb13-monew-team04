@@ -18,6 +18,9 @@ public class RssFeedUrlResolver {
         if (category == null) {
             throw new ArticleFetchRequestInvalidException("category");
         }
+        if (category.source() != source) {
+            throw new ArticleFetchRequestInvalidException("category");
+        }
 
         String normalizedBaseUrl = baseUrl.strip();
 

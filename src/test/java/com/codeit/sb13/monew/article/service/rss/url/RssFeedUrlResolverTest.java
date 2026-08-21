@@ -127,4 +127,14 @@ class RssFeedUrlResolverTest {
                 null
         )).isInstanceOf(ArticleFetchRequestInvalidException.class);
     }
+
+    @Test
+    @DisplayName("source와 category 출처가 다르면 요청 invalid 예외가 발생한다")
+    void throwsInvalidRequestWhenSourceAndCategoryDoNotMatch() {
+        assertThatThrownBy(() -> resolver.resolve(
+                ArticleSource.HANKYUNG,
+                "https://www.hankyung.com/feed",
+                ChosunRssCategory.ALL
+        )).isInstanceOf(ArticleFetchRequestInvalidException.class);
+    }
 }

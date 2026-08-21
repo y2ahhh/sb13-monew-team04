@@ -1,5 +1,6 @@
 package com.codeit.sb13.monew.article.service.rss.category;
 
+import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchRequestInvalidException;
 import org.springframework.util.StringUtils;
 
@@ -46,6 +47,11 @@ public enum HankyungRssCategory implements RssNewsCategory {
             throw new ArticleFetchRequestInvalidException("hankyung category");
         }
         return hankyungRssCategory;
+    }
+
+    @Override
+    public ArticleSource source() {
+        return ArticleSource.HANKYUNG;
     }
 
     @Override

@@ -52,6 +52,9 @@ public class RestClientRssNewsClient implements RssNewsClient {
         if (category == null) {
             throw new ArticleFetchRequestInvalidException("category");
         }
+        if (category.source() != source) {
+            throw new ArticleFetchRequestInvalidException("category");
+        }
     }
 
     private String getBaseUrl(ArticleSource source) {

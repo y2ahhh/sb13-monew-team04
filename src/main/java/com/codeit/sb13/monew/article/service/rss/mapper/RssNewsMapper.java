@@ -61,6 +61,8 @@ public class RssNewsMapper {
         String title = normalizeText(entry.getTitle());
         String link = normalizeText(entry.getLink());
         if (!StringUtils.hasText(link)) {
+            log.warn("RSS 기사 링크를 확인할 수 없어 수집 후보에서 제외합니다. source={}, title={}",
+                    source, title);
             return Optional.empty();
         }
 

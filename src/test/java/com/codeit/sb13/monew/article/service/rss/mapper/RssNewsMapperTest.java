@@ -94,12 +94,13 @@ class RssNewsMapperTest {
     }
 
     @Test
-    @DisplayName("link가 없는 item은 제외한다")
-    void skipsItemWithoutLink() {
+    @DisplayName("link가 없는 item은 제외하고 로그를 남긴다")
+    void skipsItemWithoutLink(CapturedOutput output) {
         String xml = rss("""
                 <item>
                     <title>Title</title>
                     <description>Summary</description>
+                    <pubDate>Fri, 21 Aug 2026 10:28:09 +0900</pubDate>
                 </item>
                 <item>
                     <title>Linked title</title>
@@ -114,6 +115,11 @@ class RssNewsMapperTest {
         assertThat(articles)
                 .singleElement()
                 .satisfies(article -> assertThat(article.link()).isEqualTo("https://example.com/articles/2"));
+        assertThat(output).contains(
+                "RSS 기사 링크를 확인할 수 없어 수집 후보에서 제외합니다.",
+                "source=CHOSUN",
+                "title=Title"
+        );
     }
 
     @Test

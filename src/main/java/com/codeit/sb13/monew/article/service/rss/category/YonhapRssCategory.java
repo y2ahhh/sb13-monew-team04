@@ -1,5 +1,6 @@
 package com.codeit.sb13.monew.article.service.rss.category;
 
+import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchRequestInvalidException;
 import org.springframework.util.StringUtils;
 
@@ -45,6 +46,11 @@ public enum YonhapRssCategory implements RssNewsCategory {
             throw new ArticleFetchRequestInvalidException("yonhap category");
         }
         return yonhapRssCategory;
+    }
+
+    @Override
+    public ArticleSource source() {
+        return ArticleSource.YEONHAP;
     }
 
     @Override

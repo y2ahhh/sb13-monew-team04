@@ -95,6 +95,17 @@ class AbstractRssNewsSourceAdapterTest {
         verifyNoInteractions(client);
     }
 
+    @Test
+    @DisplayName("카테고리 key 전체 검증이 실패하면 client를 호출하지 않는다")
+    void doesNotFetchWhenAnyCategoryKeyIsInvalid() {
+        RssNewsClient client = mock(RssNewsClient.class);
+        HankyungRssNewsSourceAdapter adapter = new HankyungRssNewsSourceAdapter(client);
+
+        assertThatThrownBy(() -> adapter.fetch(List.of("economy", "unknown")))
+                .isInstanceOf(ArticleFetchRequestInvalidException.class);
+        verifyNoInteractions(client);
+    }
+
     private CollectedArticle article(ArticleSource source, String title) {
         return new CollectedArticle(
                 source,

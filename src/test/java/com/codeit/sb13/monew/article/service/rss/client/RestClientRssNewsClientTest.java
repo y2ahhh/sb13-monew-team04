@@ -188,6 +188,15 @@ class RestClientRssNewsClientTest {
         verifyNoInteractions(mapper);
     }
 
+    @Test
+    @DisplayName("source와 category 출처가 다르면 요청 invalid 예외가 발생한다")
+    void throwsInvalidRequestWhenSourceAndCategoryDoNotMatch() {
+        assertThatThrownBy(() -> client.fetch(ArticleSource.HANKYUNG, ChosunRssCategory.ALL))
+                .isInstanceOf(ArticleFetchRequestInvalidException.class);
+        verifyNoInteractions(mapper);
+        server.verify();
+    }
+
     private CollectedArticle article(ArticleSource source) {
         return new CollectedArticle(
                 source,

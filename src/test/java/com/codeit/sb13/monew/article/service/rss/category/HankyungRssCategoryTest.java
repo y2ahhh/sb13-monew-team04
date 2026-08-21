@@ -1,5 +1,6 @@
 package com.codeit.sb13.monew.article.service.rss.category;
 
+import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchRequestInvalidException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,10 +25,11 @@ class HankyungRssCategoryTest {
     }
 
     @Test
-    @DisplayName("key와 한글명을 보존한다")
-    void preservesKeyAndLabel() {
+    @DisplayName("key, 한글명, 출처를 보존한다")
+    void preservesKeyLabelAndSource() {
         assertThat(HankyungRssCategory.ALL_NEWS.key()).isEqualTo("all-news");
         assertThat(HankyungRssCategory.ALL_NEWS.label()).isEqualTo("전체뉴스");
+        assertThat(HankyungRssCategory.ALL_NEWS.source()).isEqualTo(ArticleSource.HANKYUNG);
     }
 
     @Test
