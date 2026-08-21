@@ -92,7 +92,9 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
                         InterestSearchRow::subscriberCount
                 ));
 
-        fetchKeywordsInto(pageInterests);
+        // 키워드는 여기서 즉시 조회하지 않는다. Interest.keywords에 붙은 @BatchSize(size = 100) 덕분에,
+        // 이후 같은 트랜잭션 안에서 interest.getKeywords()가 처음 호출되는 시점에 이 페이지에 담긴
+        // 관심사들의 id를 묶어 IN 쿼리 한 번으로 지연 로딩된다(InterestServiceImpl#search 참고).
 
         Set<UUID> subscribedInterestIds = pageRows.stream()
                 .filter(InterestSearchRow::subscribedByMe)
@@ -215,25 +217,5 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
         OrderSpecifier<?> tiebreaker = ascending ? interest.createdAt.asc() : interest.createdAt.desc();
 
         return new OrderSpecifier<?>[] {primary, tiebreaker};
-    }
-
-    /**
-     * 이미 확정된 관심사 목록에 키워드를 한 번에 fetch join으로 채워 넣는다.
-     *
-     * <p>같은 영속성 컨텍스트 안에서는 id가 같은 엔티티가 항상 같은 인스턴스로 관리되므로,
-     * 이 메서드가 반환하는 리스트를 따로 쓰지 않아도 {@code interests}에 담긴 인스턴스들의
-     * keywords 컬렉션이 그대로 초기화된다.</p>
-     */
-    private void fetchKeywordsInto(List<Interest> interests) {
-        if (interests.isEmpty()) {
-            return;
-        }
-
-        queryFactory
-                .selectFrom(interest)
-                .distinct()
-                .leftJoin(interest.keywords, keyword).fetchJoin()
-                .where(interest.in(interests))
-                .fetch();
     }
 }
