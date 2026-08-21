@@ -212,6 +212,8 @@ public class UserServiceImplTest {
     // when & then
     assertThatThrownBy(() -> userServiceImpl.login(command))
     .isInstanceOf(LoginUserNotFoundException.class);
+    verify(passwordEncoder, never()).matches(any(), any());
+    verify(userMapper, never()).toLoginResult(any());
 
   }
 
