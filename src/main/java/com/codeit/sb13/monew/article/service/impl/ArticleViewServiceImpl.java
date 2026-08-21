@@ -7,9 +7,11 @@ import com.codeit.sb13.monew.article.repository.ArticleViewRepository;
 import com.codeit.sb13.monew.article.service.ArticleService;
 import com.codeit.sb13.monew.article.service.ArticleViewService;
 import com.codeit.sb13.monew.article.service.dto.ArticleViewDto;
+import com.codeit.sb13.monew.global.exception.article.ArticleViewConflictException;
 import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,8 +40,7 @@ public class ArticleViewServiceImpl implements ArticleViewService {
                     view.updateViewedAt(LocalDateTime.now());
                     return articleViewRepository.save(view);
                 })
-                .orElseGet(() -> articleViewRepository.save(
-                        ArticleView.create(article, user, LocalDateTime.now())));
+                .orElseGet(() -> saveNewView(article, user));
 
         long viewCount = articleViewRepository.countByArticle(article);
 
@@ -63,6 +64,23 @@ public class ArticleViewServiceImpl implements ArticleViewService {
     public List<ArticleView> getArticleViews(UUID articleId) {
         Article article = articleService.findById(articleId);
         return articleViewRepository.findByArticleOrderByViewedAtDesc(article);
+    }
+
+    private ArticleView saveNewView(Article article, User user) {
+        try {
+            return articleViewRepository.saveAndFlush(
+                    ArticleView.create(article, user, LocalDateTime.now()));
+        } catch (DataIntegrityViolationException e) {
+            if (isArticleViewUniqueViolation(e)) {
+                throw new ArticleViewConflictException();
+            }
+            throw e;
+        }
+    }
+
+    private boolean isArticleViewUniqueViolation(DataIntegrityViolationException e) {
+        String message = e.getMostSpecificCause().getMessage();
+        return message != null && message.contains("uk_article_views_article_user");
     }
 
 }

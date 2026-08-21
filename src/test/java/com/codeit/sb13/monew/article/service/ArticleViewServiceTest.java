@@ -8,9 +8,9 @@ import com.codeit.sb13.monew.article.repository.ArticleViewRepository;
 import com.codeit.sb13.monew.article.service.dto.ArticleViewDto;
 import com.codeit.sb13.monew.article.service.impl.ArticleViewServiceImpl;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
+import com.codeit.sb13.monew.global.exception.article.ArticleViewConflictException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.user.domain.User;
-import com.codeit.sb13.monew.user.repository.UserRepository;
 import com.codeit.sb13.monew.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -40,9 +41,6 @@ class ArticleViewServiceTest {
 
     @Mock
     private ArticleService articleService;
-
-    @Mock
-    private UserRepository userRepository;
 
     @InjectMocks
     private ArticleViewServiceImpl articleViewService;
@@ -101,7 +99,7 @@ class ArticleViewServiceTest {
         when(userService.findById(testUserId)).thenReturn(testUser);
         when(articleViewRepository.findByArticleAndUser(testArticle, testUser))
                 .thenReturn(Optional.empty());
-        when(articleViewRepository.save(any(ArticleView.class)))
+        when(articleViewRepository.saveAndFlush(any(ArticleView.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(articleViewRepository.countByArticle(testArticle)).thenReturn(1L);
         when(articleMapper.toViewDto(any(ArticleView.class), eq(0L), eq(1L)))
@@ -114,10 +112,11 @@ class ArticleViewServiceTest {
         assertThat(result).isEqualTo(testViewDto);
 
         ArgumentCaptor<ArticleView> captor = ArgumentCaptor.forClass(ArticleView.class);
-        verify(articleViewRepository, times(1)).save(captor.capture());
+        verify(articleViewRepository, times(1)).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getArticle()).isEqualTo(testArticle);
         assertThat(captor.getValue().getUser()).isEqualTo(testUser);
         assertThat(captor.getValue().getViewedAt()).isNotNull();
+        verify(articleViewRepository, never()).save(any(ArticleView.class));
     }
 
     @Test
@@ -160,6 +159,7 @@ class ArticleViewServiceTest {
                 .isInstanceOf(ArticleNotFoundException.class);
         verify(userService, never()).findById(any(UUID.class));
         verify(articleViewRepository, never()).save(any(ArticleView.class));
+        verify(articleViewRepository, never()).saveAndFlush(any(ArticleView.class));
     }
 
     @Test
@@ -174,6 +174,45 @@ class ArticleViewServiceTest {
         assertThatThrownBy(() -> articleViewService.recordView(testArticleId, testUserId))
                 .isInstanceOf(UserNotFoundException.class);
         verify(articleViewRepository, never()).save(any(ArticleView.class));
+        verify(articleViewRepository, never()).saveAndFlush(any(ArticleView.class));
+    }
+
+    @Test
+    @DisplayName("동시 요청으로 UNIQUE 제약을 위반하면 ArticleViewConflictException을 던진다")
+    void testRecordViewUniqueViolation() {
+        // given
+        when(articleService.findById(testArticleId)).thenReturn(testArticle);
+        when(userService.findById(testUserId)).thenReturn(testUser);
+        when(articleViewRepository.findByArticleAndUser(testArticle, testUser))
+                .thenReturn(Optional.empty());
+        when(articleViewRepository.saveAndFlush(any(ArticleView.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "could not execute statement",
+                        new RuntimeException(
+                                "duplicate key value violates unique constraint \"uk_article_views_article_user\"")));
+
+        // when & then
+        assertThatThrownBy(() -> articleViewService.recordView(testArticleId, testUserId))
+                .isInstanceOf(ArticleViewConflictException.class);
+    }
+
+    @Test
+    @DisplayName("다른 무결성 위반은 변환하지 않고 그대로 전파한다")
+    void testRecordViewOtherIntegrityViolation() {
+        // given
+        when(articleService.findById(testArticleId)).thenReturn(testArticle);
+        when(userService.findById(testUserId)).thenReturn(testUser);
+        when(articleViewRepository.findByArticleAndUser(testArticle, testUser))
+                .thenReturn(Optional.empty());
+        when(articleViewRepository.saveAndFlush(any(ArticleView.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "could not execute statement",
+                        new RuntimeException("null value in column \"viewed_at\"")));
+
+        // when & then
+        assertThatThrownBy(() -> articleViewService.recordView(testArticleId, testUserId))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .isNotInstanceOf(ArticleViewConflictException.class);
     }
 
     @Test

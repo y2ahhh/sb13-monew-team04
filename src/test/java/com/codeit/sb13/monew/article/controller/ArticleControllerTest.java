@@ -6,6 +6,7 @@ import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.ArticleService;
 import com.codeit.sb13.monew.article.service.dto.ArticleViewDto;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
+import com.codeit.sb13.monew.global.exception.article.ArticleViewConflictException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -229,5 +230,19 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.code").value("GLB_001"));
 
         verify(articleViewService, never()).recordView(any(), any());
+    }
+
+    @Test
+    @DisplayName("뷰 등록 중 동시 요청 충돌 시 409와 ART_006을 반환한다")
+    void registerArticleViewConflict() throws Exception {
+        // given
+        when(articleViewService.recordView(articleId, userId))
+                .thenThrow(new ArticleViewConflictException());
+
+        // when & then
+        mockMvc.perform(post("/api/articles/{articleId}/article-views", articleId)
+                        .header(USER_ID_HEADER, userId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ART_006"));
     }
 }

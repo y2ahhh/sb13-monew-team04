@@ -36,6 +36,7 @@ public class ArticleController {
             @ApiResponse(responseCode = "404", description = "뉴스 기사 정보 없음"),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
+
     @GetMapping("/{articleId}")
     public ResponseEntity<ArticleDto> getArticle(
             @Parameter(description = "뉴스 기사 ID") @PathVariable UUID articleId,
@@ -50,8 +51,10 @@ public class ArticleController {
             @ApiResponse(responseCode = "200", description = "등록 성공"),
             @ApiResponse(responseCode = "400", description = "요청 형식 오류 (헤더 누락, 잘못된 UUID)"),
             @ApiResponse(responseCode = "404", description = "뉴스 기사 또는 사용자 정보 없음"),
+            @ApiResponse(responseCode = "409", description = "동시 요청으로 조회 기록 등록이 충돌함"),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
+
     @PostMapping("/{articleId}/article-views")
     public ResponseEntity<ArticleViewDto> registerArticleView(
             @Parameter(description = "뉴스 기사 ID") @PathVariable UUID articleId,
@@ -65,6 +68,7 @@ public class ArticleController {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
+    
     @GetMapping("/sources")
     public ResponseEntity<List<ArticleSource>> getSources() {
         return ResponseEntity.ok(articleService.getSources());
