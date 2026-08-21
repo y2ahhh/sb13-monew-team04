@@ -2,6 +2,7 @@ package com.codeit.sb13.monew.user.service.impl;
 
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.user.domain.User;
+import com.codeit.sb13.monew.user.exception.AlreadyDeletedUserException;
 import com.codeit.sb13.monew.user.exception.DuplicateEmailException;
 import com.codeit.sb13.monew.user.exception.InvalidPasswordException;
 import com.codeit.sb13.monew.user.exception.LoginUserNotFoundException;
@@ -14,6 +15,7 @@ import com.codeit.sb13.monew.user.service.dto.UserLoginCommand;
 import com.codeit.sb13.monew.user.service.dto.UserLoginResult;
 import com.codeit.sb13.monew.user.service.dto.UserUpdateNicknameCommand;
 import com.codeit.sb13.monew.user.service.dto.UserUpdateNicknameResult;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -95,6 +97,19 @@ public class UserServiceImpl implements UserService {
       throw new UserNotFoundException(userId);
     }
 
+  }
+
+  @Override
+  @Transactional
+  public void deleteUser(UUID userId) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new UserNotFoundException(userId));
+
+    if(user.getDeletedAt() != null) {
+      throw new AlreadyDeletedUserException(userId);
+    }
+
+    user.softDelete();
   }
 
   private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {

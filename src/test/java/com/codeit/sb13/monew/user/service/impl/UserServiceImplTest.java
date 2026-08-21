@@ -2,6 +2,7 @@ package com.codeit.sb13.monew.user.service.impl;
 
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.user.domain.User;
+import com.codeit.sb13.monew.user.exception.AlreadyDeletedUserException;
 import com.codeit.sb13.monew.user.exception.DuplicateEmailException;
 import com.codeit.sb13.monew.user.exception.InvalidPasswordException;
 import com.codeit.sb13.monew.user.exception.LoginUserNotFoundException;
@@ -332,6 +333,61 @@ public class UserServiceImplTest {
         .doesNotThrowAnyException();
   }
 
+  @Test
+  @DisplayName("존재하지 않는 userId로 deleteUser요청 시 예외를 던진다")
+  void 존재하지_않는_userId로_요청_시_예외를_던진다() {
+    // given
+    UUID userId = UUID.randomUUID();
+
+    when(userRepository.findById(userId))
+        .thenReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.deleteUser(userId))
+        .isInstanceOf(UserNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("정상적인 요청 시 사용자가 논리 삭제된다")
+  void 정상_요청_시_사용자가_논리_살제된다() {
+    // given
+    UUID userId = UUID.randomUUID();
+    User user = User.builder()
+        .email("email@email.com")
+        .nickname("닉네임")
+        .password("PassWord123!")
+        .build();
+    when(userRepository.findById(userId))
+        .thenReturn(Optional.of(user));
+
+    // when
+    userServiceImpl.deleteUser(userId);
+
+    // then
+    assertThat(user.getDeletedAt()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("이미 논리 삭제된 user 조회시 예외를 던진다")
+  void 논리_삭제된_user_조회시_예외를_던진다() {
+    // given
+    UUID userId = UUID.randomUUID();
+    User user = User.builder()
+        .email("email@email.com")
+        .nickname("닉네임")
+        .password("PassWord123!")
+        .build();
+    user.softDelete();
+
+    when(userRepository.findById(userId))
+        .thenReturn(Optional.of(user));
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.deleteUser(userId))
+        .isInstanceOf(AlreadyDeletedUserException.class);
+
+
+  }
 
 
 }
