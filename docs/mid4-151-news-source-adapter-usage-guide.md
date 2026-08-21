@@ -109,14 +109,15 @@ public interface RssNewsSourceAdapter extends NewsSourceAdapter {
 | `CHOSUN` | `all` | 전체기사 |
 | `YEONHAP` | `latest` | 최신 |
 
-작업자가 원하는 RSS 카테고리만 수집하려면 `RssNewsSourceAdapter.fetch(List<String> categoryKeys)`를 호출합니다.
+작업자가 원하는 RSS 카테고리만 수집하려면 출처별 RSS 구현체의 `fetch(List<String> categoryKeys)`를 호출합니다.
 
 ```java
-if (adapter instanceof RssNewsSourceAdapter rssAdapter) {
-    List<CollectedArticle> articles = rssAdapter.fetch(List.of("economy", "finance"));
+if (adapter instanceof HankyungRssNewsSourceAdapter hankyungAdapter) {
+    List<CollectedArticle> articles = hankyungAdapter.fetch(List.of("economy", "finance"));
 }
 ```
 
+위 예시는 한국경제 전용입니다. 카테고리 key는 출처별 enum에 정의된 값만 사용할 수 있습니다.
 카테고리 key는 앞뒤 공백 제거 후 lowercase로 정규화합니다. 지원하지 않는 key가 들어오면 `ArticleFetchRequestInvalidException`이 발생합니다.
 
 ### 한국경제 카테고리
