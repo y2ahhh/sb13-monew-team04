@@ -3,8 +3,10 @@ package com.codeit.sb13.monew.article.service.rss.url;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.rss.category.RssNewsCategory;
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchRequestInvalidException;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+@Component
 public class RssFeedUrlResolver {
     public String resolve(ArticleSource source, String baseUrl, RssNewsCategory category) {
         if (source == null) {
