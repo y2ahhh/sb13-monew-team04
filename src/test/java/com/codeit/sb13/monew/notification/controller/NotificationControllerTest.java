@@ -198,7 +198,7 @@ class NotificationControllerTest {
                     result.resourceType(), result.confirmed(), result.createdAt(), result.updatedAt()
             );
             CursorPageResponseDto<NotificationResult> serviceResult =
-                    new CursorPageResponseDto<>(List.of(result), null, null, 1, 1L, false);
+                    new CursorPageResponseDto<>(List.of(result), null, null, null,1, 1L, false);
 
             when(notificationService.findAllNotifications(any(NotificationFindDto.class))).thenReturn(serviceResult);
             when(mapper.toResponse(result)).thenReturn(response);

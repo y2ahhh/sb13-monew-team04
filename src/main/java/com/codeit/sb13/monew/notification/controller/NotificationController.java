@@ -40,6 +40,7 @@ public class NotificationController {
                 content,
                 result.nextCursor(),
                 result.nextAfter(),
+                null,
                 result.size(),
                 result.totalElements(),
                 result.hasNext()

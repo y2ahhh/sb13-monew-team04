@@ -101,7 +101,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .map(mapper::toResult)
                 .toList();
 
-        return new CursorPageResponseDto<>(results, nextCursor, nextAfter, content.size(), totalElements, hasNext);
+        return new CursorPageResponseDto<>(results, nextCursor, nextAfter, null,content.size(), totalElements, hasNext);
     }
 
 
