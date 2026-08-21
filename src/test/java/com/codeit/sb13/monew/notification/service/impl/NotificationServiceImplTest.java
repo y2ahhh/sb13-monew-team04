@@ -453,7 +453,6 @@ class NotificationServiceImplTest {
             // given
             UUID userId = UUID.randomUUID();
             NotificationFindDto request = new NotificationFindDto("not-a-uuid", LocalDateTime.now(), 10, userId);
-            when(userRepository.existsById(userId)).thenReturn(true);
 
             // when & then
             assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
