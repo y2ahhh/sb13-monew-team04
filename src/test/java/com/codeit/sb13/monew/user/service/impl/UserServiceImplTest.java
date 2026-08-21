@@ -30,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
@@ -363,8 +364,11 @@ public class UserServiceImplTest {
     // given
     UUID userId = UUID.randomUUID();
 
-    when(userRepository.findById(userId))
-        .thenReturn(Optional.empty());
+    when(userRepository.softDeleteIfNotDeleted(eq(userId),
+        any(LocalDateTime.class)))
+        .thenReturn(0);
+    when(userRepository.existsById(userId))
+        .thenReturn(false);
 
     // when & then
     assertThatThrownBy(() -> userServiceImpl.deleteUser(userId))
@@ -376,19 +380,17 @@ public class UserServiceImplTest {
   void 정상_요청_시_사용자가_논리_살제된다() {
     // given
     UUID userId = UUID.randomUUID();
-    User user = User.builder()
-        .email("email@email.com")
-        .nickname("닉네임")
-        .password("PassWord123!")
-        .build();
-    when(userRepository.findById(userId))
-        .thenReturn(Optional.of(user));
 
-    // when
-    userServiceImpl.deleteUser(userId);
+    when(userRepository.softDeleteIfNotDeleted(eq(userId),
+         any(LocalDateTime.class)))
+        .thenReturn(1);
 
-    // then
-    assertThat(user.getDeletedAt()).isNotNull();
+    // when & then
+    assertThatCode(() -> userServiceImpl.deleteUser(userId))
+        .doesNotThrowAnyException();
+    verify(userRepository).softDeleteIfNotDeleted(eq(userId),
+        any(LocalDateTime.class));
+    verify(userRepository, never()).existsById(any());
   }
 
   @Test
@@ -396,21 +398,15 @@ public class UserServiceImplTest {
   void 논리_삭제된_user_조회시_예외를_던진다() {
     // given
     UUID userId = UUID.randomUUID();
-    User user = User.builder()
-        .email("email@email.com")
-        .nickname("닉네임")
-        .password("PassWord123!")
-        .build();
-    user.softDelete();
-
-    when(userRepository.findById(userId))
-        .thenReturn(Optional.of(user));
+    when(userRepository.softDeleteIfNotDeleted(eq(userId),
+        any(LocalDateTime.class)))
+        .thenReturn(0);
+    when(userRepository.existsById(userId))
+        .thenReturn(true);  // 여기가 다름
 
     // when & then
     assertThatThrownBy(() -> userServiceImpl.deleteUser(userId))
         .isInstanceOf(AlreadyDeletedUserException.class);
-
-
   }
 
 

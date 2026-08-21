@@ -107,14 +107,12 @@ public class UserServiceImpl implements UserService {
   @Override
   @Transactional
   public void deleteUser(UUID userId) {
-    User user = userRepository.findById(userId)
-        .orElseThrow(() -> new UserNotFoundException(userId));
+    int updatedCount = userRepository.softDeleteIfNotDeleted(userId, LocalDateTime.now());
 
-    if(user.getDeletedAt() != null) {
+    if (updatedCount == 0) {
+      validateExists(userId);
       throw new AlreadyDeletedUserException(userId);
     }
-
-    user.softDelete();
   }
 
   private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
