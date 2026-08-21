@@ -64,6 +64,11 @@ public class UserServiceImpl implements UserService {
   public UserLoginResult login(UserLoginCommand command) {
     User user = userRepository.findByEmail(command.email())
         .orElseThrow(() -> new LoginUserNotFoundException(command.email()));
+    LocalDateTime deletedAt = user.getDeletedAt();
+    if(deletedAt != null) {
+      throw new LoginUserNotFoundException(command.email());
+    }
+
     String password = user.getPassword();
 
     boolean matches = passwordEncoder.matches(command.password(), password);

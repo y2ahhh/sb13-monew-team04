@@ -194,6 +194,28 @@ public class UserServiceImplTest {
   }
 
   @Test
+  @DisplayName("삭제된 사용자가 로그인을 시도하면 LoginUserNotFoundException을 던진다")
+  void 삭제된_사용자가_로그인_시도시_예외를_던진다() {
+    // given
+    User user = User.builder()
+        .email("email@email.com")
+        .nickname("닉네임")
+        .password("PassWord123!")
+        .build();
+    user.softDelete();
+    UserLoginCommand command = new UserLoginCommand(
+        "email@email.com", "PassWord123!"
+    );
+    when(userRepository.findByEmail(command.email()))
+        .thenReturn(Optional.of(user));
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.login(command))
+    .isInstanceOf(LoginUserNotFoundException.class);
+
+  }
+
+  @Test
   @DisplayName("이메일/비밀번호가 올바르면 로그인에 성공한다.")
   void 올바른_이메일과_비밀번호라면_로그인_성공() {
     // given
