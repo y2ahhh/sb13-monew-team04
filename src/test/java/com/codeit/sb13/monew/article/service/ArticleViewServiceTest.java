@@ -3,12 +3,15 @@ package com.codeit.sb13.monew.article.service;
 import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.domain.ArticleView;
+import com.codeit.sb13.monew.article.mapper.ArticleMapper;
 import com.codeit.sb13.monew.article.repository.ArticleViewRepository;
+import com.codeit.sb13.monew.article.service.dto.ArticleViewDto;
 import com.codeit.sb13.monew.article.service.impl.ArticleViewServiceImpl;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.repository.UserRepository;
+import com.codeit.sb13.monew.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,10 +47,17 @@ class ArticleViewServiceTest {
     @InjectMocks
     private ArticleViewServiceImpl articleViewService;
 
+    @Mock
+    private UserService userService;
+
+    @Mock
+    private ArticleMapper articleMapper;
+
     private UUID testArticleId;
     private UUID testUserId;
     private Article testArticle;
     private User testUser;
+    private ArticleViewDto testViewDto;
 
     @BeforeEach
     void setUp() {
@@ -67,6 +77,20 @@ class ArticleViewServiceTest {
                 .nickname("tester")
                 .password("encoded-password")
                 .build();
+
+        testViewDto = new ArticleViewDto(
+                UUID.randomUUID(),
+                testUserId,
+                LocalDateTime.now(),
+                testArticleId,
+                ArticleSource.NAVER,
+                "https://example.com/article",
+                "Test Article",
+                LocalDateTime.now(),
+                "Test Summary",
+                0L,
+                1L
+        );
     }
 
     @Test
@@ -74,20 +98,26 @@ class ArticleViewServiceTest {
     void testRecordViewNewRecord() {
         // given
         when(articleService.findById(testArticleId)).thenReturn(testArticle);
-        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
+        when(userService.findById(testUserId)).thenReturn(testUser);
         when(articleViewRepository.findByArticleAndUser(testArticle, testUser))
                 .thenReturn(Optional.empty());
         when(articleViewRepository.save(any(ArticleView.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(articleViewRepository.countByArticle(testArticle)).thenReturn(1L);
+        when(articleMapper.toViewDto(any(ArticleView.class), eq(0L), eq(1L)))
+                .thenReturn(testViewDto);
 
         // when
-        ArticleView result = articleViewService.recordView(testArticleId, testUserId);
+        ArticleViewDto result = articleViewService.recordView(testArticleId, testUserId);
 
         // then
-        assertThat(result.getArticle()).isEqualTo(testArticle);
-        assertThat(result.getUser()).isEqualTo(testUser);
-        assertThat(result.getViewedAt()).isNotNull();
-        verify(articleViewRepository, times(1)).save(any(ArticleView.class));
+        assertThat(result).isEqualTo(testViewDto);
+
+        ArgumentCaptor<ArticleView> captor = ArgumentCaptor.forClass(ArticleView.class);
+        verify(articleViewRepository, times(1)).save(captor.capture());
+        assertThat(captor.getValue().getArticle()).isEqualTo(testArticle);
+        assertThat(captor.getValue().getUser()).isEqualTo(testUser);
+        assertThat(captor.getValue().getViewedAt()).isNotNull();
     }
 
     @Test
@@ -98,16 +128,21 @@ class ArticleViewServiceTest {
         ArticleView existingView = ArticleView.create(testArticle, testUser, previousViewedAt);
 
         when(articleService.findById(testArticleId)).thenReturn(testArticle);
-        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
+        when(userService.findById(testUserId)).thenReturn(testUser);
         when(articleViewRepository.findByArticleAndUser(testArticle, testUser))
                 .thenReturn(Optional.of(existingView));
         when(articleViewRepository.save(any(ArticleView.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(articleViewRepository.countByArticle(testArticle)).thenReturn(3L);
+        when(articleMapper.toViewDto(any(ArticleView.class), eq(0L), eq(3L)))
+                .thenReturn(testViewDto);
 
         // when
-        articleViewService.recordView(testArticleId, testUserId);
+        ArticleViewDto result = articleViewService.recordView(testArticleId, testUserId);
 
         // then
+        assertThat(result).isEqualTo(testViewDto);
+
         ArgumentCaptor<ArticleView> captor = ArgumentCaptor.forClass(ArticleView.class);
         verify(articleViewRepository, times(1)).save(captor.capture());
         assertThat(captor.getValue().getViewedAt()).isAfter(previousViewedAt);
@@ -123,7 +158,7 @@ class ArticleViewServiceTest {
         // when & then
         assertThatThrownBy(() -> articleViewService.recordView(testArticleId, testUserId))
                 .isInstanceOf(ArticleNotFoundException.class);
-        verify(userRepository, never()).findById(any(UUID.class));
+        verify(userService, never()).findById(any(UUID.class));
         verify(articleViewRepository, never()).save(any(ArticleView.class));
     }
 
@@ -132,7 +167,8 @@ class ArticleViewServiceTest {
     void testRecordViewUserNotFound() {
         // given
         when(articleService.findById(testArticleId)).thenReturn(testArticle);
-        when(userRepository.findById(testUserId)).thenReturn(Optional.empty());
+        when(userService.findById(testUserId))
+                .thenThrow(new UserNotFoundException(testUserId));
 
         // when & then
         assertThatThrownBy(() -> articleViewService.recordView(testArticleId, testUserId))
@@ -174,7 +210,7 @@ class ArticleViewServiceTest {
                 ArticleView.create(testArticle, testUser, LocalDateTime.now()),
                 ArticleView.create(testArticle, testUser, LocalDateTime.now().minusHours(1))
         );
-        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
+        when(userService.findById(testUserId)).thenReturn(testUser);
         when(articleViewRepository.findByUserOrderByViewedAtDesc(testUser)).thenReturn(views);
 
         // when
@@ -189,7 +225,7 @@ class ArticleViewServiceTest {
     @DisplayName("사용자의 조회 기록이 없을 때 빈 리스트 반환")
     void testGetUserArticleViewsEmpty() {
         // given
-        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
+        when(userService.findById(testUserId)).thenReturn(testUser);
         when(articleViewRepository.findByUserOrderByViewedAtDesc(testUser)).thenReturn(List.of());
 
         // when & then
@@ -200,7 +236,8 @@ class ArticleViewServiceTest {
     @DisplayName("사용자 조회 기록 조회 실패 - 사용자 없음")
     void testGetUserArticleViewsUserNotFound() {
         // given
-        when(userRepository.findById(testUserId)).thenReturn(Optional.empty());
+        when(userService.findById(testUserId))
+                .thenThrow(new UserNotFoundException(testUserId));
 
         // when & then
         assertThatThrownBy(() -> articleViewService.getUserArticleViews(testUserId))
