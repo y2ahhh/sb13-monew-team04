@@ -10,6 +10,7 @@ import com.codeit.sb13.monew.article.service.ArticleService;
 import com.codeit.sb13.monew.article.service.dto.ArticleRequest;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
 import com.codeit.sb13.monew.global.exception.article.ArticleDuplicateException;
+import com.codeit.sb13.monew.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class ArticleServiceImpl implements ArticleService {
     private final ArticleRepository articleRepository;
     private final ArticleViewRepository articleViewRepository;
     private final ArticleMapper articleMapper;
+    private final UserService userService;
 
     @Override
     public List<Article> findAll() {
@@ -40,6 +42,8 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     public ArticleDto getArticle(UUID articleId, UUID requestUserId) {
+        userService.validateExists(requestUserId);
+
         Article article = findById(articleId);
 
         boolean viewedByMe = articleViewRepository

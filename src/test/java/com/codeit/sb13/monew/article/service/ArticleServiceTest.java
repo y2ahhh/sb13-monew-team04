@@ -10,6 +10,8 @@ import com.codeit.sb13.monew.article.service.dto.ArticleRequest;
 import com.codeit.sb13.monew.article.service.impl.ArticleServiceImpl;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
 import com.codeit.sb13.monew.global.exception.article.ArticleDuplicateException;
+import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
+import com.codeit.sb13.monew.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,9 @@ class ArticleServiceTest {
 
     @Mock
     private ArticleMapper articleMapper;
+
+    @Mock
+    private UserService userService;
 
     @InjectMocks
     private ArticleServiceImpl articleService;
@@ -253,6 +258,19 @@ class ArticleServiceTest {
         assertThat(articleService.getSources())
                 .containsExactly(ArticleSource.NAVER, ArticleSource.HANKYUNG,
                         ArticleSource.CHOSUN, ArticleSource.YEONHAP);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자가 단건 조회를 요청하면 예외가 발생한다")
+    void testGetArticleUserNotFound() {
+        // given
+        doThrow(new UserNotFoundException(testUserId))
+                .when(userService).validateExists(testUserId);
+
+        // when & then
+        assertThatThrownBy(() -> articleService.getArticle(testArticleId, testUserId))
+                .isInstanceOf(UserNotFoundException.class);
+        verify(articleRepository, never()).findByIdAndDeletedAtIsNull(any());
     }
 
 
