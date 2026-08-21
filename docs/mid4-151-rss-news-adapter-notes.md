@@ -221,7 +221,7 @@
 | `title` | `title` | CDATA 또는 텍스트 값 사용 |
 | `link` | `link` | CDATA 또는 텍스트 값 사용 |
 | `description`, `content:encoded` | `summary` | RSS 공통 summary 정책 적용 |
-| `pubDate` | `publishedAt` | Rome이 파싱한 `publishedDate` 사용 |
+| `pubDate` | `publishedAt` | Rome이 파싱한 `publishedDate` 사용, 없으면 item 제외 |
 | `author`, `dc:creator` | 사용하지 않음 | 현재 `CollectedArticle`에 대응 필드 없음 |
 | `guid`, `comments`, `category`, `enclosure`, `media:content` | 사용하지 않음 | 현재 `CollectedArticle`에 대응 필드 없음 |
 
@@ -247,8 +247,9 @@
 ### 파싱 실패 정책
 
 - XML 자체가 파싱되지 않으면 `ArticleFetchParseException`으로 처리합니다.
-- `pubDate`가 없거나 Rome에서 `publishedDate`로 제공되지 않으면 `publishedAt=null`로 처리합니다.
-- raw XML의 `pubDate` 위치를 별도로 추적하지 않으므로, `invalid pubDate` 문자열만을 직접 검증하는 정책은 적용하지 않습니다.
+- `pubDate`가 없거나 Rome이 날짜를 제공하지 못하면 해당 item은 수집 후보에서 제외합니다.
+- 제외 시 `source`, `title`, `link`를 warn 로그로 남깁니다.
+- `Article.date`는 `nullable=false`이므로 `publishedAt=null` 후보를 서비스단에 전달하지 않습니다.
 - HTTP 오류, timeout 등 RSS 호출 실패는 `ArticleFetchFailedException`으로 처리합니다.
 
 ## 구현 시 고려할 점
@@ -264,6 +265,8 @@
 - 링크 중복 방지는 MID4-151 범위 밖이므로, 이 티켓에서 제거할지 여부는 추가 결정이 필요합니다.
 - `description`이 없는 RSS item이 있으므로 `CollectedArticle.summary`는 `null`을 허용하는 방향으로 처리해야 합니다.
 - `content:encoded`는 HTML 조각일 수 있으므로 summary fallback으로 사용할 때 HTML 제거, entity decode, 공백 정규화가 필요합니다.
+- `publishedAt`을 만들 수 없는 RSS item은 저장 가능한 기사 후보가 아니므로 제외합니다.
+- 제외 item의 별도 저장과 재처리는 MID4-151 범위 밖이며, 저장 정책 확정 시 후속 티켓으로 다룹니다.
 
 ## 검증 기준
 
@@ -286,3 +289,4 @@
 ## 미결 항목
 
 - 카테고리 간 중복 기사 처리 위치 확정
+- RSS 수집 제외 item 또는 실패건 저장 정책 확정

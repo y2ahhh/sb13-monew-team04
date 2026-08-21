@@ -6,6 +6,9 @@ import com.codeit.sb13.monew.global.exception.article.ArticleFetchParseException
 import com.codeit.sb13.monew.global.exception.article.ArticleFetchRequestInvalidException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -15,6 +18,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@ExtendWith(OutputCaptureExtension.class)
 @DisplayName("RssNewsMapper 단위 테스트")
 class RssNewsMapperTest {
 
@@ -60,6 +64,7 @@ class RssNewsMapperTest {
                     <link>https://example.com/articles/1</link>
                     <description><![CDATA[<p>ㅤ&nbsp;</p>]]></description>
                     <content:encoded><![CDATA[<div>Content&nbsp;<b>summary</b></div>]]></content:encoded>
+                    <pubDate>Fri, 21 Aug 2026 10:28:09 +0900</pubDate>
                 </item>
                 """);
 
@@ -78,6 +83,7 @@ class RssNewsMapperTest {
                     <link>https://example.com/articles/1</link>
                     <description><![CDATA[<br />]]></description>
                     <content:encoded><![CDATA[<p>ㅤ</p>]]></content:encoded>
+                    <pubDate>Fri, 21 Aug 2026 10:28:09 +0900</pubDate>
                 </item>
                 """);
 
@@ -99,6 +105,7 @@ class RssNewsMapperTest {
                     <title>Linked title</title>
                     <link>https://example.com/articles/2</link>
                     <description>Linked summary</description>
+                    <pubDate>Fri, 21 Aug 2026 10:28:09 +0900</pubDate>
                 </item>
                 """);
 
@@ -110,8 +117,8 @@ class RssNewsMapperTest {
     }
 
     @Test
-    @DisplayName("pubDate가 없으면 publishedAt을 null로 반환한다")
-    void returnsNullPublishedAtWhenPubDateIsMissing() {
+    @DisplayName("pubDate가 없으면 item을 제외하고 로그를 남긴다")
+    void skipsItemAndLogsWhenPubDateIsMissing(CapturedOutput output) {
         String xml = rss("""
                 <item>
                     <title>Title</title>
@@ -122,8 +129,36 @@ class RssNewsMapperTest {
 
         List<CollectedArticle> articles = mapper.toCollectedArticles(ArticleSource.YEONHAP, xml);
 
-        assertThat(articles).singleElement()
-                .satisfies(article -> assertThat(article.publishedAt()).isNull());
+        assertThat(articles).isEmpty();
+        assertThat(output).contains(
+                "RSS 기사 발행일을 확인할 수 없어 수집 후보에서 제외합니다.",
+                "source=YEONHAP",
+                "title=Title",
+                "link=https://example.com/articles/1"
+        );
+    }
+
+    @Test
+    @DisplayName("pubDate 파싱에 실패하면 item을 제외하고 로그를 남긴다")
+    void skipsItemAndLogsWhenPubDateIsInvalid(CapturedOutput output) {
+        String xml = rss("""
+                <item>
+                    <title>Title</title>
+                    <link>https://example.com/articles/1</link>
+                    <description>Summary</description>
+                    <pubDate>invalid-date</pubDate>
+                </item>
+                """);
+
+        List<CollectedArticle> articles = mapper.toCollectedArticles(ArticleSource.YEONHAP, xml);
+
+        assertThat(articles).isEmpty();
+        assertThat(output).contains(
+                "RSS 기사 발행일을 확인할 수 없어 수집 후보에서 제외합니다.",
+                "source=YEONHAP",
+                "title=Title",
+                "link=https://example.com/articles/1"
+        );
     }
 
     @Test

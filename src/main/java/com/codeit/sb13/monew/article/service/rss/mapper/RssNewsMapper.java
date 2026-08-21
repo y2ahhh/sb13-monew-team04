@@ -10,6 +10,7 @@ import com.rometools.rome.feed.synd.SyndEntry;
 import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.io.FeedException;
 import com.rometools.rome.io.SyndFeedInput;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringEscapeUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+@Slf4j
 @Component
 public class RssNewsMapper {
 
@@ -56,17 +58,25 @@ public class RssNewsMapper {
     }
 
     private Optional<CollectedArticle> toArticle(ArticleSource source, SyndEntry entry) {
+        String title = normalizeText(entry.getTitle());
         String link = normalizeText(entry.getLink());
         if (!StringUtils.hasText(link)) {
             return Optional.empty();
         }
 
+        LocalDateTime publishedAt = parsePublishedAt(entry);
+        if (publishedAt == null) {
+            log.warn("RSS 기사 발행일을 확인할 수 없어 수집 후보에서 제외합니다. source={}, title={}, link={}",
+                    source, title, link);
+            return Optional.empty();
+        }
+
         return Optional.of(new CollectedArticle(
                 source,
-                normalizeText(entry.getTitle()),
+                title,
                 resolveSummary(entry),
                 link,
-                parsePublishedAt(entry)
+                publishedAt
         ));
     }
 
