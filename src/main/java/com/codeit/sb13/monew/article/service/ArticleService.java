@@ -1,6 +1,6 @@
 package com.codeit.sb13.monew.article.service;
 
-import com.codeit.sb13.monew.article.controller.dto.ArticleDto;
+import com.codeit.sb13.monew.article.service.dto.ArticleDto;
 import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.dto.ArticleRequest;

@@ -1,6 +1,6 @@
 package com.codeit.sb13.monew.article.controller;
 
-import com.codeit.sb13.monew.article.controller.dto.ArticleDto;
+import com.codeit.sb13.monew.article.service.dto.ArticleDto;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.ArticleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,6 +33,7 @@ public class ArticleController {
             description = "뉴스 기사 ID로 뉴스 기사 단건을 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (헤더 누락, 잘못된 UUID)"),
             @ApiResponse(responseCode = "404", description = "뉴스 기사 정보 없음"),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })

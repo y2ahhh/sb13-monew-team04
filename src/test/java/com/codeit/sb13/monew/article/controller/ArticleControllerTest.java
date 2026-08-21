@@ -1,6 +1,6 @@
 package com.codeit.sb13.monew.article.controller;
 
-import com.codeit.sb13.monew.article.controller.dto.ArticleDto;
+import com.codeit.sb13.monew.article.service.dto.ArticleDto;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.service.ArticleService;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
@@ -52,8 +52,8 @@ class ArticleControllerTest {
                 "Test Article",
                 LocalDateTime.of(2026, 8, 20, 10, 0),
                 "Test Summary",
-                0,
-                7,
+                0L,
+                7L,
                 true
         );
     }
@@ -132,6 +132,17 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$[1]").value("HANKYUNG"))
                 .andExpect(jsonPath("$[2]").value("CHOSUN"))
                 .andExpect(jsonPath("$[3]").value("YEONHAP"));
+
+        verify(articleService, never()).getArticle(any(), any());
+    }
+
+    @Test
+    @DisplayName("잘못된 UUID 형식의 요청자 헤더는 400을 반환한다")
+    void getArticleWithInvalidHeaderUuid() throws Exception {
+        mockMvc.perform(get("/api/articles/{articleId}", articleId)
+                        .header(USER_ID_HEADER, "not-a-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("GLB_001"));
 
         verify(articleService, never()).getArticle(any(), any());
     }
