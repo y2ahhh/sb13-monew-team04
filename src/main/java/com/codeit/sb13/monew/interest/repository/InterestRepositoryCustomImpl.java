@@ -188,25 +188,32 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
             return null;
         }
 
-        boolean asc = direction.isAscending();
-        BooleanExpression createdAtGt = asc ? interest.createdAt.gt(after) : interest.createdAt.lt(after);
-        BooleanExpression createdAtEq = interest.createdAt.eq(after);
-        BooleanExpression idGt = asc ? interest.id.gt(idAfter) : interest.id.lt(idAfter);
-
         if (orderBy == InterestOrderBy.NAME) {
-            BooleanExpression primaryGt = asc ? interest.name.gt(cursor) : interest.name.lt(cursor);
             BooleanExpression primaryEq = interest.name.eq(cursor);
-            return primaryGt
-                    .or(primaryEq.and(createdAtGt))
-                    .or(primaryEq.and(createdAtEq).and(idGt));
+
+            if (direction.isAscending()) {
+                return interest.name.gt(cursor)
+                        .or(primaryEq.and(interest.createdAt.gt(after)))
+                        .or(primaryEq.and(interest.createdAt.eq(after)).and(interest.id.gt(idAfter)));
+            }
+
+            return interest.name.lt(cursor)
+                    .or(primaryEq.and(interest.createdAt.lt(after)))
+                    .or(primaryEq.and(interest.createdAt.eq(after)).and(interest.id.lt(idAfter)));
         }
 
         long cursorCount = parseCursorAsCount(cursor);
-        BooleanExpression primaryGt = asc ? subscriberCountExpr.gt(cursorCount) : subscriberCountExpr.lt(cursorCount);
         BooleanExpression primaryEq = subscriberCountExpr.eq(cursorCount);
-        return primaryGt
-                .or(primaryEq.and(createdAtGt))
-                .or(primaryEq.and(createdAtEq).and(idGt));
+
+        if (direction.isAscending()) {
+            return subscriberCountExpr.gt(cursorCount)
+                    .or(primaryEq.and(interest.createdAt.gt(after)))
+                    .or(primaryEq.and(interest.createdAt.eq(after)).and(interest.id.gt(idAfter)));
+        }
+
+        return subscriberCountExpr.lt(cursorCount)
+                .or(primaryEq.and(interest.createdAt.lt(after)))
+                .or(primaryEq.and(interest.createdAt.eq(after)).and(interest.id.lt(idAfter)));
     }
 
     private long parseCursorAsCount(String cursor) {
@@ -224,13 +231,30 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
     ) {
         boolean ascending = direction.isAscending();
 
-        OrderSpecifier<?> primary = orderBy == InterestOrderBy.NAME
-                ? (ascending ? interest.name.asc() : interest.name.desc())
-                : (ascending ? subscriberCountExpr.asc() : subscriberCountExpr.desc());
-
+        OrderSpecifier<?> primary = primaryOrderSpecifier(orderBy, ascending, subscriberCountExpr);
         OrderSpecifier<?> tiebreaker = ascending ? interest.createdAt.asc() : interest.createdAt.desc();
         OrderSpecifier<?> idTiebreaker = ascending ? interest.id.asc() : interest.id.desc();
 
         return new OrderSpecifier<?>[] {primary, tiebreaker, idTiebreaker};
+    }
+
+    /**
+     * 정렬 기준(orderBy)에 따라 실제로 정렬에 쓸 표현식을 고른 뒤, 방향(ascending)에 맞춰
+     * asc/desc를 적용한다.
+     *
+     * <p>orderBy 분기와 ascending 분기를 하나의 중첩 삼항 연산자로 처리하면 "이름 기준
+     * 오름차순"인지 "구독자 수 기준 내림차순"인지를 한 표현식 안에서 바로 구분하기 어려워,
+     * orderBy 갈래를 먼저 early return으로 나눈다.</p>
+     */
+    private OrderSpecifier<?> primaryOrderSpecifier(
+            InterestOrderBy orderBy,
+            boolean ascending,
+            NumberExpression<Long> subscriberCountExpr
+    ) {
+        if (orderBy == InterestOrderBy.NAME) {
+            return ascending ? interest.name.asc() : interest.name.desc();
+        }
+
+        return ascending ? subscriberCountExpr.asc() : subscriberCountExpr.desc();
     }
 }
