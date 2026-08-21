@@ -108,7 +108,7 @@ class NotificationRepositoryTest {
 
         // when: newer를 커서로 넘기면 newer 자신과 그 이전 항목은 제외되고 older만 남는다
         List<Notification> nextPage = notificationRepository.findUnconfirmedByUserWithCursor(
-                user.getId(), newer.getId(), sameTime, 10);
+                user.getId(), newer.getId(), newer.getCreatedAt(), 10);
 
         // then
         assertThat(nextPage).extracting(Notification::getId).containsExactly(older.getId());
