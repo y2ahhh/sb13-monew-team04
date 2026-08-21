@@ -1,13 +1,16 @@
 package com.codeit.sb13.monew.notification.controller;
 
+import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
 import com.codeit.sb13.monew.notification.controller.dto.NotificationResponse;
 import com.codeit.sb13.monew.notification.mapper.NotificationMapper;
 import com.codeit.sb13.monew.notification.service.NotificationService;
+import com.codeit.sb13.monew.notification.service.dto.NotificationFindDto;
 import com.codeit.sb13.monew.notification.service.dto.NotificationResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,6 +21,32 @@ public class NotificationController {
 
     private final NotificationService notificationService;
     private final NotificationMapper mapper;
+
+    @GetMapping
+    public ResponseEntity<CursorPageResponseDto<NotificationResponse>> findAllNotifications(
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) LocalDateTime after,
+            @RequestParam int limit,
+            @RequestHeader("Monew-Request-User-ID") UUID userId
+    ) {
+        NotificationFindDto request = new NotificationFindDto(cursor, after, limit, userId);
+        CursorPageResponseDto<NotificationResult> result = notificationService.findAllNotifications(request);
+
+        List<NotificationResponse> content = result.content().stream()
+                .map(mapper::toResponse)
+                .toList();
+
+        CursorPageResponseDto<NotificationResponse> response = new CursorPageResponseDto<>(
+                content,
+                result.nextCursor(),
+                result.nextAfter(),
+                result.size(),
+                result.totalElements(),
+                result.hasNext()
+        );
+
+        return ResponseEntity.ok(response);
+    }
 
     @PatchMapping("/{notificationId}")
     public ResponseEntity<NotificationResponse> confirmNotification(@PathVariable UUID notificationId,
