@@ -57,13 +57,15 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
         Sort.Direction direction = condition.direction();
         String cursor = condition.cursor();
         LocalDateTime after = condition.after();
+        UUID idAfter = condition.idAfter();
         int limit = condition.limit();
         UUID requestUserId = condition.requestUserId();
 
         NumberExpression<Long> subscriberCountExpr = subscriberCountExpression();
         BooleanExpression subscribedByMeExpr = subscribedByMeExpression(requestUserId);
         BooleanExpression searchCondition = searchCondition(keywordText);
-        BooleanExpression keysetCondition = keysetCondition(orderBy, direction, cursor, after, subscriberCountExpr);
+        BooleanExpression keysetCondition =
+                keysetCondition(orderBy, direction, cursor, after, idAfter, subscriberCountExpr);
 
         // 다음 페이지 존재 여부를 별도 쿼리 없이 판단하기 위해 요청한 limit보다 하나 더 가져온다.
         List<InterestSearchRow> rows = queryFactory
@@ -163,36 +165,48 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
     /**
      * 커서 기반(keyset) 페이지네이션 조건을 만든다.
      *
-     * <p>정렬 기준 값이 커서 값보다 "다음" 쪽(방향에 따라 크거나 작은 쪽)이면 그대로 통과,
-     * 정렬 기준 값이 커서와 완전히 같다면 생성 시각을 보조 기준으로 비교한다. 보조 기준을
-     * 주 기준과 같은 방향으로 비교해야, 정렬 기준 값이 같은 항목들 사이에서도 페이지가
-     * 진행될수록 항상 "다음" 쪽으로만 나아가는 일관된 순서가 유지된다.</p>
+     * <p>정렬 기준 값(주 기준), 생성 시각(보조 기준), id(3차 기준) 순으로 사전식(lexicographic)
+     * 비교를 한다. 주 기준이 커서 값보다 "다음" 쪽이면 그대로 통과, 주 기준이 커서와 같으면
+     * 생성 시각을 비교하고, 생성 시각까지 같으면 마지막으로 id를 비교한다. 세 기준 모두
+     * 같은 방향으로 비교해야, 어느 조합으로 값이 겹치더라도 페이지가 진행될수록 항상 "다음"
+     * 쪽으로만 나아가는 유일한 순서가 유지된다.</p>
+     *
+     * <p>id는 UUID라 그 자체로 크고 작음에 비즈니스적인 의미는 없지만, 항상 유일하므로
+     * 정렬 기준과 생성 시각이 모두 같은 항목이 있더라도 순서를 확정적으로 정해준다.
+     * 그래서 정렬 기준·생성 시각까지 같은 항목이 페이지 경계에 걸려도 커서가 항목을
+     * 건너뛰거나 중복으로 돌려주는 일이 없다.</p>
      */
     private BooleanExpression keysetCondition(
             InterestOrderBy orderBy,
             Sort.Direction direction,
             String cursor,
             LocalDateTime after,
+            UUID idAfter,
             NumberExpression<Long> subscriberCountExpr
     ) {
-        if (!StringUtils.hasText(cursor) || after == null) {
+        if (!StringUtils.hasText(cursor) || after == null || idAfter == null) {
             return null;
         }
 
         boolean asc = direction.isAscending();
+        BooleanExpression createdAtGt = asc ? interest.createdAt.gt(after) : interest.createdAt.lt(after);
+        BooleanExpression createdAtEq = interest.createdAt.eq(after);
+        BooleanExpression idGt = asc ? interest.id.gt(idAfter) : interest.id.lt(idAfter);
 
         if (orderBy == InterestOrderBy.NAME) {
-            BooleanExpression primary = asc ? interest.name.gt(cursor) : interest.name.lt(cursor);
-            BooleanExpression tie = interest.name.eq(cursor)
-                    .and(asc ? interest.createdAt.gt(after) : interest.createdAt.lt(after));
-            return primary.or(tie);
+            BooleanExpression primaryGt = asc ? interest.name.gt(cursor) : interest.name.lt(cursor);
+            BooleanExpression primaryEq = interest.name.eq(cursor);
+            return primaryGt
+                    .or(primaryEq.and(createdAtGt))
+                    .or(primaryEq.and(createdAtEq).and(idGt));
         }
 
         long cursorCount = parseCursorAsCount(cursor);
-        BooleanExpression primary = asc ? subscriberCountExpr.gt(cursorCount) : subscriberCountExpr.lt(cursorCount);
-        BooleanExpression tie = subscriberCountExpr.eq(cursorCount)
-                .and(asc ? interest.createdAt.gt(after) : interest.createdAt.lt(after));
-        return primary.or(tie);
+        BooleanExpression primaryGt = asc ? subscriberCountExpr.gt(cursorCount) : subscriberCountExpr.lt(cursorCount);
+        BooleanExpression primaryEq = subscriberCountExpr.eq(cursorCount);
+        return primaryGt
+                .or(primaryEq.and(createdAtGt))
+                .or(primaryEq.and(createdAtEq).and(idGt));
     }
 
     private long parseCursorAsCount(String cursor) {
@@ -215,7 +229,8 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
                 : (ascending ? subscriberCountExpr.asc() : subscriberCountExpr.desc());
 
         OrderSpecifier<?> tiebreaker = ascending ? interest.createdAt.asc() : interest.createdAt.desc();
+        OrderSpecifier<?> idTiebreaker = ascending ? interest.id.asc() : interest.id.desc();
 
-        return new OrderSpecifier<?>[] {primary, tiebreaker};
+        return new OrderSpecifier<?>[] {primary, tiebreaker, idTiebreaker};
     }
 }

@@ -122,6 +122,7 @@ public class InterestServiceImpl implements InterestService{
                 command.direction(),
                 command.cursor(),
                 command.after(),
+                command.idAfter(),
                 command.limit(),
                 command.requestUserId()
         ));
@@ -138,6 +139,7 @@ public class InterestServiceImpl implements InterestService{
                 content,
                 nextCursor(content, command.orderBy()),
                 nextAfter(content),
+                nextIdAfter(content),
                 content.size(),
                 page.totalElements(),
                 page.hasNext()
@@ -170,6 +172,20 @@ public class InterestServiceImpl implements InterestService{
         }
 
         return content.get(content.size() - 1).createdAt().toString();
+    }
+
+    /**
+     * 다음 페이지 조회 시 {@code idAfter} 파라미터로 그대로 돌려보낼 3차 커서(마지막 항목의 id) 값을 만든다.
+     *
+     * <p>{@code cursor}와 {@code after}가 모두 같은 항목이 여러 건 있을 때 순서를 확정하는
+     * 타이브레이커로 쓰인다.</p>
+     */
+    private String nextIdAfter(List<InterestResponse> content) {
+        if (content.isEmpty()) {
+            return null;
+        }
+
+        return content.get(content.size() - 1).id().toString();
     }
 
     /**

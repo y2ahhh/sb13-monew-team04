@@ -127,7 +127,7 @@ class InterestControllerTest {
                 UUID.randomUUID(), "스포츠", List.of("축구"), 3L, true, LocalDateTime.now()
         );
         CursorPageResponseDto<InterestResponse> response =
-                new CursorPageResponseDto<>(List.of(item), "스포츠", LocalDateTime.now().toString(), 1, 1L, false);
+                new CursorPageResponseDto<>(List.of(item), "스포츠", LocalDateTime.now().toString(), null, 1, 1L, false);
         when(interestService.search(any(InterestSearchCommand.class))).thenReturn(response);
 
         mockMvc.perform(get("/api/interests")

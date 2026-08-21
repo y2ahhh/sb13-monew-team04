@@ -14,6 +14,9 @@ import org.springframework.data.domain.Sort;
  * @param direction 정렬 방향
  * @param cursor 이전 페이지 마지막 항목의 정렬 기준 값. 첫 페이지 조회 시 {@code null}
  * @param after 이전 페이지 마지막 항목의 생성 시각(보조 커서). 첫 페이지 조회 시 {@code null}
+ * @param idAfter 이전 페이지 마지막 항목의 id(3차 커서). {@code cursor}와 {@code after}가
+ *                모두 같은 항목이 여러 건 있을 때 순서를 확정하는 타이브레이커.
+ *                첫 페이지 조회 시 {@code null}
  * @param limit 조회할 최대 개수
  * @param requestUserId 요청자 id. {@code null}이면 구독 여부는 계산하지 않는다
  */
@@ -23,6 +26,7 @@ public record InterestSearchCondition(
         Sort.Direction direction,
         String cursor,
         LocalDateTime after,
+        UUID idAfter,
         int limit,
         UUID requestUserId
 ) {

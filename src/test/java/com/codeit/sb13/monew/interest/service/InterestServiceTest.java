@@ -291,13 +291,13 @@ class InterestServiceTest {
         Interest last = interestWithIdAndCreatedAt("나비", now.plusSeconds(1));
 
         InterestSearchCommand command =
-                new InterestSearchCommand(null, InterestOrderBy.NAME, Sort.Direction.ASC, null, null, 10, null);
+                new InterestSearchCommand(null, InterestOrderBy.NAME, Sort.Direction.ASC, null, null, null, 10, null);
         InterestSearchPage page = new InterestSearchPage(
                 List.of(first, last), Map.of(), Set.of(), true, 2L);
 
         when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
-                command.cursor(), command.after(), command.limit(), command.requestUserId()
+                command.cursor(), command.after(), command.idAfter(), command.limit(), command.requestUserId()
         ))).thenReturn(page);
 
         // when
@@ -307,6 +307,7 @@ class InterestServiceTest {
         assertThat(response.content()).hasSize(2);
         assertThat(response.nextCursor()).isEqualTo("나비");
         assertThat(response.nextAfter()).isEqualTo(now.plusSeconds(1).toString());
+        assertThat(response.nextIdAfter()).isEqualTo(last.getId().toString());
         assertThat(response.hasNext()).isTrue();
         assertThat(response.totalElements()).isEqualTo(2L);
     }
@@ -320,7 +321,7 @@ class InterestServiceTest {
         Interest last = interestWithIdAndCreatedAt("여행", now.plusSeconds(1));
 
         InterestSearchCommand command = new InterestSearchCommand(
-                null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC, null, null, 10, null);
+                null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC, null, null, null, 10, null);
         InterestSearchPage page = new InterestSearchPage(
                 List.of(first, last),
                 Map.of(first.getId(), 5L, last.getId(), 2L),
@@ -331,7 +332,7 @@ class InterestServiceTest {
 
         when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
-                command.cursor(), command.after(), command.limit(), command.requestUserId()
+                command.cursor(), command.after(), command.idAfter(), command.limit(), command.requestUserId()
         ))).thenReturn(page);
 
         // when
@@ -349,12 +350,12 @@ class InterestServiceTest {
     void search_emptyPage_returnsNullCursorsAndEmptyContent() {
         // given
         InterestSearchCommand command =
-                new InterestSearchCommand("없는검색어", InterestOrderBy.NAME, Sort.Direction.ASC, null, null, 10, null);
+                new InterestSearchCommand("없는검색어", InterestOrderBy.NAME, Sort.Direction.ASC, null, null, null, 10, null);
         InterestSearchPage page = new InterestSearchPage(List.of(), Map.of(), Set.of(), false, 0L);
 
         when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
-                command.cursor(), command.after(), command.limit(), command.requestUserId()
+                command.cursor(), command.after(), command.idAfter(), command.limit(), command.requestUserId()
         ))).thenReturn(page);
 
         // when
@@ -373,14 +374,15 @@ class InterestServiceTest {
     void search_passesCommandFieldsToRepository() {
         // given
         UUID requestUserId = UUID.randomUUID();
+        UUID idAfter = UUID.randomUUID();
         InterestSearchCommand command = new InterestSearchCommand(
                 "스포츠", InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC,
-                "3", LocalDateTime.now(), 20, requestUserId);
+                "3", LocalDateTime.now(), idAfter, 20, requestUserId);
         InterestSearchPage page = new InterestSearchPage(List.of(), Map.of(), Set.of(), false, 0L);
 
         when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
-                command.cursor(), command.after(), command.limit(), command.requestUserId()
+                command.cursor(), command.after(), command.idAfter(), command.limit(), command.requestUserId()
         ))).thenReturn(page);
 
         // when
@@ -389,6 +391,6 @@ class InterestServiceTest {
         // then
         verify(interestRepository).search(new InterestSearchCondition(
                 "스포츠", InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC,
-                "3", command.after(), 20, requestUserId));
+                "3", command.after(), idAfter, 20, requestUserId));
     }
 }

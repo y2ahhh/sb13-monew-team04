@@ -2,6 +2,7 @@ package com.codeit.sb13.monew.interest.controller.dto;
 
 import com.codeit.sb13.monew.interest.service.dto.InterestOrderBy;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -21,7 +22,10 @@ import org.springframework.format.annotation.DateTimeFormat;
  * @param orderBy 정렬 기준({@code name} 또는 {@code subscriberCount})
  * @param direction 정렬 방향({@code ASC} 또는 {@code DESC})
  * @param cursor 이전 페이지 마지막 항목의 정렬 기준 값. 첫 페이지 조회 시 생략
- * @param after 이전 페이지 마지막 항목의 생성 시각. 첫 페이지 조회 시 생략
+ * @param after 이전 페이지 마지막 항목의 생성 시각(보조 커서). 첫 페이지 조회 시 생략
+ * @param idAfter 이전 페이지 마지막 항목의 id(3차 커서). {@code cursor}와 {@code after}가
+ *                모두 같은 항목이 여러 건 있을 때 순서를 확정하기 위한 타이브레이커.
+ *                첫 페이지 조회 시 생략
  * @param limit 조회할 최대 개수. 1 미만이면 400(INT_006)으로 응답한다
  */
 public record InterestSearchRequest(
@@ -30,6 +34,7 @@ public record InterestSearchRequest(
         Sort.Direction direction,
         String cursor,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime after,
+        UUID idAfter,
         int limit
 ) {
 }
