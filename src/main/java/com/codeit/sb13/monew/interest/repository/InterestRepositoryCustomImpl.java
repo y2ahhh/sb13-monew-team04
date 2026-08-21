@@ -3,7 +3,6 @@ package com.codeit.sb13.monew.interest.repository;
 import static com.codeit.sb13.monew.interest.domain.QInterest.interest;
 import static com.codeit.sb13.monew.interest.domain.QSubscribe.subscribe;
 
-import com.codeit.sb13.monew.interest.domain.Interest;
 import com.codeit.sb13.monew.global.exception.interest.InterestSearchConditionInvalidException;
 import com.codeit.sb13.monew.interest.domain.QKeyword;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchCondition;
@@ -19,10 +18,7 @@ import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.util.StringUtils;
@@ -84,24 +80,9 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
         boolean hasNext = rows.size() > limit;
         List<InterestSearchRow> pageRows = hasNext ? rows.subList(0, limit) : rows;
 
-        List<Interest> pageInterests = pageRows.stream()
-                .map(InterestSearchRow::interest)
-                .toList();
-
-        Map<UUID, Long> subscriberCounts = pageRows.stream()
-                .collect(Collectors.toMap(
-                        row -> row.interest().getId(),
-                        InterestSearchRow::subscriberCount
-                ));
-
         // 키워드는 여기서 즉시 조회하지 않는다. Interest.keywords에 붙은 @BatchSize(size = 100) 덕분에,
         // 이후 같은 트랜잭션 안에서 interest.getKeywords()가 처음 호출되는 시점에 이 페이지에 담긴
         // 관심사들의 id를 묶어 IN 쿼리 한 번으로 지연 로딩된다(InterestServiceImpl#search 참고).
-
-        Set<UUID> subscribedInterestIds = pageRows.stream()
-                .filter(InterestSearchRow::subscribedByMe)
-                .map(row -> row.interest().getId())
-                .collect(Collectors.toSet());
 
         Long totalElements = queryFactory
                 .select(interest.count())
@@ -110,9 +91,7 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
                 .fetchOne();
 
         return new InterestSearchPage(
-                pageInterests,
-                subscriberCounts,
-                subscribedInterestIds,
+                pageRows,
                 hasNext,
                 totalElements == null ? 0L : totalElements
         );

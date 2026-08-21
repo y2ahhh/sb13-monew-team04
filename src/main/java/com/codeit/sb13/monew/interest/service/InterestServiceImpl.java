@@ -111,8 +111,8 @@ public class InterestServiceImpl implements InterestService{
      * {@link InterestRepository#search}에 위임한다.</p>
      *
      * <p>목록의 각 항목이 가진 {@code subscriberCount}, {@code subscribedByMe}는
-     * {@code InterestRepositoryCustomImpl}이 별도로 계산해 {@link InterestSearchPage}에
-     * 담아 돌려준 값을 그대로 {@link InterestResponse#of}에 넘겨 조립한다.</p>
+     * {@code InterestRepositoryCustomImpl}이 {@code InterestSearchRow}에 row 단위로
+     * 계산해 담아 돌려준 값을 그대로 {@link InterestResponse#of}에 넘겨 조립한다.</p>
      */
     @Override
     public CursorPageResponseDto<InterestResponse> search(InterestSearchCommand command) {
@@ -127,12 +127,8 @@ public class InterestServiceImpl implements InterestService{
                 command.requestUserId()
         ));
 
-        List<InterestResponse> content = page.interests().stream()
-                .map(interest -> InterestResponse.of(
-                        interest,
-                        page.subscriberCounts().getOrDefault(interest.getId(), 0L),
-                        page.subscribedInterestIds().contains(interest.getId())
-                ))
+        List<InterestResponse> content = page.rows().stream()
+                .map(row -> InterestResponse.of(row.interest(), row.subscriberCount(), row.subscribedByMe()))
                 .toList();
 
         return new CursorPageResponseDto<>(

@@ -12,11 +12,15 @@ import com.codeit.sb13.monew.interest.domain.Interest;
 import com.codeit.sb13.monew.interest.domain.Subscribe;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchCondition;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchPage;
+import com.codeit.sb13.monew.interest.repository.dto.InterestSearchRow;
 import com.codeit.sb13.monew.interest.service.dto.InterestOrderBy;
 import com.codeit.sb13.monew.user.domain.User;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +74,37 @@ class InterestRepositoryCustomImplTest {
         em.persist(Subscribe.of(interest, userId));
     }
 
+    /**
+     * {@link InterestSearchPage#rows}에서 {@link Interest} 목록만 뽑아낸다.
+     *
+     * <p>{@code InterestSearchPage}는 {@code InterestSearchRow} 목록만 담고 있어,
+     * 정렬 순서나 이름을 확인하는 테스트에서 매번 {@code .rows().stream().map(...)}을
+     * 반복하지 않도록 뽑아낸 헬퍼다.</p>
+     */
+    private List<Interest> interestsOf(InterestSearchPage page) {
+        return page.rows().stream().map(InterestSearchRow::interest).toList();
+    }
+
+    /**
+     * {@link InterestSearchPage#rows}를 관심사 id별 구독자 수 맵으로 다시 조립한다.
+     * 리포지토리가 실제로 이 맵을 만들어 돌려주는 것은 아니지만, 테스트에서 특정
+     * 관심사의 구독자 수를 id로 바로 찾아보기 편하도록 이 헬퍼에서만 조립한다.
+     */
+    private Map<UUID, Long> subscriberCountsOf(InterestSearchPage page) {
+        return page.rows().stream()
+                .collect(Collectors.toMap(row -> row.interest().getId(), InterestSearchRow::subscriberCount));
+    }
+
+    /**
+     * {@link InterestSearchPage#rows} 중 요청자가 구독 중인 관심사의 id만 집합으로 뽑아낸다.
+     */
+    private Set<UUID> subscribedInterestIdsOf(InterestSearchPage page) {
+        return page.rows().stream()
+                .filter(InterestSearchRow::subscribedByMe)
+                .map(row -> row.interest().getId())
+                .collect(Collectors.toSet());
+    }
+
     @Test
     @DisplayName("정렬 기준이 이름이면 오름차순으로 정렬해 반환한다")
     void search_orderByNameAscending_returnsSortedByName() {
@@ -82,7 +117,7 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage page = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.NAME, Sort.Direction.ASC, null, null, null, 10, null));
 
-        assertThat(page.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(page)).extracting(Interest::getName)
                 .containsExactly("가나다", "나비", "다람쥐");
         assertThat(page.hasNext()).isFalse();
         assertThat(page.totalElements()).isEqualTo(3);
@@ -100,7 +135,7 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage page = interestRepository.search(new InterestSearchCondition(
                 "스포츠", InterestOrderBy.NAME, Sort.Direction.ASC, null, null, null, 10, null));
 
-        assertThat(page.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(page)).extracting(Interest::getName)
                 .containsExactlyInAnyOrder("스포츠", "여행");
         assertThat(page.totalElements()).isEqualTo(2);
     }
@@ -123,10 +158,10 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage page = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.NAME, Sort.Direction.ASC, null, null, null, 10, requester));
 
-        assertThat(page.subscriberCounts().get(popular.getId())).isEqualTo(2L);
-        assertThat(page.subscriberCounts().getOrDefault(lonely.getId(), 0L)).isEqualTo(0L);
-        assertThat(page.subscribedInterestIds()).contains(popular.getId());
-        assertThat(page.subscribedInterestIds()).doesNotContain(lonely.getId());
+        assertThat(subscriberCountsOf(page).get(popular.getId())).isEqualTo(2L);
+        assertThat(subscriberCountsOf(page).getOrDefault(lonely.getId(), 0L)).isEqualTo(0L);
+        assertThat(subscribedInterestIdsOf(page)).contains(popular.getId());
+        assertThat(subscribedInterestIdsOf(page)).doesNotContain(lonely.getId());
     }
 
     @Test
@@ -149,7 +184,7 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage page = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC, null, null, null, 10, null));
 
-        assertThat(page.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(page)).extracting(Interest::getName)
                 .containsExactly("A", "B", "C");
     }
 
@@ -167,11 +202,11 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage firstPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.NAME, Sort.Direction.ASC, null, null, null, 2, null));
 
-        assertThat(firstPage.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(firstPage)).extracting(Interest::getName)
                 .containsExactly("가", "나");
         assertThat(firstPage.hasNext()).isTrue();
 
-        Interest lastOfFirstPage = firstPage.interests().get(firstPage.interests().size() - 1);
+        Interest lastOfFirstPage = interestsOf(firstPage).get(interestsOf(firstPage).size() - 1);
         String cursor = lastOfFirstPage.getName();
         LocalDateTime after = lastOfFirstPage.getCreatedAt();
         UUID idAfter = lastOfFirstPage.getId();
@@ -179,16 +214,16 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage secondPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.NAME, Sort.Direction.ASC, cursor, after, idAfter, 2, null));
 
-        assertThat(secondPage.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(secondPage)).extracting(Interest::getName)
                 .containsExactly("다", "라");
         assertThat(secondPage.hasNext()).isTrue();
 
         InterestSearchPage thirdPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.NAME, Sort.Direction.ASC,
-                secondPage.interests().get(1).getName(), secondPage.interests().get(1).getCreatedAt(),
-                secondPage.interests().get(1).getId(), 2, null));
+                interestsOf(secondPage).get(1).getName(), interestsOf(secondPage).get(1).getCreatedAt(),
+                interestsOf(secondPage).get(1).getId(), 2, null));
 
-        assertThat(thirdPage.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(thirdPage)).extracting(Interest::getName)
                 .containsExactly("마");
         assertThat(thirdPage.hasNext()).isFalse();
     }
@@ -203,8 +238,8 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage page = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.NAME, Sort.Direction.ASC, null, null, null, 10, null));
 
-        assertThat(page.interests()).hasSize(1);
-        assertThat(page.interests().get(0).getKeywords())
+        assertThat(interestsOf(page)).hasSize(1);
+        assertThat(interestsOf(page).get(0).getKeywords())
                 .extracting(k -> k.getKeyword())
                 .containsExactlyInAnyOrder("축구", "야구");
     }
@@ -221,17 +256,17 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage firstPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.NAME, Sort.Direction.DESC, null, null, null, 2, null));
 
-        assertThat(firstPage.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(firstPage)).extracting(Interest::getName)
                 .containsExactly("다", "나");
         assertThat(firstPage.hasNext()).isTrue();
 
-        Interest lastOfFirstPage = firstPage.interests().get(firstPage.interests().size() - 1);
+        Interest lastOfFirstPage = interestsOf(firstPage).get(interestsOf(firstPage).size() - 1);
 
         InterestSearchPage secondPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.NAME, Sort.Direction.DESC,
                 lastOfFirstPage.getName(), lastOfFirstPage.getCreatedAt(), lastOfFirstPage.getId(), 2, null));
 
-        assertThat(secondPage.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(secondPage)).extracting(Interest::getName)
                 .containsExactly("가");
         assertThat(secondPage.hasNext()).isFalse();
     }
@@ -256,18 +291,18 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage firstPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.ASC, null, null, null, 2, null));
 
-        assertThat(firstPage.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(firstPage)).extracting(Interest::getName)
                 .containsExactly("A", "B");
         assertThat(firstPage.hasNext()).isTrue();
 
-        Interest lastOfFirstPage = firstPage.interests().get(firstPage.interests().size() - 1);
-        String cursor = String.valueOf(firstPage.subscriberCounts().getOrDefault(lastOfFirstPage.getId(), 0L));
+        Interest lastOfFirstPage = interestsOf(firstPage).get(interestsOf(firstPage).size() - 1);
+        String cursor = String.valueOf(subscriberCountsOf(firstPage).getOrDefault(lastOfFirstPage.getId(), 0L));
 
         InterestSearchPage secondPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.ASC,
                 cursor, lastOfFirstPage.getCreatedAt(), lastOfFirstPage.getId(), 2, null));
 
-        assertThat(secondPage.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(secondPage)).extracting(Interest::getName)
                 .containsExactly("C");
         assertThat(secondPage.hasNext()).isFalse();
     }
@@ -292,18 +327,18 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage firstPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC, null, null, null, 2, null));
 
-        assertThat(firstPage.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(firstPage)).extracting(Interest::getName)
                 .containsExactly("C", "B");
         assertThat(firstPage.hasNext()).isTrue();
 
-        Interest lastOfFirstPage = firstPage.interests().get(firstPage.interests().size() - 1);
-        String cursor = String.valueOf(firstPage.subscriberCounts().getOrDefault(lastOfFirstPage.getId(), 0L));
+        Interest lastOfFirstPage = interestsOf(firstPage).get(interestsOf(firstPage).size() - 1);
+        String cursor = String.valueOf(subscriberCountsOf(firstPage).getOrDefault(lastOfFirstPage.getId(), 0L));
 
         InterestSearchPage secondPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC,
                 cursor, lastOfFirstPage.getCreatedAt(), lastOfFirstPage.getId(), 2, null));
 
-        assertThat(secondPage.interests()).extracting(Interest::getName)
+        assertThat(interestsOf(secondPage)).extracting(Interest::getName)
                 .containsExactly("A");
         assertThat(secondPage.hasNext()).isFalse();
     }
@@ -340,11 +375,11 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage page = interestRepository.search(new InterestSearchCondition(
                 "존재하지않는검색어", InterestOrderBy.NAME, Sort.Direction.ASC, null, null, null, 10, requester));
 
-        assertThat(page.interests()).isEmpty();
+        assertThat(interestsOf(page)).isEmpty();
         assertThat(page.hasNext()).isFalse();
         assertThat(page.totalElements()).isEqualTo(0);
-        assertThat(page.subscribedInterestIds()).isEmpty();
-        assertThat(page.subscriberCounts()).isEmpty();
+        assertThat(subscribedInterestIdsOf(page)).isEmpty();
+        assertThat(subscriberCountsOf(page)).isEmpty();
     }
 
     @Test
@@ -368,26 +403,26 @@ class InterestRepositoryCustomImplTest {
         InterestSearchPage firstPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.ASC, null, null, null, 2, null));
 
-        assertThat(firstPage.interests()).hasSize(2);
+        assertThat(interestsOf(firstPage)).hasSize(2);
         assertThat(firstPage.hasNext()).isTrue();
 
-        Interest lastOfFirstPage = firstPage.interests().get(firstPage.interests().size() - 1);
+        Interest lastOfFirstPage = interestsOf(firstPage).get(interestsOf(firstPage).size() - 1);
         String cursor = String.valueOf(
-                firstPage.subscriberCounts().getOrDefault(lastOfFirstPage.getId(), 0L));
+                subscriberCountsOf(firstPage).getOrDefault(lastOfFirstPage.getId(), 0L));
 
         InterestSearchPage secondPage = interestRepository.search(new InterestSearchCondition(
                 null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.ASC,
                 cursor, lastOfFirstPage.getCreatedAt(), lastOfFirstPage.getId(), 2, null));
 
-        assertThat(secondPage.interests()).hasSize(1);
+        assertThat(interestsOf(secondPage)).hasSize(1);
         assertThat(secondPage.hasNext()).isFalse();
 
         // 페이지 경계에서 id 타이브레이커가 없었다면 createdAt 동률로 인해
         // 같은 행이 양쪽 페이지에 중복되거나, 반대로 어느 쪽에도 나타나지 않을 수 있다.
         List<UUID> combinedIds = List.of(
-                firstPage.interests().get(0).getId(),
-                firstPage.interests().get(1).getId(),
-                secondPage.interests().get(0).getId()
+                interestsOf(firstPage).get(0).getId(),
+                interestsOf(firstPage).get(1).getId(),
+                interestsOf(secondPage).get(0).getId()
         );
         assertThat(combinedIds).containsExactlyInAnyOrder(a.getId(), b.getId(), c.getId());
     }

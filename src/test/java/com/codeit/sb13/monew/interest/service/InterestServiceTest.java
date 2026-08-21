@@ -16,14 +16,13 @@ import com.codeit.sb13.monew.interest.repository.InterestRepository;
 import com.codeit.sb13.monew.interest.repository.SubscribeRepository;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchCondition;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchPage;
+import com.codeit.sb13.monew.interest.repository.dto.InterestSearchRow;
 import com.codeit.sb13.monew.interest.service.dto.InterestCreateCommand;
 import com.codeit.sb13.monew.interest.service.dto.InterestOrderBy;
 import com.codeit.sb13.monew.interest.service.dto.InterestSearchCommand;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -293,7 +292,8 @@ class InterestServiceTest {
         InterestSearchCommand command =
                 new InterestSearchCommand(null, InterestOrderBy.NAME, Sort.Direction.ASC, null, null, null, 10, null);
         InterestSearchPage page = new InterestSearchPage(
-                List.of(first, last), Map.of(), Set.of(), true, 2L);
+                List.of(new InterestSearchRow(first, 0L, false), new InterestSearchRow(last, 0L, false)),
+                true, 2L);
 
         when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
@@ -323,9 +323,7 @@ class InterestServiceTest {
         InterestSearchCommand command = new InterestSearchCommand(
                 null, InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC, null, null, null, 10, null);
         InterestSearchPage page = new InterestSearchPage(
-                List.of(first, last),
-                Map.of(first.getId(), 5L, last.getId(), 2L),
-                Set.of(),
+                List.of(new InterestSearchRow(first, 5L, false), new InterestSearchRow(last, 2L, false)),
                 false,
                 2L
         );
@@ -351,7 +349,7 @@ class InterestServiceTest {
         // given
         InterestSearchCommand command =
                 new InterestSearchCommand("없는검색어", InterestOrderBy.NAME, Sort.Direction.ASC, null, null, null, 10, null);
-        InterestSearchPage page = new InterestSearchPage(List.of(), Map.of(), Set.of(), false, 0L);
+        InterestSearchPage page = new InterestSearchPage(List.of(), false, 0L);
 
         when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
@@ -378,7 +376,7 @@ class InterestServiceTest {
         InterestSearchCommand command = new InterestSearchCommand(
                 "스포츠", InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC,
                 "3", LocalDateTime.now(), idAfter, 20, requestUserId);
-        InterestSearchPage page = new InterestSearchPage(List.of(), Map.of(), Set.of(), false, 0L);
+        InterestSearchPage page = new InterestSearchPage(List.of(), false, 0L);
 
         when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
