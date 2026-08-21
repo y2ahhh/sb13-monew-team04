@@ -8,9 +8,10 @@ import com.codeit.sb13.monew.global.exception.interest.InterestSearchConditionIn
 import com.codeit.sb13.monew.interest.domain.QKeyword;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchCondition;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchPage;
+import com.codeit.sb13.monew.interest.repository.dto.InterestSearchRow;
 import com.codeit.sb13.monew.interest.service.dto.InterestOrderBy;
-import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
+import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
@@ -60,12 +61,18 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
         UUID requestUserId = condition.requestUserId();
 
         NumberExpression<Long> subscriberCountExpr = subscriberCountExpression();
+        BooleanExpression subscribedByMeExpr = subscribedByMeExpression(requestUserId);
         BooleanExpression searchCondition = searchCondition(keywordText);
         BooleanExpression keysetCondition = keysetCondition(orderBy, direction, cursor, after, subscriberCountExpr);
 
         // 다음 페이지 존재 여부를 별도 쿼리 없이 판단하기 위해 요청한 limit보다 하나 더 가져온다.
-        List<Tuple> rows = queryFactory
-                .select(interest, subscriberCountExpr)
+        List<InterestSearchRow> rows = queryFactory
+                .select(Projections.constructor(
+                        // subscriberCountExpr는 서브쿼리를 감싼 표현식이라 getType()이 Long이 아니라
+                        // Object로 소실되는 QueryDSL의 알려진 특성이 있다. Projections.constructor는
+                        // 각 표현식의 getType()을 리플렉션으로 읽어 생성자 파라미터 타입과 맞춰보므로,
+                        // longValue()로 타입을 Long으로 다시 명시해줘야 InterestSearchRow의 생성자를 찾는다.
+                        InterestSearchRow.class, interest, subscriberCountExpr.longValue(), subscribedByMeExpr))
                 .from(interest)
                 .where(searchCondition, keysetCondition)
                 .orderBy(orderSpecifiers(orderBy, direction, subscriberCountExpr))
@@ -73,23 +80,24 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
                 .fetch();
 
         boolean hasNext = rows.size() > limit;
-        List<Tuple> pageRows = hasNext ? rows.subList(0, limit) : rows;
+        List<InterestSearchRow> pageRows = hasNext ? rows.subList(0, limit) : rows;
 
         List<Interest> pageInterests = pageRows.stream()
-                .map(row -> row.get(interest))
+                .map(InterestSearchRow::interest)
                 .toList();
 
         Map<UUID, Long> subscriberCounts = pageRows.stream()
                 .collect(Collectors.toMap(
-                        row -> row.get(interest).getId(),
-                        row -> row.get(subscriberCountExpr)
+                        row -> row.interest().getId(),
+                        InterestSearchRow::subscriberCount
                 ));
 
         fetchKeywordsInto(pageInterests);
 
-        Set<UUID> subscribedInterestIds = requestUserId == null
-                ? Set.of()
-                : findSubscribedInterestIds(requestUserId, pageInterests);
+        Set<UUID> subscribedInterestIds = pageRows.stream()
+                .filter(InterestSearchRow::subscribedByMe)
+                .map(row -> row.interest().getId())
+                .collect(Collectors.toSet());
 
         Long totalElements = queryFactory
                 .select(interest.count())
@@ -112,6 +120,25 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
                         .from(subscribe)
                         .where(subscribe.interest.eq(interest))
         );
+    }
+
+    /**
+     * 요청자가 이 관심사를 구독 중인지 여부를 서브쿼리로 계산한다.
+     *
+     * <p>{@code requestUserId}가 {@code null}이면(비로그인 요청) 구독 여부를 물을 대상이
+     * 없으므로 서브쿼리 없이 상수 {@code false}를 돌려준다. {@code subscribe.userId.eq(null)}을
+     * 직접 조건에 넣으면 SQL의 {@code = NULL}과 같은 방식으로 다뤄질 위험이 있어, 그 경우를
+     * 아예 분리해 처리한다.</p>
+     */
+    private BooleanExpression subscribedByMeExpression(UUID requestUserId) {
+        if (requestUserId == null) {
+            return Expressions.asBoolean(false);
+        }
+
+        return JPAExpressions.selectOne()
+                .from(subscribe)
+                .where(subscribe.interest.eq(interest), subscribe.userId.eq(requestUserId))
+                .exists();
     }
 
     private BooleanExpression searchCondition(String keywordText) {
@@ -208,17 +235,5 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
                 .leftJoin(interest.keywords, keyword).fetchJoin()
                 .where(interest.in(interests))
                 .fetch();
-    }
-
-    private Set<UUID> findSubscribedInterestIds(UUID requestUserId, List<Interest> interests) {
-        if (interests.isEmpty()) {
-            return Set.of();
-        }
-
-        return Set.copyOf(queryFactory
-                .select(subscribe.interest.id)
-                .from(subscribe)
-                .where(subscribe.userId.eq(requestUserId), subscribe.interest.in(interests))
-                .fetch());
     }
 }

@@ -14,6 +14,7 @@ import com.codeit.sb13.monew.interest.controller.dto.InterestResponse;
 import com.codeit.sb13.monew.interest.domain.Interest;
 import com.codeit.sb13.monew.interest.repository.InterestRepository;
 import com.codeit.sb13.monew.interest.repository.SubscribeRepository;
+import com.codeit.sb13.monew.interest.repository.dto.InterestSearchCondition;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchPage;
 import com.codeit.sb13.monew.interest.service.dto.InterestCreateCommand;
 import com.codeit.sb13.monew.interest.service.dto.InterestOrderBy;
@@ -294,10 +295,10 @@ class InterestServiceTest {
         InterestSearchPage page = new InterestSearchPage(
                 List.of(first, last), Map.of(), Set.of(), true, 2L);
 
-        when(interestRepository.search(
+        when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
                 command.cursor(), command.after(), command.limit(), command.requestUserId()
-        )).thenReturn(page);
+        ))).thenReturn(page);
 
         // when
         CursorPageResponseDto<InterestResponse> response = interestServiceImpl.search(command);
@@ -328,10 +329,10 @@ class InterestServiceTest {
                 2L
         );
 
-        when(interestRepository.search(
+        when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
                 command.cursor(), command.after(), command.limit(), command.requestUserId()
-        )).thenReturn(page);
+        ))).thenReturn(page);
 
         // when
         CursorPageResponseDto<InterestResponse> response = interestServiceImpl.search(command);
@@ -351,10 +352,10 @@ class InterestServiceTest {
                 new InterestSearchCommand("없는검색어", InterestOrderBy.NAME, Sort.Direction.ASC, null, null, 10, null);
         InterestSearchPage page = new InterestSearchPage(List.of(), Map.of(), Set.of(), false, 0L);
 
-        when(interestRepository.search(
+        when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
                 command.cursor(), command.after(), command.limit(), command.requestUserId()
-        )).thenReturn(page);
+        ))).thenReturn(page);
 
         // when
         CursorPageResponseDto<InterestResponse> response = interestServiceImpl.search(command);
@@ -377,17 +378,17 @@ class InterestServiceTest {
                 "3", LocalDateTime.now(), 20, requestUserId);
         InterestSearchPage page = new InterestSearchPage(List.of(), Map.of(), Set.of(), false, 0L);
 
-        when(interestRepository.search(
+        when(interestRepository.search(new InterestSearchCondition(
                 command.keyword(), command.orderBy(), command.direction(),
                 command.cursor(), command.after(), command.limit(), command.requestUserId()
-        )).thenReturn(page);
+        ))).thenReturn(page);
 
         // when
         interestServiceImpl.search(command);
 
         // then
-        verify(interestRepository).search(
+        verify(interestRepository).search(new InterestSearchCondition(
                 "스포츠", InterestOrderBy.SUBSCRIBER_COUNT, Sort.Direction.DESC,
-                "3", command.after(), 20, requestUserId);
+                "3", command.after(), 20, requestUserId));
     }
 }
