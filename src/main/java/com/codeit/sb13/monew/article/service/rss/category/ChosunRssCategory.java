@@ -4,6 +4,7 @@ import com.codeit.sb13.monew.global.exception.article.ArticleFetchRequestInvalid
 import org.springframework.util.StringUtils;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -35,7 +36,8 @@ public enum ChosunRssCategory implements RssNewsCategory {
             throw new ArticleFetchRequestInvalidException("chosun category");
         }
 
-        ChosunRssCategory chosunRssCategory = CATEGORY_BY_KEY.get(key);
+        String normalizedKey = key.strip().toLowerCase(Locale.ROOT);
+        ChosunRssCategory chosunRssCategory = CATEGORY_BY_KEY.get(normalizedKey);
 
         if (chosunRssCategory == null) {
             throw new ArticleFetchRequestInvalidException("chosun category");
