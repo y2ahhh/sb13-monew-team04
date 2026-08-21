@@ -29,6 +29,8 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class NotificationServiceImpl implements NotificationService {
 
+    private static final int MAX_LIMIT = 100;
+
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final NotificationMapper mapper;
@@ -65,7 +67,7 @@ public class NotificationServiceImpl implements NotificationService {
         if ((request.cursor() == null) != (request.after() == null)) {
             throw new NotificationInvalidCursorException(request.cursor());
         }
-        if(request.limit()<=0) {
+        if(request.limit()<=0 || request.limit() > MAX_LIMIT) {
             throw new NotificationInvalidLimitException(request.limit());
         }
         if(!userRepository.existsById(request.userId())) {

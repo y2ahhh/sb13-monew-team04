@@ -391,6 +391,41 @@ class NotificationServiceImplTest {
         }
 
         @Test
+        @DisplayName("limit이 MAX_LIMIT과 같으면 정상적으로 조회된다.")
+        void limit이_MAX_LIMIT과_같으면_정상조회() {
+            // given
+            int maxLimit = (int) ReflectionTestUtils.getField(NotificationServiceImpl.class, "MAX_LIMIT");
+            UUID userId = UUID.randomUUID();
+
+            NotificationFindDto request = new NotificationFindDto(null, null, maxLimit, userId);
+
+            when(userRepository.existsById(userId)).thenReturn(true);
+            when(notificationRepository.findUnconfirmedByUserWithCursor(userId, null, null, maxLimit + 1))
+                    .thenReturn(List.of());
+            when(notificationRepository.countByUser_IdAndConfirmedFalse(userId)).thenReturn(0L);
+
+            // when
+            CursorPageResponseDto<NotificationResult> result = notificationServiceImpl.findAllNotifications(request);
+
+            // then
+            assertThat(result.hasNext()).isFalse();
+            verify(notificationRepository).findUnconfirmedByUserWithCursor(userId, null, null, maxLimit + 1);
+        }
+
+        @Test
+        @DisplayName("limit이 MAX_LIMIT을 초과하면 NotificationInvalidLimitException이 발생한다.")
+        void limit이_MAX_LIMIT_초과면_예외() {
+            // given
+            NotificationFindDto request = new NotificationFindDto(null, null, Integer.MAX_VALUE, UUID.randomUUID());
+
+            // when & then
+            assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
+                    .isInstanceOf(NotificationInvalidLimitException.class);
+
+            verify(userRepository, never()).existsById(any());
+        }
+
+        @Test
         @DisplayName("cursor만 있고 after가 없으면 NotificationInvalidCursorException이 발생한다.")
         void cursor만_있으면_예외() {
             // given
