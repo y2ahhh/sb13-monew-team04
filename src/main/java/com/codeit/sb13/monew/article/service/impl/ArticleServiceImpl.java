@@ -1,7 +1,11 @@
 package com.codeit.sb13.monew.article.service.impl;
 
+import com.codeit.sb13.monew.article.controller.dto.ArticleDto;
 import com.codeit.sb13.monew.article.domain.Article;
+import com.codeit.sb13.monew.article.domain.ArticleSource;
+import com.codeit.sb13.monew.article.mapper.ArticleMapper;
 import com.codeit.sb13.monew.article.repository.ArticleRepository;
+import com.codeit.sb13.monew.article.repository.ArticleViewRepository;
 import com.codeit.sb13.monew.article.service.ArticleService;
 import com.codeit.sb13.monew.article.service.dto.ArticleRequest;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
@@ -20,6 +24,8 @@ import java.util.UUID;
 public class ArticleServiceImpl implements ArticleService {
 
     private final ArticleRepository articleRepository;
+    private final ArticleViewRepository articleViewRepository;
+    private final ArticleMapper articleMapper;
 
     @Override
     public List<Article> findAll() {
@@ -30,6 +36,23 @@ public class ArticleServiceImpl implements ArticleService {
     public Article findById(UUID id) {
         return articleRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new ArticleNotFoundException(id));
+    }
+
+    @Override
+    public ArticleDto getArticle(UUID articleId, UUID requestUserId) {
+        Article article = findById(articleId);
+
+        boolean viewedByMe = articleViewRepository
+                .existsByArticle_IdAndUser_Id(articleId, requestUserId);
+        long viewCount = articleViewRepository.countByArticle_Id(articleId);
+
+        // commentCount는 댓글 파트 집계 방식 확정 전까지 0 (MID4-147)
+        return articleMapper.toDto(article, viewedByMe, 0, (int) viewCount);
+    }
+
+    @Override
+    public List<ArticleSource> getSources() {
+        return List.of(ArticleSource.values());
     }
 
     /**
