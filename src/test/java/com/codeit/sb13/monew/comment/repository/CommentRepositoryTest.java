@@ -6,9 +6,9 @@ import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.comment.repository.dto.RecentCommentActivityProjection;
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;
+import com.codeit.sb13.monew.global.config.QueryDslConfig;
 import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.repository.UserRepository;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +23,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-@Import(JpaAuditingConfig.class)
+@Import({JpaAuditingConfig.class, QueryDslConfig.class})
 class CommentRepositoryTest {
 
     @Autowired
@@ -61,10 +61,10 @@ class CommentRepositoryTest {
         userRepository.saveAndFlush(otherUser);
 
         Article article = articleRepository.saveAndFlush(createArticle("testTitle", "testContent", "link"));
-        Comment oldestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment1"));
-        Comment middleComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment2"));
-        Comment newestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment3"));
-        commentRepository.saveAndFlush(new Comment(article.getId(), otherUser, "testComment4"));
+        Comment oldestComment = commentRepository.saveAndFlush(new Comment(article, targetUser, "testComment1"));
+        Comment middleComment = commentRepository.saveAndFlush(new Comment(article, targetUser, "testComment2"));
+        Comment newestComment = commentRepository.saveAndFlush(new Comment(article, targetUser, "testComment3"));
+        commentRepository.saveAndFlush(new Comment(article, otherUser, "testComment4"));
 
         LocalDateTime baseTime = LocalDateTime.of(2026, 8, 20, 10, 0);
         updateCommentCreatedAt(oldestComment.getId(), baseTime.minusMinutes(2));
@@ -94,11 +94,11 @@ class CommentRepositoryTest {
         Article article = articleRepository.saveAndFlush(createArticle("testTitle", "testContent", "link"));
         LocalDateTime baseTime = LocalDateTime.of(2026, 8, 20, 10, 0);
         for (int index = 1; index <= 11; index++) {
-            Comment comment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment" + index));
+            Comment comment = commentRepository.saveAndFlush(new Comment(article, targetUser, "testComment" + index));
             updateCommentCreatedAt(comment.getId(), baseTime.minusMinutes(11L - index));
         }
 
-        Comment otherUserComment = commentRepository.saveAndFlush(new Comment(article.getId(), otherUser, "otherTestComment"));
+        Comment otherUserComment = commentRepository.saveAndFlush(new Comment(article, otherUser, "otherTestComment"));
         updateCommentCreatedAt(otherUserComment.getId(), baseTime.plusMinutes(1));
 
         em.clear();
@@ -121,7 +121,7 @@ class CommentRepositoryTest {
         userRepository.saveAndFlush(targetUser);
 
         Article article = articleRepository.saveAndFlush(createArticle("testTitle", "testContent", "link"));
-        commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "deletedUserComment"));
+        commentRepository.saveAndFlush(new Comment(article, targetUser, "deletedUserComment"));
 
         targetUser.softDelete();
         userRepository.saveAndFlush(targetUser);
@@ -142,9 +142,9 @@ class CommentRepositoryTest {
         userRepository.saveAndFlush(targetUser);
 
         Article article = articleRepository.saveAndFlush(createArticle("testTitle", "testContent", "link"));
-        Comment oldestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment1"));
-        Comment middleComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment2"));
-        Comment newestComment = commentRepository.saveAndFlush(new Comment(article.getId(), targetUser, "testComment3"));
+        Comment oldestComment = commentRepository.saveAndFlush(new Comment(article, targetUser, "testComment1"));
+        Comment middleComment = commentRepository.saveAndFlush(new Comment(article, targetUser, "testComment2"));
+        Comment newestComment = commentRepository.saveAndFlush(new Comment(article, targetUser, "testComment3"));
 
         LocalDateTime baseTime = LocalDateTime.of(2026, 8, 20, 10, 0);
         updateCommentCreatedAt(oldestComment.getId(), baseTime.minusMinutes(2));
@@ -176,8 +176,8 @@ class CommentRepositoryTest {
         Article activeArticle = articleRepository.saveAndFlush(createArticle("activeTitle", "activeContent", "activeLink"));
         Article deletedArticle = articleRepository.saveAndFlush(createArticle("deletedTitle", "deletedContent", "deletedLink"));
 
-        Comment activeArticleComment = commentRepository.saveAndFlush(new Comment(activeArticle.getId(), targetUser, "activeArticleComment"));
-        Comment deletedArticleComment = commentRepository.saveAndFlush(new Comment(deletedArticle.getId(), targetUser, "deletedArticleComment"));
+        Comment activeArticleComment = commentRepository.saveAndFlush(new Comment(activeArticle, targetUser, "activeArticleComment"));
+        Comment deletedArticleComment = commentRepository.saveAndFlush(new Comment(deletedArticle, targetUser, "deletedArticleComment"));
 
         LocalDateTime baseTime = LocalDateTime.of(2026, 8, 20, 10, 0);
         updateCommentCreatedAt(activeArticleComment.getId(), baseTime);
