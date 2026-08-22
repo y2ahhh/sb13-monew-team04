@@ -1,6 +1,7 @@
 package com.codeit.sb13.monew.notification.controller;
 
 import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
+import com.codeit.sb13.monew.notification.controller.dto.NotificationFindRequest;
 import com.codeit.sb13.monew.notification.controller.dto.NotificationResponse;
 import com.codeit.sb13.monew.notification.mapper.NotificationMapper;
 import com.codeit.sb13.monew.notification.service.NotificationService;
@@ -10,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,13 +24,12 @@ public class NotificationController {
 
     @GetMapping
     public ResponseEntity<CursorPageResponseDto<NotificationResponse>> findAllNotifications(
-            @RequestParam(required = false) String cursor,
-            @RequestParam(required = false) LocalDateTime after,
-            @RequestParam int limit,
+            @ModelAttribute NotificationFindRequest request,
             @RequestHeader("Monew-Request-User-ID") UUID userId
     ) {
-        NotificationFindDto request = new NotificationFindDto(cursor, after, limit, userId);
-        CursorPageResponseDto<NotificationResult> result = notificationService.findAllNotifications(request);
+        NotificationFindDto command = new NotificationFindDto(
+                request.cursor(), request.after(), request.limit(), userId);
+        CursorPageResponseDto<NotificationResult> result = notificationService.findAllNotifications(command);
 
         List<NotificationResponse> content = result.content().stream()
                 .map(mapper::toResponse)
