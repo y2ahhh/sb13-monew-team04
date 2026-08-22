@@ -10,6 +10,7 @@ import com.codeit.sb13.monew.comment.repository.dto.RecentCommentLikeActivityPro
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;
 import com.codeit.sb13.monew.global.config.QueryDslConfig;
 import com.codeit.sb13.monew.user.domain.User;
+import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -84,6 +85,36 @@ class CommentLikeRepositoryTest {
             "comment-2",
             "comment-1"
         );
+  }
+
+  @Test
+  @DisplayName("좋아요 생성일이 같으면 좋아요 ID 내림차순으로 보조 정렬한다")
+  void findRecentCommentLikeActivity_sameCreatedAt_ordersByLikeIdDesc() {
+    User requester = persistUser("requester");
+    User writer = persistUser("writer");
+    Article article = persistArticle("article");
+    LocalDateTime sameCreatedAt = LocalDateTime.of(2026, 8, 22, 10, 0);
+    List<CommentLike> likes = new ArrayList<>();
+
+    for (int i = 0; i < 11; i++) {
+      Comment comment = persistComment(article, writer, "same-time-comment-" + i);
+      likes.add(persistCommentLike(comment, requester));
+    }
+    em.flush();
+
+    for (CommentLike like : likes) {
+      updateCommentLikeCreatedAt(like, sameCreatedAt);
+    }
+    em.clear();
+
+    List<UUID> expectedIds = findExpectedLikeIdsByNativeOrder(requester.getId());
+    List<UUID> resultIds = commentLikeRepository.findRecentCommentLikeActivity(requester.getId())
+        .stream()
+        .map(RecentCommentLikeActivityProjection::id)
+        .toList();
+
+    assertThat(resultIds).hasSize(10);
+    assertThat(resultIds).containsExactlyElementsOf(expectedIds);
   }
 
   @Test
@@ -243,5 +274,36 @@ class CommentLikeRepositoryTest {
         .setParameter("createdAt", createdAt)
         .setParameter("id", commentLike.getId())
         .executeUpdate();
+  }
+
+  private List<UUID> findExpectedLikeIdsByNativeOrder(UUID userId) {
+    List<?> rows = em.getEntityManager()
+        .createNativeQuery("""
+            SELECT id
+            FROM comment_likes
+            WHERE liked_by = :userId
+            ORDER BY created_at DESC, id DESC
+            LIMIT 10
+            """)
+        .setParameter("userId", userId)
+        .getResultList();
+
+    return rows.stream()
+        .map(this::toUuid)
+        .toList();
+  }
+
+  private UUID toUuid(Object value) {
+    if (value instanceof UUID uuid) {
+      return uuid;
+    }
+    if (value instanceof String string) {
+      return UUID.fromString(string);
+    }
+    if (value instanceof byte[] bytes) {
+      ByteBuffer buffer = ByteBuffer.wrap(bytes);
+      return new UUID(buffer.getLong(), buffer.getLong());
+    }
+    throw new IllegalArgumentException("Unsupported UUID value type: " + value.getClass());
   }
 }

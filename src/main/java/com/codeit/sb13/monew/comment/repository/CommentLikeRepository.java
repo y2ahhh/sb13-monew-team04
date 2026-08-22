@@ -55,7 +55,7 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> 
         AND U.deletedAt IS NULL
         AND A.deletedAt IS NULL
         AND C.deletedAt IS NULL
-    ORDER BY CL.createdAt DESC
+    ORDER BY CL.createdAt DESC, CL.id DESC
     LIMIT 10
     """)
   List<RecentCommentLikeActivityProjection> findRecentCommentLikeActivity(@Param("userId") UUID userId);
