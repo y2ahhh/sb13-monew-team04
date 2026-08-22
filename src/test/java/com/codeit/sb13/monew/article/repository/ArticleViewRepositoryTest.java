@@ -18,6 +18,7 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -115,6 +116,31 @@ class ArticleViewRepositoryTest {
                 .containsExactly(
                         "article11", "article10", "article9", "article8", "article7",
                         "article6", "article5", "article4", "article3", "article2");
+    }
+
+    @Test
+    @DisplayName("조회 시각이 같으면 조회 기록 ID 내림차순으로 보조 정렬한다")
+    void returnsArticleViewsOrderedByViewedAtDescAndIdDescWhenViewedAtTies() {
+        // given
+        User targetUser = saveUser("target");
+        LocalDateTime sameViewedAt = LocalDateTime.of(2026, 8, 22, 10, 0);
+
+        for (int index = 1; index <= 11; index++) {
+            Article article = saveArticle("same-viewed-at-" + index, sameViewedAt.minusDays(index));
+            saveArticleView(article, targetUser, sameViewedAt);
+        }
+        flushAndClear();
+
+        // when
+        List<UUID> expectedIds = findExpectedArticleViewIdsByNativeOrder(targetUser.getId());
+        List<UUID> resultIds = articleViewRepository.findRecentArticleViewActivities(targetUser.getId())
+                .stream()
+                .map(RecentArticleViewActivityProjection::id)
+                .toList();
+
+        // then
+        assertThat(resultIds).hasSize(10);
+        assertThat(resultIds).containsExactlyElementsOf(expectedIds);
     }
 
     @Test
@@ -270,5 +296,36 @@ class ArticleViewRepositoryTest {
     private void flushAndClear() {
         em.flush();
         em.clear();
+    }
+
+    private List<UUID> findExpectedArticleViewIdsByNativeOrder(UUID userId) {
+        List<?> rows = em.getEntityManager()
+                .createNativeQuery("""
+                        SELECT id
+                        FROM article_views
+                        WHERE user_id = :userId
+                        ORDER BY viewed_at DESC, id DESC
+                        LIMIT 10
+                        """)
+                .setParameter("userId", userId)
+                .getResultList();
+
+        return rows.stream()
+                .map(this::toUuid)
+                .toList();
+    }
+
+    private UUID toUuid(Object value) {
+        if (value instanceof UUID uuid) {
+            return uuid;
+        }
+        if (value instanceof String string) {
+            return UUID.fromString(string);
+        }
+        if (value instanceof byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            return new UUID(buffer.getLong(), buffer.getLong());
+        }
+        throw new IllegalArgumentException("Unsupported UUID value type: " + value.getClass());
     }
 }

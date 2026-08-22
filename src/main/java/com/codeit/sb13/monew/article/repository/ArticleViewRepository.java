@@ -66,7 +66,7 @@ public interface ArticleViewRepository extends JpaRepository<ArticleView, UUID> 
                 WHERE U.id = :userId
                 AND A.deletedAt IS NULL
                 AND U.deletedAt IS NULL
-                ORDER BY AT.viewedAt DESC
+                ORDER BY AT.viewedAt DESC, AT.id DESC
                 LIMIT 10
             """)
     List<RecentArticleViewActivityProjection> findRecentArticleViewActivities(@Param("userId") UUID userId);
