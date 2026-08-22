@@ -233,7 +233,7 @@ class ArticleServiceTest {
                 .thenReturn(Optional.of(testArticle));
         when(articleViewRepository.existsByArticle_IdAndUser_Id(testArticleId, testUserId))
                 .thenReturn(true);
-        when(articleViewRepository.countByArticle_Id(testArticleId))
+        when(articleViewRepository.countByArticle_IdAndUser_DeletedAtIsNull(testArticleId))
                 .thenReturn(7L);
         when(articleMapper.toDto(testArticle, true, 0L, 7L))
                 .thenReturn(expectedDto);
@@ -254,7 +254,7 @@ class ArticleServiceTest {
 
         assertThatThrownBy(() -> articleService.getArticle(testArticleId, testUserId))
                 .isInstanceOf(ArticleNotFoundException.class);
-        verify(articleViewRepository, never()).countByArticle_Id(any());
+        verify(articleViewRepository, never()).countByArticle_IdAndUser_DeletedAtIsNull(any());
     }
 
     @Test

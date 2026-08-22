@@ -230,4 +230,19 @@ class ArticleRepositoryCustomImplTest {
         assertThat(rows.get(0).viewedByMe()).isFalse();
         assertThat(rows.get(0).viewCount()).isEqualTo(1L);
     }
+
+    @Test
+    @DisplayName("탈퇴한 사용자의 조회 이력은 viewCount에서 제외한다")
+    void searchExcludesDeletedUserViews() {
+        Article article = persistArticle("기사", "요약", D1, ArticleSource.NAVER);
+        view(article, persistUser());
+        User deleted = persistUser();
+        view(article, deleted);
+        deleted.softDelete();
+
+        List<ArticleSearchRow> rows = search(condition(null, null, null, null, null));
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).viewCount()).isEqualTo(1L);
+    }
 }

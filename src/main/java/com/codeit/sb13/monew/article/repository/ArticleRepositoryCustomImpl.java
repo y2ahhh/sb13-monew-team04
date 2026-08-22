@@ -2,6 +2,7 @@ package com.codeit.sb13.monew.article.repository;
 
 import static com.codeit.sb13.monew.article.domain.QArticle.article;
 import static com.codeit.sb13.monew.article.domain.QArticleView.articleView;
+import static com.codeit.sb13.monew.user.domain.QUser.user;
 
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.repository.dto.ArticleSearchCondition;
@@ -49,7 +50,8 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
         return Expressions.asNumber(
                 JPAExpressions.select(articleView.count())
                         .from(articleView)
-                        .where(articleView.article.eq(article))
+                        .join(articleView.user, user)
+                        .where(articleView.article.eq(article), user.deletedAt.isNull())
         );
     }
 

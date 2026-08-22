@@ -50,7 +50,7 @@ public class ArticleServiceImpl implements ArticleService {
 
         boolean viewedByMe = articleViewRepository
                 .existsByArticle_IdAndUser_Id(articleId, requestUserId);
-        long viewCount = articleViewRepository.countByArticle_Id(articleId);
+        long viewCount = articleViewRepository.countByArticle_IdAndUser_DeletedAtIsNull(articleId);
 
         // commentCount는 댓글 파트 집계 방식 확정 전까지 0 (MID4-147)
         return articleMapper.toDto(article, viewedByMe, 0L, viewCount);
