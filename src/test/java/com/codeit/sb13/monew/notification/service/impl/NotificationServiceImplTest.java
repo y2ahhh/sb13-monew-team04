@@ -1,8 +1,6 @@
 package com.codeit.sb13.monew.notification.service.impl;
 
 import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
-import com.codeit.sb13.monew.global.exception.notification.NotificationInvalidCursorException;
-import com.codeit.sb13.monew.global.exception.notification.NotificationInvalidLimitException;
 import com.codeit.sb13.monew.global.exception.notification.NotificationNotFoundException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.notification.domain.Notification;
@@ -381,90 +379,6 @@ class NotificationServiceImplTest {
         }
 
         @Test
-        @DisplayName("limit이 0 이하면 NotificationInvalidLimitException이 발생한다.")
-        void limit_0이하면_예외() {
-            // given
-            NotificationFindDto request = new NotificationFindDto(null, null, 0, UUID.randomUUID());
-
-            // when & then
-            assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
-                    .isInstanceOf(NotificationInvalidLimitException.class);
-
-            verify(userRepository, never()).existsById(any());
-        }
-
-        @Test
-        @DisplayName("limit이 MAX_LIMIT과 같으면 정상적으로 조회된다.")
-        void limit이_MAX_LIMIT과_같으면_정상조회() {
-            // given
-            int maxLimit = (int) ReflectionTestUtils.getField(NotificationServiceImpl.class, "MAX_LIMIT");
-            UUID userId = UUID.randomUUID();
-
-            NotificationFindDto request = new NotificationFindDto(null, null, maxLimit, userId);
-
-            when(userRepository.existsById(userId)).thenReturn(true);
-            when(notificationRepository.findUnconfirmedByUserWithCursor(
-                    new NotificationFindCondition(userId, null, null, maxLimit + 1)))
-                    .thenReturn(List.of());
-            when(notificationRepository.countByUser_IdAndConfirmedFalse(userId)).thenReturn(0L);
-
-            // when
-            CursorPageResponseDto<NotificationResult> result = notificationServiceImpl.findAllNotifications(request);
-
-            // then
-            assertThat(result.hasNext()).isFalse();
-            verify(notificationRepository).findUnconfirmedByUserWithCursor(
-                    new NotificationFindCondition(userId, null, null, maxLimit + 1));
-        }
-
-        @Test
-        @DisplayName("limit이 MAX_LIMIT을 초과하면 NotificationInvalidLimitException이 발생한다.")
-        void limit이_MAX_LIMIT_초과면_예외() {
-            // given
-            NotificationFindDto request = new NotificationFindDto(null, null, Integer.MAX_VALUE, UUID.randomUUID());
-
-            // when & then
-            assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
-                    .isInstanceOf(NotificationInvalidLimitException.class);
-
-            verify(userRepository, never()).existsById(any());
-        }
-
-        @Test
-        @DisplayName("cursor만 있고 after가 없으면 NotificationInvalidCursorException이 발생한다.")
-        void cursor만_있으면_예외() {
-            // given
-            NotificationFindDto request = new NotificationFindDto(UUID.randomUUID().toString(), null, 10, UUID.randomUUID());
-
-            // when & then
-            assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
-                    .isInstanceOf(NotificationInvalidCursorException.class);
-        }
-
-        @Test
-        @DisplayName("after만 있고 cursor가 없으면 NotificationInvalidCursorException이 발생한다.")
-        void after만_있으면_예외() {
-            // given
-            NotificationFindDto request = new NotificationFindDto(null, LocalDateTime.now(), 10, UUID.randomUUID());
-
-            // when & then
-            assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
-                    .isInstanceOf(NotificationInvalidCursorException.class);
-        }
-
-        @Test
-        @DisplayName("cursor가 UUID 형식이 아니면 NotificationInvalidCursorException이 발생한다.")
-        void cursor_형식_오류면_예외() {
-            // given
-            UUID userId = UUID.randomUUID();
-            NotificationFindDto request = new NotificationFindDto("not-a-uuid", LocalDateTime.now(), 10, userId);
-
-            // when & then
-            assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
-                    .isInstanceOf(NotificationInvalidCursorException.class);
-        }
-
-        @Test
         @DisplayName("존재하지 않는 요청자면 UserNotFoundException이 발생한다.")
         void 요청자_없으면_예외() {
             // given
@@ -479,17 +393,5 @@ class NotificationServiceImplTest {
             verify(notificationRepository, never()).findUnconfirmedByUserWithCursor(any(NotificationFindCondition.class));
         }
 
-        @Test
-        @DisplayName("존재하지 않는 사용자와 잘못된 cursor 형식이 함께 오면 cursor 검증이 우선한다")
-        void 잘못된_cursor와_존재하지않는_사용자_동시() {
-            // given
-            NotificationFindDto request = new NotificationFindDto("not-a-uuid", LocalDateTime.now(), 10, UUID.randomUUID());
-
-            // when & then
-            assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
-                    .isInstanceOf(NotificationInvalidCursorException.class);
-
-            verify(userRepository, never()).existsById(any());
-        }
     }
 }

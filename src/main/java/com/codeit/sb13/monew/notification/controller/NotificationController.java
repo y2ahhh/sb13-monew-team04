@@ -27,7 +27,7 @@ public class NotificationController {
             @ModelAttribute NotificationFindRequest request,
             @RequestHeader("Monew-Request-User-ID") UUID userId
     ) {
-        NotificationFindDto command = new NotificationFindDto(
+        NotificationFindDto command = NotificationFindDto.of(
                 request.cursor(), request.after(), request.limit(), userId);
 
         CursorPageResponseDto<NotificationResult> result = notificationService.findAllNotifications(command);

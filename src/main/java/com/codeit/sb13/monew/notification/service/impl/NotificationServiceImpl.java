@@ -1,8 +1,6 @@
 package com.codeit.sb13.monew.notification.service.impl;
 
 import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
-import com.codeit.sb13.monew.global.exception.notification.NotificationInvalidCursorException;
-import com.codeit.sb13.monew.global.exception.notification.NotificationInvalidLimitException;
 import com.codeit.sb13.monew.global.exception.notification.NotificationNotFoundException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.notification.domain.Notification;
@@ -29,8 +27,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class NotificationServiceImpl implements NotificationService {
-
-    private static final int MAX_LIMIT = 100;
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
@@ -65,27 +61,12 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public CursorPageResponseDto<NotificationResult> findAllNotifications(NotificationFindDto request) {
-        if ((request.cursor() == null) != (request.after() == null)) {
-            throw new NotificationInvalidCursorException(request.cursor());
-        }
-        if(request.limit()<=0 || request.limit() > MAX_LIMIT) {
-            throw new NotificationInvalidLimitException(request.limit());
-        }
-
-        UUID cursorId = null;
-        if(request.cursor()!=null) {
-            try {
-                cursorId = UUID.fromString(request.cursor());
-            } catch (IllegalArgumentException e) {
-                throw new NotificationInvalidCursorException(request.cursor());
-            }
-        }
-        if(!userRepository.existsById(request.userId())) {
+        if (!userRepository.existsById(request.userId())) {
             throw new UserNotFoundException(request.userId());
         }
 
         List<Notification> fetched = notificationRepository.findUnconfirmedByUserWithCursor(
-                new NotificationFindCondition(request.userId(), cursorId, request.after(), request.limit() + 1));
+                new NotificationFindCondition(request.userId(), request.cursorId(), request.after(), request.limit() + 1));
 
         boolean hasNext = fetched.size() > request.limit();
         List<Notification> content = hasNext ? fetched.subList(0, request.limit()) : fetched;
