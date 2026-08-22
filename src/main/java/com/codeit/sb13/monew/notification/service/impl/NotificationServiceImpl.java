@@ -9,6 +9,7 @@ import com.codeit.sb13.monew.notification.domain.Notification;
 import com.codeit.sb13.monew.notification.domain.ResourceType;
 import com.codeit.sb13.monew.notification.mapper.NotificationMapper;
 import com.codeit.sb13.monew.notification.repository.NotificationRepository;
+import com.codeit.sb13.monew.notification.repository.dto.NotificationFindCondition;
 import com.codeit.sb13.monew.notification.service.NotificationService;
 import com.codeit.sb13.monew.notification.service.dto.ArticlesForInterestDto;
 import com.codeit.sb13.monew.notification.service.dto.CommentLikedDto;
@@ -84,7 +85,7 @@ public class NotificationServiceImpl implements NotificationService {
         }
 
         List<Notification> fetched = notificationRepository.findUnconfirmedByUserWithCursor(
-                request.userId(), cursorId, request.after(), request.limit() + 1);
+                new NotificationFindCondition(request.userId(), cursorId, request.after(), request.limit() + 1));
 
         boolean hasNext = fetched.size() > request.limit();
         List<Notification> content = hasNext ? fetched.subList(0, request.limit()) : fetched;

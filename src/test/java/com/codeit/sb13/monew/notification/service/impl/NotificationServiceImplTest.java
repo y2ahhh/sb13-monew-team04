@@ -9,6 +9,7 @@ import com.codeit.sb13.monew.notification.domain.Notification;
 import com.codeit.sb13.monew.notification.domain.ResourceType;
 import com.codeit.sb13.monew.notification.mapper.NotificationMapper;
 import com.codeit.sb13.monew.notification.repository.NotificationRepository;
+import com.codeit.sb13.monew.notification.repository.dto.NotificationFindCondition;
 import com.codeit.sb13.monew.notification.service.dto.ArticlesForInterestDto;
 import com.codeit.sb13.monew.notification.service.dto.CommentLikedDto;
 import com.codeit.sb13.monew.notification.service.dto.NotificationFindDto;
@@ -324,7 +325,8 @@ class NotificationServiceImplTest {
             NotificationFindDto request = new NotificationFindDto(null, null, limit, userId);
 
             when(userRepository.existsById(userId)).thenReturn(true);
-            when(notificationRepository.findUnconfirmedByUserWithCursor(userId, null, null, limit + 1))
+            when(notificationRepository.findUnconfirmedByUserWithCursor(
+                    new NotificationFindCondition(userId, null, null, limit + 1)))
                     .thenReturn(List.of(n1, n2, n3));
             when(notificationRepository.countByUser_IdAndConfirmedFalse(userId)).thenReturn(5L);
             when(mapper.toResult(any(Notification.class))).thenAnswer(invocation -> {
@@ -360,7 +362,8 @@ class NotificationServiceImplTest {
             NotificationFindDto request = new NotificationFindDto(null, null, limit, userId);
 
             when(userRepository.existsById(userId)).thenReturn(true);
-            when(notificationRepository.findUnconfirmedByUserWithCursor(userId, null, null, limit + 1))
+            when(notificationRepository.findUnconfirmedByUserWithCursor(
+                    new NotificationFindCondition(userId, null, null, limit + 1)))
                     .thenReturn(List.of(n1));
             when(notificationRepository.countByUser_IdAndConfirmedFalse(userId)).thenReturn(1L);
             when(mapper.toResult(n1)).thenReturn(new NotificationResult(
@@ -400,7 +403,8 @@ class NotificationServiceImplTest {
             NotificationFindDto request = new NotificationFindDto(null, null, maxLimit, userId);
 
             when(userRepository.existsById(userId)).thenReturn(true);
-            when(notificationRepository.findUnconfirmedByUserWithCursor(userId, null, null, maxLimit + 1))
+            when(notificationRepository.findUnconfirmedByUserWithCursor(
+                    new NotificationFindCondition(userId, null, null, maxLimit + 1)))
                     .thenReturn(List.of());
             when(notificationRepository.countByUser_IdAndConfirmedFalse(userId)).thenReturn(0L);
 
@@ -409,7 +413,8 @@ class NotificationServiceImplTest {
 
             // then
             assertThat(result.hasNext()).isFalse();
-            verify(notificationRepository).findUnconfirmedByUserWithCursor(userId, null, null, maxLimit + 1);
+            verify(notificationRepository).findUnconfirmedByUserWithCursor(
+                    new NotificationFindCondition(userId, null, null, maxLimit + 1));
         }
 
         @Test
@@ -471,7 +476,7 @@ class NotificationServiceImplTest {
             assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
                     .isInstanceOf(UserNotFoundException.class);
 
-            verify(notificationRepository, never()).findUnconfirmedByUserWithCursor(any(), any(), any(), anyInt());
+            verify(notificationRepository, never()).findUnconfirmedByUserWithCursor(any(NotificationFindCondition.class));
         }
 
         @Test

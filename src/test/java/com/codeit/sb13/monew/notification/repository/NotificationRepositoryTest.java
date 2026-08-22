@@ -3,6 +3,7 @@ package com.codeit.sb13.monew.notification.repository;
 import com.codeit.sb13.monew.global.config.QueryDslConfig;
 import com.codeit.sb13.monew.notification.domain.Notification;
 import com.codeit.sb13.monew.notification.domain.ResourceType;
+import com.codeit.sb13.monew.notification.repository.dto.NotificationFindCondition;
 import com.codeit.sb13.monew.user.domain.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,7 +62,7 @@ class NotificationRepositoryTest {
 
         // when
         List<Notification> result = notificationRepository.findUnconfirmedByUserWithCursor(
-                me.getId(), null, null, 10);
+                new NotificationFindCondition(me.getId(), null, null, 10));
 
         // then
         assertThat(result).hasSize(1);
@@ -81,7 +82,7 @@ class NotificationRepositoryTest {
 
         // when
         List<Notification> result = notificationRepository.findUnconfirmedByUserWithCursor(
-                user.getId(), null, null, 10);
+                new NotificationFindCondition(user.getId(), null, null, 10));
 
         // then
         assertThat(result).hasSize(1);
@@ -99,7 +100,7 @@ class NotificationRepositoryTest {
 
         // when: 커서 없이 조회하면 createdAt이 같은 두 건이 DB 정렬 순서(id 내림차순)로 나온다
         List<Notification> firstPage = notificationRepository.findUnconfirmedByUserWithCursor(
-                user.getId(), null, null, 10);
+                new NotificationFindCondition(user.getId(), null, null, 10));
 
         // then
         assertThat(firstPage).hasSize(2);
@@ -108,7 +109,7 @@ class NotificationRepositoryTest {
 
         // when: newer를 커서로 넘기면 newer 자신과 그 이전 항목은 제외되고 older만 남는다
         List<Notification> nextPage = notificationRepository.findUnconfirmedByUserWithCursor(
-                user.getId(), newer.getId(), newer.getCreatedAt(), 10);
+                new NotificationFindCondition(user.getId(), newer.getId(), newer.getCreatedAt(), 10));
 
         // then
         assertThat(nextPage).extracting(Notification::getId).containsExactly(older.getId());
@@ -125,7 +126,7 @@ class NotificationRepositoryTest {
 
         // when
         List<Notification> result = notificationRepository.findUnconfirmedByUserWithCursor(
-                user.getId(), null, null, 3);
+                new NotificationFindCondition(user.getId(), null, null, 3));
 
         // then
         assertThat(result).hasSize(3);
