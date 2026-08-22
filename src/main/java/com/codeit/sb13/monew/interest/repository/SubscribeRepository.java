@@ -1,9 +1,12 @@
 package com.codeit.sb13.monew.interest.repository;
 
 import com.codeit.sb13.monew.interest.domain.Subscribe;
+import com.codeit.sb13.monew.interest.repository.dto.SubscribedInterestActivityProjection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
-
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import java.util.UUID;
 
 public interface SubscribeRepository extends JpaRepository<Subscribe, UUID> {
@@ -47,4 +50,22 @@ public interface SubscribeRepository extends JpaRepository<Subscribe, UUID> {
      */
     Optional<Subscribe> findByInterest_IdAndUserId(UUID interestId, UUID userId);
 
+    @Query("""
+        SELECT new com.codeit.sb13.monew.interest.repository.dto.SubscribedInterestActivityProjection(
+            S.id,
+            I,
+            (SELECT COUNT(S2) 
+             FROM Subscribe S2 
+             JOIN User U2 ON S2.userId = U2.id 
+             JOIN S2.interest I2
+             WHERE I2.id = I.id 
+                 AND U2.deletedAt IS NULL)
+            )
+        FROM Subscribe S
+        JOIN S.interest I 
+        JOIN User U ON U.id = S.userId
+        WHERE S.userId = :userId
+            AND U.deletedAt IS NULL 
+    """)
+    List<SubscribedInterestActivityProjection> findSubscribedInterestActivities(@Param("userId") UUID userId);
 }
