@@ -10,7 +10,7 @@ public record RecentCommentActivityProjection(
         UUID userId,
         String userNickname,
         String content,
-        Integer likeCount,
+        Long likeCount,
         LocalDateTime createdAt
 ) {
 }

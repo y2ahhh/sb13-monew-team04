@@ -15,24 +15,27 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
 
   @Query("""
       SELECT new com.codeit.sb13.monew.comment.repository.dto.RecentCommentActivityProjection(
-          c.id,
-          a.id,
-          a.title,
-          u.id,
-          u.nickname,
-          c.content,
-          0,
-          c.createdAt
+          C.id,
+          A.id,
+          A.title,
+          U.id,
+          U.nickname,
+          C.content,
+          (SELECT COUNT(CL)
+           FROM CommentLike CL
+           WHERE CL.comment.id = C.id
+                 AND CL.likedBy.deletedAt IS NULL),
+          C.createdAt
       )
-      FROM Comment c
-          JOIN c.user u
-          JOIN c.article a
+      FROM Comment C
+          JOIN C.user U
+          JOIN C.article A
       WHERE
-          u.id = :userId
-          AND u.deletedAt IS NULL
-          AND c.deletedAt IS NULL
-          AND a.deletedAt IS NULL
-      ORDER BY c.createdAt DESC
+          U.id = :userId
+          AND U.deletedAt IS NULL
+          AND C.deletedAt IS NULL
+          AND A.deletedAt IS NULL
+      ORDER BY C.createdAt DESC
       LIMIT 10
       """)
   List<RecentCommentActivityProjection> findRecentCommentActivities(@Param("userId") UUID userId);
