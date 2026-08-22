@@ -16,6 +16,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
+import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -114,6 +115,35 @@ class CommentRepositoryTest {
     }
 
     @Test
+    @DisplayName("작성 시각이 같으면 댓글 ID 내림차순으로 보조 정렬한다")
+    void returns_user_comments_ordered_by_created_at_desc_and_id_desc_when_created_at_ties() {
+        // given
+        User targetUser = new User("test@eamil.com", "testNickname", "testPassword");
+        userRepository.saveAndFlush(targetUser);
+
+        Article article = articleRepository.saveAndFlush(createArticle("testTitle", "testContent", "link"));
+        LocalDateTime sameCreatedAt = LocalDateTime.of(2026, 8, 20, 10, 0);
+
+        for (int index = 1; index <= 11; index++) {
+            Comment comment = commentRepository.saveAndFlush(new Comment(article, targetUser, "sameCreatedAtComment" + index));
+            updateCommentCreatedAt(comment.getId(), sameCreatedAt);
+        }
+
+        em.clear();
+
+        // when
+        List<UUID> expectedIds = findExpectedCommentIdsByNativeOrder(targetUser.getId());
+        List<UUID> resultIds = commentRepository.findRecentCommentActivities(targetUser.getId())
+                .stream()
+                .map(RecentCommentActivityProjection::id)
+                .toList();
+
+        // then
+        assertThat(resultIds).hasSize(10);
+        assertThat(resultIds).containsExactlyElementsOf(expectedIds);
+    }
+
+    @Test
     @DisplayName("삭제된 사용자 댓글 제외")
     void returns_empty_when_user_is_soft_deleted() {
         // given
@@ -203,6 +233,42 @@ class CommentRepositoryTest {
                 .setParameter(1, createdAt)
                 .setParameter(2, commentId)
                 .executeUpdate();
+    }
+
+    private List<UUID> findExpectedCommentIdsByNativeOrder(UUID userId) {
+        List<?> rows = em.getEntityManager()
+                .createNativeQuery("""
+                        SELECT C.id
+                        FROM comments C
+                            JOIN users U ON U.id = C.user_id
+                            JOIN articles A ON A.id = C.article_id
+                        WHERE C.user_id = :userId
+                            AND U.deleted_at IS NULL
+                            AND C.deleted_at IS NULL
+                            AND A.deleted_at IS NULL
+                        ORDER BY C.created_at DESC, C.id DESC
+                        LIMIT 10
+                        """)
+                .setParameter("userId", userId)
+                .getResultList();
+
+        return rows.stream()
+                .map(this::toUuid)
+                .toList();
+    }
+
+    private UUID toUuid(Object value) {
+        if (value instanceof UUID uuid) {
+            return uuid;
+        }
+        if (value instanceof String string) {
+            return UUID.fromString(string);
+        }
+        if (value instanceof byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            return new UUID(buffer.getLong(), buffer.getLong());
+        }
+        throw new IllegalArgumentException("Unsupported UUID value type: " + value.getClass());
     }
 
     private Article createArticle(String title, String summary, String link) {

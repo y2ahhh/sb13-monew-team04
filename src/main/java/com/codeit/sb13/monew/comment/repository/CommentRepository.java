@@ -35,7 +35,7 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
           AND U.deletedAt IS NULL
           AND C.deletedAt IS NULL
           AND A.deletedAt IS NULL
-      ORDER BY C.createdAt DESC
+      ORDER BY C.createdAt DESC, C.id DESC
       LIMIT 10
       """)
   List<RecentCommentActivityProjection> findRecentCommentActivities(@Param("userId") UUID userId);
