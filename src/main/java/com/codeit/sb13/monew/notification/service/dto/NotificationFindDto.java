@@ -14,24 +14,21 @@ public record NotificationFindDto(
 ) {
     private static final int MAX_LIMIT = 100;
 
-    public static NotificationFindDto of(String cursor, LocalDateTime after, int limit, UUID userId) {
-        validateCursorCondition(cursor, after);
+    public NotificationFindDto {
+        validateCursorCondition(cursorId, after);
         validateLimit(limit);
-
-        return new NotificationFindDto(
-                parseCursorId(cursor),
-                after,
-                limit,
-                userId
-        );
     }
 
-    private static void validateCursorCondition(String cursor, LocalDateTime after) {
-        boolean hasCursor = cursor != null;
+    public static NotificationFindDto of(String cursor, LocalDateTime after, int limit, UUID userId) {
+        return new NotificationFindDto(parseCursorId(cursor), after, limit, userId);
+    }
+
+    private static void validateCursorCondition(UUID cursorId, LocalDateTime after) {
+        boolean hasCursor = cursorId != null;
         boolean hasAfter = after != null;
 
         if (hasCursor != hasAfter) {
-            throw new NotificationInvalidCursorException(cursor);
+            throw new NotificationInvalidCursorException(cursorId == null ? null : cursorId.toString());
         }
     }
 

@@ -97,4 +97,28 @@ class NotificationFindDtoTest {
         assertThatThrownBy(() -> NotificationFindDto.of(null, null, Integer.MAX_VALUE, UUID.randomUUID()))
                 .isInstanceOf(NotificationInvalidLimitException.class);
     }
+
+    @Test
+    @DisplayName("정규 생성자에 limit이 MAX_LIMIT을 초과하면 NotificationInvalidLimitException이 발생한다.")
+    void 정규생성자_limit_초과_예외() {
+        // given & when & then
+        assertThatThrownBy(() -> new NotificationFindDto(null, null, Integer.MAX_VALUE, UUID.randomUUID()))
+                .isInstanceOf(NotificationInvalidLimitException.class);
+    }
+
+    @Test
+    @DisplayName("정규 생성자에 cursorId만 있고 after가 없으면 NotificationInvalidCursorException이 발생한다.")
+    void 정규생성자_cursorId만_있으면_예외() {
+        // given & when & then
+        assertThatThrownBy(() -> new NotificationFindDto(UUID.randomUUID(), null, 10, UUID.randomUUID()))
+                .isInstanceOf(NotificationInvalidCursorException.class);
+    }
+
+    @Test
+    @DisplayName("정규 생성자에 after만 있고 cursorId가 없으면 NotificationInvalidCursorException이 발생한다.")
+    void 정규생성자_after만_있으면_예외() {
+        // given & when & then
+        assertThatThrownBy(() -> new NotificationFindDto(null, LocalDateTime.now(), 10, UUID.randomUUID()))
+                .isInstanceOf(NotificationInvalidCursorException.class);
+    }
 }
