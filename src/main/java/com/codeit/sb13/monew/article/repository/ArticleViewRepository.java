@@ -51,7 +51,7 @@ public interface ArticleViewRepository extends JpaRepository<ArticleView, UUID> 
                     (SELECT COUNT(C)
                      FROM Comment C
                      JOIN C.user U2
-                     WHERE C.articleId = A.id
+                     WHERE C.article.id = A.id
                           AND C.deletedAt IS NULL
                           AND U2.deletedAt IS NULL),
                     (SELECT COUNT(AT2)

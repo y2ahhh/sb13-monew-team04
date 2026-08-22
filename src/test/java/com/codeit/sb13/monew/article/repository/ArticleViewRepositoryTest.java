@@ -236,9 +236,9 @@ class ArticleViewRepositoryTest {
         saveArticleView(article, activeViewer, targetViewedAt.minusMinutes(1));
         saveArticleView(article, deletedViewer, targetViewedAt.minusMinutes(2));
 
-        Comment activeComment = new Comment(article.getId(), activeCommenter, "active comment");
-        Comment deletedComment = new Comment(article.getId(), activeCommenter, "deleted comment");
-        Comment deletedUserComment = new Comment(article.getId(), deletedCommenter, "deleted user comment");
+        Comment activeComment = new Comment(article, activeCommenter, "active comment");
+        Comment deletedComment = new Comment(article, activeCommenter, "deleted comment");
+        Comment deletedUserComment = new Comment(article, deletedCommenter, "deleted user comment");
         commentRepository.saveAndFlush(activeComment);
         commentRepository.saveAndFlush(deletedComment);
         commentRepository.saveAndFlush(deletedUserComment);
