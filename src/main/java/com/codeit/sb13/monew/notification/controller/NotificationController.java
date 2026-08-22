@@ -29,23 +29,9 @@ public class NotificationController {
     ) {
         NotificationFindDto command = new NotificationFindDto(
                 request.cursor(), request.after(), request.limit(), userId);
+
         CursorPageResponseDto<NotificationResult> result = notificationService.findAllNotifications(command);
-
-        List<NotificationResponse> content = result.content().stream()
-                .map(mapper::toResponse)
-                .toList();
-
-        CursorPageResponseDto<NotificationResponse> response = new CursorPageResponseDto<>(
-                content,
-                result.nextCursor(),
-                result.nextAfter(),
-                null,
-                result.size(),
-                result.totalElements(),
-                result.hasNext()
-        );
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(mapper.toResponse(result));
     }
 
     @PatchMapping("/{notificationId}")

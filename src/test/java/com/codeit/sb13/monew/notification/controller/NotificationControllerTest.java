@@ -198,10 +198,12 @@ class NotificationControllerTest {
                     result.resourceType(), result.confirmed(), result.createdAt(), result.updatedAt()
             );
             CursorPageResponseDto<NotificationResult> serviceResult =
-                    new CursorPageResponseDto<>(List.of(result), null, null, null,1, 1L, false);
+                    new CursorPageResponseDto<>(List.of(result), null, null, null, 1, 1L, false);
+            CursorPageResponseDto<NotificationResponse> expectedResponse =
+                    new CursorPageResponseDto<>(List.of(response), null, null, null, 1, 1L, false);
 
             when(notificationService.findAllNotifications(any(NotificationFindDto.class))).thenReturn(serviceResult);
-            when(mapper.toResponse(result)).thenReturn(response);
+            when(mapper.toResponse(serviceResult)).thenReturn(expectedResponse);
 
             // when & then
             mockMvc.perform(get("/api/notifications")
