@@ -292,7 +292,7 @@ class StorageImplTest {
                     assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_S3_CONFIG_INVALID);
                     assertThat(e.getDetails())
                             .containsEntry("property", "monew.s3.bucket")
-                            .containsEntry("reason", "S3 bucket must be configured");
+                            .containsEntry("reason", "S3 bucket 설정이 필요합니다");
                 });
     }
 
@@ -306,7 +306,7 @@ class StorageImplTest {
                     assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_S3_CONFIG_INVALID);
                     assertThat(e.getDetails())
                             .containsEntry("property", "monew.s3.prefix")
-                            .containsEntry("reason", "S3 prefix must be configured");
+                            .containsEntry("reason", "S3 prefix 설정이 필요합니다");
                 });
     }
 

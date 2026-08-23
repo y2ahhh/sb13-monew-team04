@@ -67,7 +67,7 @@ class S3ConfigTest {
                             .isInstanceOfSatisfying(ArticleS3ConfigInvalidException.class, exception ->
                                     assertThat(exception.getDetails())
                                             .containsEntry("property", "monew.s3.region")
-                                            .containsEntry("reason", "S3 region must be configured"));
+                                            .containsEntry("reason", "S3 region 설정이 필요합니다"));
                 });
     }
 

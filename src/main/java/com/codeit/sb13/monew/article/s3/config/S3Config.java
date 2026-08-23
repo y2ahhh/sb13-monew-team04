@@ -45,7 +45,7 @@ public class S3Config {
 
     private String region(S3Properties props) {
         if (!StringUtils.hasText(props.region())) {
-            throw new ArticleS3ConfigInvalidException("monew.s3.region", "S3 region must be configured");
+            throw new ArticleS3ConfigInvalidException("monew.s3.region", "S3 region 설정이 필요합니다");
         }
 
         return props.region().trim();
