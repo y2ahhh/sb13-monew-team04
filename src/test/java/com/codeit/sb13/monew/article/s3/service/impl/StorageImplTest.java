@@ -2,6 +2,7 @@ package com.codeit.sb13.monew.article.s3.service.impl;
 
 import com.codeit.sb13.monew.article.s3.config.S3Properties;
 import com.codeit.sb13.monew.article.s3.service.dto.StorageCommand;
+import com.codeit.sb13.monew.article.s3.service.dto.StorageSaveResult;
 import com.codeit.sb13.monew.article.s3.service.dto.StorageSearchCommand;
 import com.codeit.sb13.monew.global.exception.ApiErrorCode;
 import com.codeit.sb13.monew.global.exception.article.ArticleS3ConfigInvalidException;
@@ -14,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -57,12 +59,13 @@ class StorageImplTest {
     }
 
     @Test
-    @DisplayName("S3 객체를 저장한다")
-    void savesObject() throws IOException {
+    @DisplayName("S3 객체를 기존 객체가 없을 때만 저장한다")
+    void savesObjectIfAbsent() throws IOException {
         StorageCommand command = new StorageCommand(BACKUP_DATE, CONTENT, null);
 
-        storage.save(command);
+        StorageSaveResult result = storage.saveIfAbsent(command);
 
+        assertThat(result).isEqualTo(StorageSaveResult.SAVED);
         ArgumentCaptor<PutObjectRequest> requestCaptor = ArgumentCaptor.forClass(PutObjectRequest.class);
         ArgumentCaptor<RequestBody> bodyCaptor = ArgumentCaptor.forClass(RequestBody.class);
         verify(s3Client).putObject(requestCaptor.capture(), bodyCaptor.capture());
@@ -71,9 +74,32 @@ class StorageImplTest {
         assertThat(request.bucket()).isEqualTo(BUCKET);
         assertThat(request.key()).isEqualTo(RESOLVED_KEY);
         assertThat(request.contentType()).isEqualTo(StorageCommand.DEFAULT_CONTENT_TYPE);
+        assertThat(request.ifNoneMatch()).isEqualTo("*");
 
         byte[] body = bodyCaptor.getValue().contentStreamProvider().newStream().readAllBytes();
         assertThat(new String(body, StandardCharsets.UTF_8)).isEqualTo(CONTENT);
+    }
+
+    @Test
+    @DisplayName("S3 객체가 이미 있으면 ALREADY_EXISTS를 반환한다")
+    void returnsAlreadyExistsWhenObjectAlreadyExists() {
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenThrow(s3Exception(412));
+
+        StorageSaveResult result = storage.saveIfAbsent(new StorageCommand(BACKUP_DATE, CONTENT, null));
+
+        assertThat(result).isEqualTo(StorageSaveResult.ALREADY_EXISTS);
+    }
+
+    @Test
+    @DisplayName("S3 조건부 저장 충돌 시 CONFLICT를 반환한다")
+    void returnsConflictWhenConditionalSaveConflicts() {
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenThrow(s3Exception(409));
+
+        StorageSaveResult result = storage.saveIfAbsent(new StorageCommand(BACKUP_DATE, CONTENT, null));
+
+        assertThat(result).isEqualTo(StorageSaveResult.CONFLICT);
     }
 
     @Test
@@ -83,7 +109,7 @@ class StorageImplTest {
         when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                 .thenThrow(cause);
 
-        assertThatThrownBy(() -> storage.save(new StorageCommand(BACKUP_DATE, CONTENT, null)))
+        assertThatThrownBy(() -> storage.saveIfAbsent(new StorageCommand(BACKUP_DATE, CONTENT, null)))
                 .isInstanceOfSatisfying(ArticleS3StorageException.class, e -> {
                     assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_S3_STORAGE_FAILED);
                     assertThat(e.getCause()).isSameAs(cause);
@@ -92,6 +118,25 @@ class StorageImplTest {
                             .containsEntry("bucket", BUCKET)
                             .containsEntry("key", RESOLVED_KEY)
                             .containsEntry("statusCode", 500);
+                });
+    }
+
+    @Test
+    @DisplayName("S3 객체 저장 클라이언트 실패 시 커스텀 예외로 원인을 보존한다")
+    void wrapsSaveClientFailureWithCustomException() {
+        SdkClientException cause = clientFailureException();
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenThrow(cause);
+
+        assertThatThrownBy(() -> storage.saveIfAbsent(new StorageCommand(BACKUP_DATE, CONTENT, null)))
+                .isInstanceOfSatisfying(ArticleS3StorageException.class, e -> {
+                    assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_S3_STORAGE_FAILED);
+                    assertThat(e.getCause()).isSameAs(cause);
+                    assertThat(e.getDetails())
+                            .containsEntry("operation", "putObject")
+                            .containsEntry("bucket", BUCKET)
+                            .containsEntry("key", RESOLVED_KEY)
+                            .doesNotContainKey("statusCode");
                 });
     }
 
@@ -152,6 +197,27 @@ class StorageImplTest {
     }
 
     @Test
+    @DisplayName("S3 객체 조회 클라이언트 실패 시 커스텀 예외로 원인을 보존한다")
+    void wrapsFindClientFailureWithCustomException() {
+        SdkClientException cause = clientFailureException();
+        when(s3Client.getObject(
+                any(GetObjectRequest.class),
+                anyResponseTransformer()
+        )).thenThrow(cause);
+
+        assertThatThrownBy(() -> storage.find(new StorageSearchCommand(BACKUP_DATE)))
+                .isInstanceOfSatisfying(ArticleS3StorageException.class, e -> {
+                    assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_S3_STORAGE_FAILED);
+                    assertThat(e.getCause()).isSameAs(cause);
+                    assertThat(e.getDetails())
+                            .containsEntry("operation", "getObject")
+                            .containsEntry("bucket", BUCKET)
+                            .containsEntry("key", RESOLVED_KEY)
+                            .doesNotContainKey("statusCode");
+                });
+    }
+
+    @Test
     @DisplayName("S3 객체 존재 여부를 확인한다")
     void checksObjectExists() {
         when(s3Client.headObject(any(HeadObjectRequest.class)))
@@ -198,11 +264,30 @@ class StorageImplTest {
     }
 
     @Test
+    @DisplayName("S3 객체 존재 확인 클라이언트 실패 시 커스텀 예외로 원인을 보존한다")
+    void wrapsExistsClientFailureWithCustomException() {
+        SdkClientException cause = clientFailureException();
+        when(s3Client.headObject(any(HeadObjectRequest.class)))
+                .thenThrow(cause);
+
+        assertThatThrownBy(() -> storage.exists(new StorageSearchCommand(BACKUP_DATE)))
+                .isInstanceOfSatisfying(ArticleS3StorageException.class, e -> {
+                    assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_S3_STORAGE_FAILED);
+                    assertThat(e.getCause()).isSameAs(cause);
+                    assertThat(e.getDetails())
+                            .containsEntry("operation", "headObject")
+                            .containsEntry("bucket", BUCKET)
+                            .containsEntry("key", RESOLVED_KEY)
+                            .doesNotContainKey("statusCode");
+                });
+    }
+
+    @Test
     @DisplayName("bucket 설정이 비어 있으면 실패한다")
     void failsWhenBucketIsBlank() {
         StorageImpl blankBucketStorage = new StorageImpl(s3Client, s3Properties(""));
 
-        assertThatThrownBy(() -> blankBucketStorage.save(new StorageCommand(BACKUP_DATE, CONTENT, null)))
+        assertThatThrownBy(() -> blankBucketStorage.saveIfAbsent(new StorageCommand(BACKUP_DATE, CONTENT, null)))
                 .isInstanceOfSatisfying(ArticleS3ConfigInvalidException.class, e -> {
                     assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_S3_CONFIG_INVALID);
                     assertThat(e.getDetails())
@@ -216,7 +301,7 @@ class StorageImplTest {
     void failsWhenPrefixIsBlank() {
         StorageImpl blankPrefixStorage = new StorageImpl(s3Client, s3Properties(BUCKET, " "));
 
-        assertThatThrownBy(() -> blankPrefixStorage.save(new StorageCommand(BACKUP_DATE, CONTENT, null)))
+        assertThatThrownBy(() -> blankPrefixStorage.saveIfAbsent(new StorageCommand(BACKUP_DATE, CONTENT, null)))
                 .isInstanceOfSatisfying(ArticleS3ConfigInvalidException.class, e -> {
                     assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_S3_CONFIG_INVALID);
                     assertThat(e.getDetails())
@@ -263,6 +348,19 @@ class StorageImplTest {
         return AccessDeniedException.builder()
                 .statusCode(500)
                 .message("s3 failure")
+                .build();
+    }
+
+    private S3Exception s3Exception(int statusCode) {
+        return AccessDeniedException.builder()
+                .statusCode(statusCode)
+                .message("s3 failure")
+                .build();
+    }
+
+    private SdkClientException clientFailureException() {
+        return SdkClientException.builder()
+                .message("client failure")
                 .build();
     }
 

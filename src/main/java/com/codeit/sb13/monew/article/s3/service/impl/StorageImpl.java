@@ -3,6 +3,7 @@ package com.codeit.sb13.monew.article.s3.service.impl;
 import com.codeit.sb13.monew.article.s3.config.S3Properties;
 import com.codeit.sb13.monew.article.s3.service.Storage;
 import com.codeit.sb13.monew.article.s3.service.dto.StorageCommand;
+import com.codeit.sb13.monew.article.s3.service.dto.StorageSaveResult;
 import com.codeit.sb13.monew.article.s3.service.dto.StorageSearchCommand;
 import com.codeit.sb13.monew.global.exception.article.ArticleS3ConfigInvalidException;
 import com.codeit.sb13.monew.global.exception.article.ArticleS3StorageException;
@@ -11,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -33,7 +35,7 @@ public class StorageImpl implements Storage {
     private final S3Properties props;
 
     @Override
-    public void save(StorageCommand command) {
+    public StorageSaveResult saveIfAbsent(StorageCommand command) {
         String bucket = bucket();
         String key = resolveKey(command.backupDate());
 
@@ -42,10 +44,20 @@ public class StorageImpl implements Storage {
                     .bucket(bucket)
                     .key(key)
                     .contentType(command.contentType())
+                    .ifNoneMatch("*")
                     .build();
 
             s3Client.putObject(request, RequestBody.fromString(command.content(), StandardCharsets.UTF_8));
+            return StorageSaveResult.SAVED;
         } catch (S3Exception e) {
+            if (isAlreadyExists(e)) {
+                return StorageSaveResult.ALREADY_EXISTS;
+            }
+            if (isConditionalConflict(e)) {
+                return StorageSaveResult.CONFLICT;
+            }
+            throw new ArticleS3StorageException("putObject", bucket, key, e);
+        } catch (SdkClientException e) {
             throw new ArticleS3StorageException("putObject", bucket, key, e);
         }
     }
@@ -69,6 +81,8 @@ public class StorageImpl implements Storage {
                 return Optional.empty();
             }
             throw new ArticleS3StorageException("getObject", bucket, key, e);
+        } catch (SdkClientException e) {
+            throw new ArticleS3StorageException("getObject", bucket, key, e);
         }
     }
 
@@ -90,6 +104,8 @@ public class StorageImpl implements Storage {
                 log.warn("S3 객체 존재 확인 대상이 없습니다. operation=headObject, bucket={}, key={}", bucket, key);
                 return false;
             }
+            throw new ArticleS3StorageException("headObject", bucket, key, e);
+        } catch (SdkClientException e) {
             throw new ArticleS3StorageException("headObject", bucket, key, e);
         }
     }
@@ -118,5 +134,13 @@ public class StorageImpl implements Storage {
 
     private boolean isNotFound(S3Exception e) {
         return e.statusCode() == 404;
+    }
+
+    private boolean isAlreadyExists(S3Exception e) {
+        return e.statusCode() == 412;
+    }
+
+    private boolean isConditionalConflict(S3Exception e) {
+        return e.statusCode() == 409;
     }
 }

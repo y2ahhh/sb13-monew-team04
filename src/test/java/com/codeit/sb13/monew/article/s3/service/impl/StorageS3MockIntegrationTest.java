@@ -2,6 +2,7 @@ package com.codeit.sb13.monew.article.s3.service.impl;
 
 import com.codeit.sb13.monew.article.s3.config.S3Properties;
 import com.codeit.sb13.monew.article.s3.service.dto.StorageCommand;
+import com.codeit.sb13.monew.article.s3.service.dto.StorageSaveResult;
 import com.codeit.sb13.monew.article.s3.service.dto.StorageSearchCommand;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -43,11 +44,7 @@ class StorageS3MockIntegrationTest {
                 .withEnv("initialBuckets", BUCKET)
                 .withExposedPorts(9090);
 
-        try {
-            s3Mock.start();
-        } catch (RuntimeException e) {
-            throw new TestAbortedException("S3Mock container could not start; skipping integration test", e);
-        }
+        s3Mock.start();
     }
 
     @AfterAll
@@ -79,8 +76,9 @@ class StorageS3MockIntegrationTest {
         LocalDate backupDate = LocalDate.of(2026, 8, 23);
         String content = "{\"schemaVersion\":1,\"articleCount\":0}";
 
-        storage.save(new StorageCommand(backupDate, content, null));
+        StorageSaveResult result = storage.saveIfAbsent(new StorageCommand(backupDate, content, null));
 
+        assertThat(result).isEqualTo(StorageSaveResult.SAVED);
         assertThat(storage.exists(new StorageSearchCommand(backupDate))).isTrue();
         assertThat(storage.find(new StorageSearchCommand(backupDate))).contains(content);
     }

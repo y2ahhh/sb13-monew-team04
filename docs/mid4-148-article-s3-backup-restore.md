@@ -84,7 +84,7 @@ Storage 계층에는 문자열 key가 아니라 백업 기준 날짜 `LocalDate`
 | `publishedAt` | `Article.date` 값 |
 | `deletedAt` | 백업 대상에 논리삭제 기사가 포함될 경우 상태 확인용, 1차 복구 중복 판단에는 사용하지 않음 |
 
-같은 S3 key에 이미 백업 파일이 존재하는 경우 기본적으로 overwrite하지 않는다. 이 정책은 동시성 제어가 아니라 실수로 기존 백업 파일을 덮어쓰지 않기 위한 저장 정책이다. 재백업이 필요하면 별도 운영 절차나 강제 옵션을 둔다.
+같은 S3 key에 이미 백업 파일이 존재하는 경우 기본적으로 overwrite하지 않는다. 이 정책은 동시성 제어가 아니라 실수로 기존 백업 파일을 덮어쓰지 않기 위한 저장 정책이다. Storage 계층의 저장 계약은 `saveIfAbsent`이며, S3 `If-None-Match: *` 조건부 저장으로 기존 객체 덮어쓰기를 방지한다. 재백업이 필요하면 별도 운영 절차나 강제 옵션을 둔다.
 
 ## AWS S3 설정 기준
 
@@ -93,10 +93,10 @@ S3 bucket, region, endpoint, prefix는 환경변수로 설정한다.
 ```text
 MONEW_AWS_REGION=
 MONEW_AWS_ENDPOINT=
+MONEW_ARTICLE_BACKUP_CRON="0 10 0 * * *"
+MONEW_ARTICLE_BACKUP_ENABLED=false
 MONEW_ARTICLE_BACKUP_S3_BUCKET=
 MONEW_ARTICLE_BACKUP_S3_PREFIX=article-backups
-MONEW_ARTICLE_BACKUP_ENABLED=false
-MONEW_ARTICLE_BACKUP_CRON=0 10 0 * * *
 ```
 
 실제 AWS S3를 사용할 때는 AWS SDK default credentials provider chain을 사용한다.
@@ -154,7 +154,7 @@ WARN 로그 예시:
 
 1차 기준은 PostgreSQL advisory lock이다. Redis가 도입되면 같은 lock key 정책을 Redis 분산락으로 대체할 수 있다.
 
-S3 object 존재 여부나 conditional put은 scheduler 동시성 제어 수단으로 사용하지 않는다. S3 object 존재 여부는 overwrite 방지 정책에서만 사용한다.
+S3 object 존재 여부나 conditional put은 scheduler 동시성 제어 수단으로 사용하지 않는다. S3 조건부 저장은 overwrite 방지 정책에서만 사용한다.
 
 ## 복구 기준
 
