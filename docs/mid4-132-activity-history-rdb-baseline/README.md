@@ -19,7 +19,7 @@
 | --- | --- | --- | --- |
 | 최근 작성 댓글 | `comments.user_id` 접근 경로 부재, 최신순 정렬 | `comments(user_id, created_at DESC, id DESC)` | `deleted_at IS NULL`은 1차 후보에서 제외 |
 | 최근 좋아요한 댓글 | `comment_likes.liked_by` 접근 경로 부재, 최신순 정렬 | `comment_likes(liked_by, created_at DESC, id DESC)` | 기존 `(comment_id, liked_by)` unique index는 선두 컬럼이 맞지 않음 |
-| 최근 조회 기사 | `article_views.user_id` 접근 경로 부재, 최신순 정렬 | `article_views(user_id, viewed_at DESC, id DESC)` | 기존 article_id 선두 인덱스들은 main query에 부적합 |
+| 최근 조회 기사 | `article_views.user_id` 접근 경로 부재, 최신순 정렬 | `article_views(user_id, viewed_at DESC, id DESC)` | 기존 article_id 선두 인덱스들은 main query에 부적합, `idx_article_views_article_viewed`는 후속 사용처 확인 후 제거 검토 |
 | 최근 조회 기사 댓글 수 | `comments.article_id` 접근 경로 부재 | `comments(article_id)` | 댓글 수 subquery의 반복 full scan 제거 후보 |
 | 구독 중인 관심사 | 현재: `subscriptions.user_id` 접근 경로 부재 / 후속: 구독 생성일자 최신순 정렬 | 현재: `subscriptions(user_id)`, `subscriptions(user_id, interest_id)` / 후속: `subscriptions(user_id, created_at DESC, id DESC)` | 최종 후보 확정 후 중복/불필요 인덱스 제거 검토 |
 
