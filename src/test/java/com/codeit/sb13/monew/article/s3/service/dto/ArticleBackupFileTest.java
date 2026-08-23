@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -55,6 +56,58 @@ class ArticleBackupFileTest {
                 LocalDate.of(2026, 8, 23),
                 LocalDateTime.of(2026, 8, 24, 0, 10),
                 2L,
+                List.of(backupItem())
+        )).isInstanceOf(ArticleBackupFileInvalidException.class);
+    }
+
+    @Test
+    @DisplayName("백업 파일 필수 값이 없으면 백업 파일 검증 예외가 발생한다")
+    void throwsInvalidExceptionWhenRequiredValuesAreMissing() {
+        assertThatThrownBy(() -> new ArticleBackupFile(
+                null,
+                LocalDate.of(2026, 8, 23),
+                LocalDateTime.of(2026, 8, 24, 0, 10),
+                1L,
+                List.of(backupItem())
+        )).isInstanceOf(ArticleBackupFileInvalidException.class);
+
+        assertThatThrownBy(() -> new ArticleBackupFile(
+                ArticleBackupFile.CURRENT_SCHEMA_VERSION,
+                null,
+                LocalDateTime.of(2026, 8, 24, 0, 10),
+                1L,
+                List.of(backupItem())
+        )).isInstanceOf(ArticleBackupFileInvalidException.class);
+
+        assertThatThrownBy(() -> new ArticleBackupFile(
+                ArticleBackupFile.CURRENT_SCHEMA_VERSION,
+                LocalDate.of(2026, 8, 23),
+                null,
+                1L,
+                List.of(backupItem())
+        )).isInstanceOf(ArticleBackupFileInvalidException.class);
+
+        assertThatThrownBy(() -> new ArticleBackupFile(
+                ArticleBackupFile.CURRENT_SCHEMA_VERSION,
+                LocalDate.of(2026, 8, 23),
+                LocalDateTime.of(2026, 8, 24, 0, 10),
+                1L,
+                null
+        )).isInstanceOf(ArticleBackupFileInvalidException.class);
+
+        assertThatThrownBy(() -> new ArticleBackupFile(
+                ArticleBackupFile.CURRENT_SCHEMA_VERSION,
+                LocalDate.of(2026, 8, 23),
+                LocalDateTime.of(2026, 8, 24, 0, 10),
+                1L,
+                Collections.singletonList(null)
+        )).isInstanceOf(ArticleBackupFileInvalidException.class);
+
+        assertThatThrownBy(() -> new ArticleBackupFile(
+                ArticleBackupFile.CURRENT_SCHEMA_VERSION,
+                LocalDate.of(2026, 8, 23),
+                LocalDateTime.of(2026, 8, 24, 0, 10),
+                null,
                 List.of(backupItem())
         )).isInstanceOf(ArticleBackupFileInvalidException.class);
     }

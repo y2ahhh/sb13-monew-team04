@@ -112,6 +112,40 @@ class ArticleBackupItemTest {
     }
 
     @Test
+    @DisplayName("백업 아이템 필수 값이 없으면 백업 파일 검증 예외가 발생한다")
+    void throwsInvalidExceptionWhenRemainingRequiredValuesAreMissing() {
+        assertThatThrownBy(() -> new ArticleBackupItem(
+                UUID.randomUUID(),
+                null,
+                "https://example.com/news/1",
+                "기사 제목",
+                "기사 요약",
+                LocalDateTime.of(2026, 8, 23, 10, 15),
+                null
+        )).isInstanceOf(ArticleBackupFileInvalidException.class);
+
+        assertThatThrownBy(() -> new ArticleBackupItem(
+                UUID.randomUUID(),
+                ArticleSource.NAVER,
+                "https://example.com/news/1",
+                " ",
+                "기사 요약",
+                LocalDateTime.of(2026, 8, 23, 10, 15),
+                null
+        )).isInstanceOf(ArticleBackupFileInvalidException.class);
+
+        assertThatThrownBy(() -> new ArticleBackupItem(
+                UUID.randomUUID(),
+                ArticleSource.NAVER,
+                "https://example.com/news/1",
+                "기사 제목",
+                " ",
+                LocalDateTime.of(2026, 8, 23, 10, 15),
+                null
+        )).isInstanceOf(ArticleBackupFileInvalidException.class);
+    }
+
+    @Test
     @DisplayName("백업할 기사가 없으면 백업 파일 검증 예외가 발생한다")
     void throwsInvalidExceptionWhenArticleIsNull() {
         assertThatThrownBy(() -> ArticleBackupItem.from(null))

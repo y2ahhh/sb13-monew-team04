@@ -7,7 +7,9 @@ import com.codeit.sb13.monew.global.exception.article.ArticleBackupFileInvalidEx
 import com.codeit.sb13.monew.global.exception.article.ArticleBackupFileJsonException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.DatabindException;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationContext;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -17,6 +19,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @DisplayName("ArticleBackupFileJsonConverter 단위 테스트")
 class ArticleBackupFileJsonConverterTest {
@@ -65,6 +70,20 @@ class ArticleBackupFileJsonConverterTest {
     void throwsInvalidExceptionWhenBackupFileIsNull() {
         assertThatThrownBy(() -> converter.serialize(null))
                 .isInstanceOf(ArticleBackupFileInvalidException.class);
+    }
+
+    @Test
+    @DisplayName("JSON 직렬화 실패 시 백업 파일 JSON 예외가 발생한다")
+    void throwsJsonExceptionWhenSerializationFails() throws Exception {
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
+        ArticleBackupFileJsonConverter failingConverter = new ArticleBackupFileJsonConverter(objectMapper);
+        ArticleBackupFile backupFile = backupFile();
+        when(objectMapper.writeValueAsString(any()))
+                .thenThrow(DatabindException.from((SerializationContext) null, "직렬화 실패"));
+
+        assertThatThrownBy(() -> failingConverter.serialize(backupFile))
+                .isInstanceOf(ArticleBackupFileJsonException.class)
+                .hasCauseInstanceOf(DatabindException.class);
     }
 
     @Test
