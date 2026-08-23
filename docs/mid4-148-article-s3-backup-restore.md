@@ -93,7 +93,7 @@ Storage 계층에는 문자열 key가 아니라 백업 기준 날짜 `LocalDate`
 S3 bucket, region, endpoint, prefix는 환경변수로 설정한다.
 
 ```text
-MONEW_AWS_REGION=
+MONEW_AWS_REGION=ap-northeast-2
 MONEW_AWS_ENDPOINT=
 MONEW_ARTICLE_BACKUP_CRON="0 10 0 * * *"
 MONEW_ARTICLE_BACKUP_ENABLED=false
