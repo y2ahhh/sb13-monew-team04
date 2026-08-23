@@ -13,6 +13,7 @@
 - `deleted_at IS NULL` 최적화는 복합 인덱스 적용 후에도 조인 대상 filter 비용이 남는 경우 추가 측정한다.
 
 ## 측정 SQL
+
 ### 최근 좋아요한 댓글
 
 `MID4-94`의 `CommentLikeRepository.findRecentCommentLikeActivity()` JPQL을 임시 Spring Boot test에서 실행하고 Hibernate SQL 로그로 캡처한 실제 query다. 아래 SQL은 측정을 위해 `userId` binding만 literal로 치환했다.

@@ -20,6 +20,7 @@
 - `users.deleted_at` 인덱스는 1차 후보로 두지 않고, `subscriptions.user_id` 개선 이후 subquery 비용이 남는 경우 추가 측정한다.
 
 ## 측정 SQL
+
 ### 구독 중인 관심사
 
 `MID4-92`의 `SubscribeRepository.findSubscribedInterestActivities()` JPQL을 임시 Spring Boot test에서 실행하고 Hibernate SQL 로그로 캡처한 실제 main query다. 아래 SQL은 측정을 위해 `userId` binding만 literal로 치환했다.

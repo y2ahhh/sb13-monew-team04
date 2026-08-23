@@ -22,6 +22,7 @@
 | 최근 조회 기사 | `article_views.user_id` 접근 경로 부재, 최신순 정렬 | `article_views(user_id, viewed_at DESC, id DESC)` | 기존 article_id 선두 인덱스들은 main query에 부적합 |
 | 최근 조회 기사 댓글 수 | `comments.article_id` 접근 경로 부재 | `comments(article_id)` | 댓글 수 subquery의 반복 full scan 제거 후보 |
 | 구독 중인 관심사 | 현재: `subscriptions.user_id` 접근 경로 부재 / 후속: 구독 생성일자 최신순 정렬 | 현재: `subscriptions(user_id)`, `subscriptions(user_id, interest_id)` / 후속: `subscriptions(user_id, created_at DESC, id DESC)` | 최종 후보 확정 후 중복/불필요 인덱스 제거 검토 |
+
 ## 측정 기준
 
 - 측정 완료 시각: 2026-08-23 08:07:24 +09:00
