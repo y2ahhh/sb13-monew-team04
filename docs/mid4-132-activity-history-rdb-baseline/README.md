@@ -25,7 +25,7 @@
 
 ## 측정 기준
 
-- 측정 완료 시각: 2026-08-23 08:07:24 +09:00
+- 초기 baseline seed/table snapshot 시각: 2026-08-23 08:07:24 +09:00
 - 최근 활동 3종 actual SQL 측정 시각: 2026-08-23 10:23:40 +09:00
 - 구독 중인 관심사 actual SQL 측정 시각: 2026-08-23 10:07:00 +09:00
 - 문서 브랜치: `docs/MID4-132-activity-history-rdb-baseline`
@@ -42,9 +42,19 @@
 - Port: `5435 -> 5432`
 - Docker engine: `linux x86_64`, CPU `24`, memory `33185484800 bytes` 약 `30.9 GiB`
 
-최근 활동 3종 조회는 Hibernate SQL 로그로 확인한 actual SQL 기준으로 측정했다. seed 소요 시간은 `100k` `3.214 s`, `1m` `14.048 s`, `10m` `124.057 s`다.
+측정 실행 세트:
 
-구독 중인 관심사 조회도 Hibernate SQL 로그로 확인한 actual SQL 기준으로 측정했다. seed 소요 시간은 `100k` `3.229 s`, `1m` `13.854 s`, `10m` `125.173 s`다.
+| 측정 세트 | 대상 | SQL 출처 | 측정 시각 | seed 소요 시간 |
+| --- | --- | --- | --- | --- |
+| 초기 baseline snapshot | Seed 결과, 테이블 크기 | DB catalog 조회 | 2026-08-23 08:07:24 +09:00 | `100k` `3.139 s`, `1m` `14.155 s`, `10m` `124.082 s` |
+| 최근 활동 3종 actual SQL | 최근 작성 댓글, 최근 좋아요한 댓글, 최근 조회 기사 | Hibernate SQL 로그 | 2026-08-23 10:23:40 +09:00 | `100k` `3.214 s`, `1m` `14.048 s`, `10m` `124.057 s` |
+| 구독 중인 관심사 actual SQL | 구독 중인 관심사 main, keywords | Hibernate SQL 로그 | 2026-08-23 10:07:00 +09:00 | `100k` `3.229 s`, `1m` `13.854 s`, `10m` `125.173 s` |
+
+아래 Seed 결과 테이블은 초기 baseline snapshot 실행값이다. 실제 조회 SQL 측정은 각 query set마다 데이터를 다시 생성한 뒤 수행했으므로 seed 소요 시간이 snapshot과 약간 다르다.
+
+최근 활동 3종 조회는 Hibernate SQL 로그로 확인한 actual SQL 기준으로 측정했다.
+
+구독 중인 관심사 조회도 Hibernate SQL 로그로 확인한 actual SQL 기준으로 측정했다. 구독 중인 관심사 측정은 최근 활동 3종 이후 별도로 추가했다.
 
 PostgreSQL 주요 설정:
 
