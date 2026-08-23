@@ -264,4 +264,24 @@ public class CommentLikeServiceTest {
     then(commentLikeRepository).shouldHaveNoInteractions();
     then(commentLikeSaveService).shouldHaveNoInteractions();
   }
+
+  @Test
+  @DisplayName("댓글 좋아요를 취소할 수 있다 - RED")
+  void 댓글_좋아요를_취소한다() {
+    // given
+    CommentLikeRegisterCommand command = new CommentLikeRegisterCommand(comment.getId(), likedBy.getId());
+    CommentLike commentLike = CommentLike.builder()
+        .comment(comment)
+        .likedBy(likedBy)
+        .build();
+
+    given(commentLikeRepository.findByCommentAndLikedBy(comment.getId(), likedBy.getId()))
+        .willReturn(Optional.of(commentLike));
+
+    // when
+    commentLikeService.unlikeComment(comment.getId(), likedBy.getId());
+
+    // then
+    then(commentLikeRepository).should(times(1)).delete(commentLike);
+  }
 }
