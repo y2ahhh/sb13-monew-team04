@@ -7,7 +7,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.scheduling.annotation.Scheduled;
 
+import java.lang.reflect.Method;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -42,5 +46,20 @@ class NotificationSchedulerTest {
                 .doesNotThrowAnyException();
 
         verify(notificationService).deleteConfirmedNotification();
+    }
+
+    @Test
+    @DisplayName("deleteNotification()은 매일 00:00(Asia/Seoul)에 실행되도록 스케줄링되어 있다.")
+    void 스케줄_메타데이터_검증() throws NoSuchMethodException {
+        // given
+        Method method = NotificationScheduler.class.getDeclaredMethod("deleteNotification");
+
+        // when
+        Scheduled scheduled = method.getAnnotation(Scheduled.class);
+
+        // then
+        assertThat(scheduled).isNotNull();
+        assertThat(scheduled.cron()).isEqualTo("0 0 0 * * *");
+        assertThat(scheduled.zone()).isEqualTo("Asia/Seoul");
     }
 }
