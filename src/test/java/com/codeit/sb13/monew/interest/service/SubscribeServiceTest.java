@@ -34,6 +34,9 @@ class SubscribeServiceTest {
     @Mock
     SubscribeRepository subscribeRepository;
 
+    @Mock
+    SubscribeSaver subscribeSaver;
+
     @InjectMocks
     SubscribeServiceImpl subscribeServiceImpl;
 
@@ -61,7 +64,7 @@ class SubscribeServiceTest {
         when(interestRepository.findById(interest.getId())).thenReturn(Optional.of(interest));
         when(subscribeRepository.findByInterest_IdAndUserId(interest.getId(), userId))
                 .thenReturn(Optional.empty());
-        when(subscribeRepository.saveAndFlush(any(Subscribe.class))).thenAnswer(invocation -> {
+        when(subscribeSaver.save(any(Subscribe.class))).thenAnswer(invocation -> {
             Subscribe saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
             ReflectionTestUtils.setField(saved, "createdAt", LocalDateTime.now());
@@ -99,7 +102,7 @@ class SubscribeServiceTest {
         // then
         assertThat(response.id()).isEqualTo(existing.getId());
         assertThat(response.createdAt()).isEqualTo(existing.getCreatedAt());
-        verify(subscribeRepository, never()).saveAndFlush(any());
+        verify(subscribeSaver, never()).save(any());
     }
 
     @Test
@@ -115,7 +118,7 @@ class SubscribeServiceTest {
                 .isInstanceOf(InterestNotFoundException.class);
 
         verify(subscribeRepository, never()).findByInterest_IdAndUserId(any(), any());
-        verify(subscribeRepository, never()).saveAndFlush(any());
+        verify(subscribeSaver, never()).save(any());
     }
 
     @Test
@@ -130,7 +133,7 @@ class SubscribeServiceTest {
         when(subscribeRepository.findByInterest_IdAndUserId(interest.getId(), userId))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(savedByOtherRequest));
-        when(subscribeRepository.saveAndFlush(any(Subscribe.class)))
+        when(subscribeSaver.save(any(Subscribe.class)))
                 .thenThrow(new DataIntegrityViolationException("uk_subscriptions_interest_user"));
         when(subscribeRepository.countByInterest_Id(interest.getId())).thenReturn(1L);
 
@@ -152,7 +155,7 @@ class SubscribeServiceTest {
         when(interestRepository.findById(interest.getId())).thenReturn(Optional.of(interest));
         when(subscribeRepository.findByInterest_IdAndUserId(interest.getId(), userId))
                 .thenReturn(Optional.empty());
-        when(subscribeRepository.saveAndFlush(any(Subscribe.class))).thenThrow(original);
+        when(subscribeSaver.save(any(Subscribe.class))).thenThrow(original);
 
         // when & then
         assertThatThrownBy(() -> subscribeServiceImpl.subscribe(interest.getId(), userId))
