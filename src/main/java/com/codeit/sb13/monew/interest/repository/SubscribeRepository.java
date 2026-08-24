@@ -81,6 +81,7 @@ public interface SubscribeRepository extends JpaRepository<Subscribe, UUID> {
         JOIN User u ON u.id = s.userId
         WHERE s.userId = :userId
             AND u.deletedAt IS NULL
+        ORDER BY s.createdAt DESC, s.id DESC
     """)
     List<SubscribedInterestActivityProjection> findSubscribedInterestActivities(@Param("userId") UUID userId);
 }

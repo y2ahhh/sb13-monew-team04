@@ -10,6 +10,7 @@ import com.codeit.sb13.monew.interest.domain.Subscribe;
 import com.codeit.sb13.monew.interest.repository.dto.SubscribedInterestActivityProjection;
 import com.codeit.sb13.monew.interest.service.dto.SubscribedInterestActivity;
 import com.codeit.sb13.monew.user.domain.User;
+import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -192,6 +193,32 @@ class SubscribeRepositoryTest {
     }
 
     @Test
+    @DisplayName("구독 생성일 내림차순으로 정렬하고 같은 시각이면 구독 ID 내림차순으로 보조 정렬한다")
+    void findSubscribedInterestActivities_ordersBySubscriptionCreatedAtDescAndIdDesc() {
+        User requester = persistUser("요청자");
+        Subscribe olderSubscribe = persistSubscribe(persistInterest("과거구독", "키워드-과거"), requester);
+        Subscribe sameTimeSubscribe1 = persistSubscribe(persistInterest("동시구독-1", "키워드-동시-1"), requester);
+        Subscribe sameTimeSubscribe2 = persistSubscribe(persistInterest("동시구독-2", "키워드-동시-2"), requester);
+        Subscribe latestSubscribe = persistSubscribe(persistInterest("최신구독", "키워드-최신"), requester);
+        em.flush();
+
+        LocalDateTime sameCreatedAt = LocalDateTime.of(2026, 8, 24, 10, 0);
+        updateSubscribeCreatedAt(olderSubscribe, sameCreatedAt.minusDays(1));
+        updateSubscribeCreatedAt(sameTimeSubscribe1, sameCreatedAt);
+        updateSubscribeCreatedAt(sameTimeSubscribe2, sameCreatedAt);
+        updateSubscribeCreatedAt(latestSubscribe, sameCreatedAt.plusDays(1));
+        em.clear();
+
+        List<UUID> expectedIds = findExpectedSubscribeIdsByNativeOrder(requester.getId());
+        List<UUID> resultIds = subscribeRepository.findSubscribedInterestActivities(requester.getId())
+                .stream()
+                .map(SubscribedInterestActivityProjection::id)
+                .toList();
+
+        assertThat(resultIds).containsExactlyElementsOf(expectedIds);
+    }
+
+    @Test
     @DisplayName("createdAt은 관심사 생성일이 아니라 구독 생성일이다")
     void findSubscribedInterestActivities_createdAtUsesSubscriptionCreatedAt() {
         User requester = persistUser("요청자");
@@ -309,6 +336,14 @@ class SubscribeRepositoryTest {
         return subscribe;
     }
 
+    private void updateSubscribeCreatedAt(Subscribe subscribe, LocalDateTime createdAt) {
+        em.getEntityManager()
+                .createQuery("UPDATE Subscribe s SET s.createdAt = :createdAt WHERE s.id = :id")
+                .setParameter("createdAt", createdAt)
+                .setParameter("id", subscribe.getId())
+                .executeUpdate();
+    }
+
     private List<SubscribedInterestActivityProjection> findActivities(UUID userId) {
         em.flush();
         em.clear();
@@ -319,6 +354,36 @@ class SubscribeRepositoryTest {
         return activities.stream()
                 .map(activity -> activity.interest().getName())
                 .toList();
+    }
+
+    private List<UUID> findExpectedSubscribeIdsByNativeOrder(UUID userId) {
+        List<?> rows = em.getEntityManager()
+                .createNativeQuery("""
+                    SELECT id
+                    FROM subscriptions
+                    WHERE user_id = :userId
+                    ORDER BY created_at DESC, id DESC
+                    """)
+                .setParameter("userId", userId)
+                .getResultList();
+
+        return rows.stream()
+                .map(this::toUuid)
+                .toList();
+    }
+
+    private UUID toUuid(Object value) {
+        if (value instanceof UUID uuid) {
+            return uuid;
+        }
+        if (value instanceof String string) {
+            return UUID.fromString(string);
+        }
+        if (value instanceof byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            return new UUID(buffer.getLong(), buffer.getLong());
+        }
+        throw new IllegalArgumentException("지원하지 않는 UUID 타입입니다: " + value.getClass());
     }
 
     private void assertKeywordBatchQueryUsesInCondition(CapturedOutput output) {
