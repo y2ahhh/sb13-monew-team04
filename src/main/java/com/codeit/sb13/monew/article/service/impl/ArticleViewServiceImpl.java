@@ -28,6 +28,7 @@ public class ArticleViewServiceImpl implements ArticleViewService {
     private final ArticleService articleService;
     private final UserService userService;
     private final ArticleMapper articleMapper;
+    private final ArticleViewSaveService articleViewSaveService;
 
     @Override
     @Transactional
@@ -36,11 +37,8 @@ public class ArticleViewServiceImpl implements ArticleViewService {
         User user = userService.findById(userId);
 
         ArticleView articleView = articleViewRepository.findByArticleAndUser(article, user)
-                .map(view -> {
-                    view.updateViewedAt(LocalDateTime.now());
-                    return articleViewRepository.save(view);
-                })
-                .orElseGet(() -> saveNewView(article, user));
+                .map(this::touch)
+                .orElseGet(() -> createOrTouchExisting(article, user));
 
         long viewCount = articleViewRepository.countByArticleAndUser_DeletedAtIsNull(article);
 
@@ -66,16 +64,30 @@ public class ArticleViewServiceImpl implements ArticleViewService {
         return articleViewRepository.findByArticleOrderByViewedAtDesc(article);
     }
 
-    private ArticleView saveNewView(Article article, User user) {
+    // 기존 조회 기록의 조회 시각만 갱신한다.
+    private ArticleView touch(ArticleView articleView) {
+        articleView.updateViewedAt(LocalDateTime.now());
+        return articleViewRepository.save(articleView);
+    }
+
+    /**
+     * 별도 트랜잭션으로 INSERT를 시도한다. 같은 (기사, 사용자) 조합의 동시 요청으로 UNIQUE 제약을
+     * 위반하면 상대 트랜잭션은 이미 커밋된 상태이므로, 그 행을 다시 조회해 조회 시각을 갱신하는
+     * 방식으로 서버가 스스로 복구한다. (MID4-164)
+     */
+    private ArticleView createOrTouchExisting(Article article, User user) {
         try {
-            return articleViewRepository.saveAndFlush(
-                    ArticleView.create(article, user, LocalDateTime.now()));
+            articleViewSaveService.create(article.getId(), user.getId(), LocalDateTime.now());
         } catch (DataIntegrityViolationException e) {
-            if (isArticleViewUniqueViolation(e)) {
-                throw new ArticleViewConflictException();
+            if (!isArticleViewUniqueViolation(e)) {
+                throw e;
             }
-            throw e;
+            return articleViewRepository.findByArticleAndUser(article, user)
+                    .map(this::touch)
+                    .orElseThrow(ArticleViewConflictException::new);
         }
+        return articleViewRepository.findByArticleAndUser(article, user)
+                .orElseThrow(ArticleViewConflictException::new);
     }
 
     private boolean isArticleViewUniqueViolation(DataIntegrityViolationException e) {
