@@ -48,13 +48,13 @@ class ArticleRestoreServiceTest {
     private ArticleBackupFileJsonConverter converter;
 
     @Mock
-    private ArticleRestoreExecutor executor;
+    private ArticleRestoreCommandService commandService;
 
     private ArticleRestoreService service;
 
     @BeforeEach
     void setUp() {
-        service = new ArticleRestoreService(storage, converter, executor);
+        service = new ArticleRestoreService(storage, converter, commandService);
     }
 
     @Test
@@ -85,12 +85,12 @@ class ArticleRestoreServiceTest {
         assertThat(results.get(0).restoredArticleIds()).isEmpty();
         assertThat(results.get(0).restoredArticleCount()).isZero();
         verify(converter, never()).deserialize(anyString());
-        verifyNoInteractions(executor);
+        verifyNoInteractions(commandService);
     }
 
     @Test
-    @DisplayName("백업 JSON을 객체화한 뒤 날짜 단위 executor에 위임한다")
-    void delegatesRestoreToExecutor() {
+    @DisplayName("백업 JSON을 객체화한 뒤 날짜 단위 command service에 위임한다")
+    void delegatesRestoreToCommandService() {
         ArticleBackupItem item = backupItem();
         ArticleBackupFile backupFile = ArticleBackupFile.of(
                 RESTORE_DATE,
@@ -103,12 +103,12 @@ class ArticleRestoreServiceTest {
         );
         when(storage.find(new StorageSearchCommand(RESTORE_DATE))).thenReturn(Optional.of("{}"));
         when(converter.deserialize("{}")).thenReturn(backupFile);
-        when(executor.restore(RESTORE_DATE, backupFile.articles())).thenReturn(restoreResult);
+        when(commandService.restore(RESTORE_DATE, backupFile.articles())).thenReturn(restoreResult);
 
         List<ArticleRestoreResult> results = service.restoreArticles(RESTORE_DATE, RESTORE_DATE);
 
         assertThat(results).containsExactly(restoreResult);
-        verify(executor).restore(RESTORE_DATE, backupFile.articles());
+        verify(commandService).restore(RESTORE_DATE, backupFile.articles());
     }
 
     @Test
@@ -167,8 +167,8 @@ class ArticleRestoreServiceTest {
     }
 
     @Test
-    @DisplayName("executor의 복구 실패 예외는 그대로 전파한다")
-    void rethrowsExecutorRestoreFailure() {
+    @DisplayName("command service의 복구 실패 예외는 그대로 전파한다")
+    void rethrowsCommandServiceRestoreFailure() {
         ArticleBackupFile backupFile = ArticleBackupFile.of(
                 RESTORE_DATE,
                 LocalDateTime.of(2026, 8, 24, 0, 10),
@@ -180,7 +180,7 @@ class ArticleRestoreServiceTest {
         );
         when(storage.find(new StorageSearchCommand(RESTORE_DATE))).thenReturn(Optional.of("{}"));
         when(converter.deserialize("{}")).thenReturn(backupFile);
-        when(executor.restore(RESTORE_DATE, backupFile.articles())).thenThrow(cause);
+        when(commandService.restore(RESTORE_DATE, backupFile.articles())).thenThrow(cause);
 
         assertThatThrownBy(() -> service.restoreArticles(RESTORE_DATE, RESTORE_DATE))
                 .isSameAs(cause);

@@ -20,7 +20,7 @@ public class ArticleRestoreService {
 
     private final Storage storage;
     private final ArticleBackupFileJsonConverter converter;
-    private final ArticleRestoreExecutor executor;
+    private final ArticleRestoreCommandService commandService;
 
     public List<ArticleRestoreResult> restoreArticles(LocalDate fromInclusive, LocalDate toInclusive) {
         validateDateRange(fromInclusive, toInclusive);
@@ -40,7 +40,7 @@ public class ArticleRestoreService {
             }
 
             ArticleBackupFile backupFile = converter.deserialize(backupJson.get());
-            return executor.restore(restoreDate, backupFile.articles());
+            return commandService.restore(restoreDate, backupFile.articles());
         } catch (ArticleRestoreFailedException e) {
             throw e;
         } catch (RuntimeException e) {

@@ -17,7 +17,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class ArticleRestoreExecutor {
+public class ArticleRestoreCommandService {
 
     private final ArticleRepository articleRepository;
 

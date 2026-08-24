@@ -32,9 +32,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@DisplayName("ArticleRestoreExecutor 단위 테스트")
+@DisplayName("ArticleRestoreCommandService 단위 테스트")
 @ExtendWith(MockitoExtension.class)
-class ArticleRestoreExecutorTest {
+class ArticleRestoreCommandServiceTest {
 
     private static final LocalDate RESTORE_DATE = LocalDate.of(2026, 8, 23);
     private static final UUID ORIGINAL_ARTICLE_ID = UUID.fromString("00000000-0000-4000-8000-000000000001");
@@ -43,17 +43,17 @@ class ArticleRestoreExecutorTest {
     @Mock
     private ArticleRepository articleRepository;
 
-    private ArticleRestoreExecutor executor;
+    private ArticleRestoreCommandService commandService;
 
     @BeforeEach
     void setUp() {
-        executor = new ArticleRestoreExecutor(articleRepository);
+        commandService = new ArticleRestoreCommandService(articleRepository);
     }
 
     @Test
     @DisplayName("restore()는 날짜 단위 트랜잭션으로 실행된다")
     void restoreIsTransactional() throws NoSuchMethodException {
-        Method restoreMethod = ArticleRestoreExecutor.class.getMethod("restore", LocalDate.class, List.class);
+        Method restoreMethod = ArticleRestoreCommandService.class.getMethod("restore", LocalDate.class, List.class);
 
         assertThat(restoreMethod.getAnnotation(Transactional.class)).isNotNull();
     }
@@ -69,7 +69,7 @@ class ArticleRestoreExecutorTest {
             return article;
         });
 
-        ArticleRestoreResult result = executor.restore(RESTORE_DATE, List.of(item));
+        ArticleRestoreResult result = commandService.restore(RESTORE_DATE, List.of(item));
 
         assertThat(result.restoreDate()).isEqualTo(RESTORE_DATE);
         assertThat(result.restoredArticleIds()).containsExactly(RESTORED_ARTICLE_ID);
@@ -91,7 +91,7 @@ class ArticleRestoreExecutorTest {
         ArticleBackupItem item = backupItem();
         when(articleRepository.findByLink(item.link())).thenReturn(Optional.of(existingArticle(item.link())));
 
-        ArticleRestoreResult result = executor.restore(RESTORE_DATE, List.of(item));
+        ArticleRestoreResult result = commandService.restore(RESTORE_DATE, List.of(item));
 
         assertThat(result.restoredArticleIds()).isEmpty();
         assertThat(result.restoredArticleCount()).isZero();
@@ -106,7 +106,7 @@ class ArticleRestoreExecutorTest {
         existingArticle.softDelete();
         when(articleRepository.findByLink(item.link())).thenReturn(Optional.of(existingArticle));
 
-        ArticleRestoreResult result = executor.restore(RESTORE_DATE, List.of(item));
+        ArticleRestoreResult result = commandService.restore(RESTORE_DATE, List.of(item));
 
         assertThat(result.restoredArticleIds()).isEmpty();
         assertThat(result.restoredArticleCount()).isZero();
@@ -123,7 +123,7 @@ class ArticleRestoreExecutorTest {
                 .thenReturn(Optional.of(existingArticle(item.link())));
         when(articleRepository.saveAndFlush(any(Article.class))).thenThrow(cause);
 
-        ArticleRestoreResult result = executor.restore(RESTORE_DATE, List.of(item));
+        ArticleRestoreResult result = commandService.restore(RESTORE_DATE, List.of(item));
 
         assertThat(result.restoredArticleIds()).isEmpty();
         assertThat(result.restoredArticleCount()).isZero();
@@ -139,7 +139,7 @@ class ArticleRestoreExecutorTest {
                 .thenReturn(Optional.empty());
         when(articleRepository.saveAndFlush(any(Article.class))).thenThrow(cause);
 
-        assertThatThrownBy(() -> executor.restore(RESTORE_DATE, List.of(item)))
+        assertThatThrownBy(() -> commandService.restore(RESTORE_DATE, List.of(item)))
                 .isInstanceOfSatisfying(ArticleRestoreFailedException.class, e -> {
                     assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_RESTORE_FAILED);
                     assertThat(e.getCause()).isSameAs(cause);
