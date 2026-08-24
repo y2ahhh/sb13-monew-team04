@@ -64,6 +64,24 @@ public class CommentLikeServiceImpl implements CommentLikeService {
         .orElseThrow(()->new IllegalStateException("댓글 좋아요 등록 후 조회 실패 - 댓글 아이디: " + commentId));
   }
 
+  @Override
+  public void unlikeComment(CommentLikeRegisterCommand command) {
+    UUID commentId = command.commentId();
+    UUID unlikedById = command.requestUserId();
+
+    log.debug("댓글 좋아요 취소 시작 - 댓글 아이디: {}", commentId);
+
+    commentRepository.findByIdAndDeletedAtIsNull(commentId).orElseThrow(()-> new CommentNotFoundException(commentId));
+    userRepository.findById(unlikedById).orElseThrow(()->new UserNotFoundException(unlikedById));
+
+    CommentLike existingCommentLike = commentLikeRepository.findByCommentAndLikedBy(commentId,
+            unlikedById)
+        .orElseThrow(() -> new CommentNotFoundException(commentId));
+
+    commentLikeRepository.delete(existingCommentLike);
+    log.info("댓글 좋아요 취소 완료 - 댓글 아이디: {}", commentId);
+  }
+
   // 댓글 좋아요가 성공적으로 등록되면 재조회하여 좋아요 수를 포함한 DTO 반환
   private CommentLikeDto toDto(CommentLike commentLike) {
     Long likeCount = commentLikeRepository.countByCommentId(commentLike.getComment().getId());
