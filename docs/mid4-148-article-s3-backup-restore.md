@@ -4,8 +4,8 @@
 
 - Jira: `MID4-148`
 - Parent: `MID4-74`
-- 현재 작업 티켓: `MID4-169`
-- PR 매핑: `MID4-166` `PR #45`, `MID4-167` `PR #47`, `MID4-168` `PR #48`, `MID4-169` `PR #57`
+- 현재 작업 티켓: `MID4-171`
+- PR 매핑: `MID4-166` `PR #45`, `MID4-167` `PR #47`, `MID4-168` `PR #48`, `MID4-169` `PR #57`, `MID4-170` `PR #62`, `MID4-171` `PR #63`
 - 목적: 뉴스 기사 데이터를 날짜 단위로 S3에 백업하고, 물리적으로 유실된 기사만 DB에 복구한다.
 - 구현 범위: 날짜 단위 백업 기준, AWS S3 설정 기준, Spring Scheduler 배치, PostgreSQL advisory lock 동시성 제어, 날짜 범위 복구 API, 실패 로그 기준
 - `MID4-166` 범위: AWS S3 설정, 환경변수, credentials provider, Storage 인터페이스, test profile 대체 구현
@@ -269,8 +269,8 @@ MID4-148은 전체 기능 기준으로 유지하고, 구현은 아래 하위 작
 | `MID4-167` | 기사 백업 파일 모델 및 JSON 직렬화 구현 | `PR #47` |
 | `MID4-168` | 날짜 단위 기사 백업 서비스 구현 | `PR #48` |
 | `MID4-169` | 기사 백업 Scheduler 및 PostgreSQL advisory lock 적용 | `PR #57` |
-| `MID4-170` | 날짜 범위 기사 복구 서비스 구현 | - |
-| `MID4-171` | 기사 복구 API 및 응답 DTO 구현 | - |
+| `MID4-170` | 날짜 범위 기사 복구 서비스 구현 | `PR #62` |
+| `MID4-171` | 기사 복구 API 및 응답 DTO 구현 | `PR #63` |
 
 ## 구현 전 확인할 사항
 
