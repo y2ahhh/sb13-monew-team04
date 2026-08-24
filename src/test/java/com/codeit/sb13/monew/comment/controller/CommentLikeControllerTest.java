@@ -105,7 +105,7 @@ public class CommentLikeControllerTest {
 
 
   @Test
-  @DisplayName("댓글 좋아요 취소 성공 - RED")
+  @DisplayName("댓글 좋아요 취소 성공 - GREEN")
   void 댓글_좋아요_취소() throws Exception {
     // given
     UUID commentId = UUID.randomUUID();
