@@ -6,6 +6,7 @@ import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.comment.service.CommentLikeService;
 import com.codeit.sb13.monew.comment.service.dto.CommentLikeDto;
 import com.codeit.sb13.monew.comment.service.dto.CommentLikeRegisterCommand;
+import com.codeit.sb13.monew.global.exception.comment.CommentLikeNotFoundException;
 import com.codeit.sb13.monew.global.exception.comment.CommentNotFoundException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.user.repository.UserRepository;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 @Slf4j
@@ -65,20 +67,21 @@ public class CommentLikeServiceImpl implements CommentLikeService {
   }
 
   @Override
-  public void unlikeComment(CommentLikeRegisterCommand command) {
+  @Transactional
+  public void unlikeComment(@Valid CommentLikeRegisterCommand command) {
     UUID commentId = command.commentId();
-    UUID unlikedById = command.requestUserId();
+    UUID requestUserId = command.requestUserId();
 
     log.debug("댓글 좋아요 취소 시작 - 댓글 아이디: {}", commentId);
 
     commentRepository.findByIdAndDeletedAtIsNull(commentId).orElseThrow(()-> new CommentNotFoundException(commentId));
-    userRepository.findById(unlikedById).orElseThrow(()->new UserNotFoundException(unlikedById));
+    userRepository.findById(requestUserId).orElseThrow(()->new UserNotFoundException(requestUserId));
 
-    CommentLike existingCommentLike = commentLikeRepository.findByCommentAndLikedBy(commentId,
-            unlikedById)
-        .orElseThrow(() -> new CommentNotFoundException(commentId));
+    Long deletedCount = commentLikeRepository.deleteByCommentIdAndLikedById(commentId, requestUserId);
+    if (deletedCount == 0L) {
+      throw new CommentLikeNotFoundException(commentId, requestUserId);
+    }
 
-    commentLikeRepository.delete(existingCommentLike);
     log.info("댓글 좋아요 취소 완료 - 댓글 아이디: {}", commentId);
   }
 
