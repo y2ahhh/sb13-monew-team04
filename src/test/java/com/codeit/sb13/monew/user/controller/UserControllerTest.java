@@ -344,8 +344,8 @@ class UserControllerTest {
   }
 
   @Test
-  @DisplayName("존재하지 않는 userId로 요청시 404예외 발생")
-  void 존재하지_않는_userId로_요청시_404예외() throws Exception {
+  @DisplayName("존재하지 않는 userId로 물리 삭제 요청시 404예외 발생")
+  void 존재하지_않는_userId로_물리_삭제_요청시_404예외() throws Exception {
     // given
     UUID userId = UUID.randomUUID();
     doThrow(new UserNotFoundException(userId))
@@ -354,6 +354,19 @@ class UserControllerTest {
     // when & then
     mockMvc.perform(delete("/api/users/{userId}/hard", userId))
         .andExpect(status().isNotFound());
+    verify(userService).hardDeleteUser(userId);
+  }
+
+  @Test
+  @DisplayName("존재하는 userId로 물리 삭제 요청시 정상적으로 삭제된다.")
+  void 존재하는_userId로_물리_삭제_요청_시_정상_삭재() throws Exception{
+    // given
+    UUID userId = UUID.randomUUID();
+
+
+    // when & then
+    mockMvc.perform(delete("/api/users/{userId}/hard", userId))
+        .andExpect(status().isOk());
     verify(userService).hardDeleteUser(userId);
 
 

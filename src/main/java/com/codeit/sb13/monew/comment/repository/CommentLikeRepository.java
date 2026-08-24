@@ -22,4 +22,7 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> 
         and cl.likedBy.id = :likedById
   """)
   Optional<CommentLike> findByCommentAndLikedBy(@Param("commentId") UUID commentId, @Param("likedById") UUID likedById);
+
+  void deleteByLikedBy_Id(UUID userId);
+
 }

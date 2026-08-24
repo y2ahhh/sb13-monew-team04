@@ -33,4 +33,6 @@ public interface ArticleViewRepository extends JpaRepository<ArticleView, UUID> 
 
     // 기사 조회수 집계
     long countByArticle_IdAndUser_DeletedAtIsNull(UUID articleId);
+
+    void deleteByUser_Id(UUID userId);
 }

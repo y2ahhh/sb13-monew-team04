@@ -21,4 +21,6 @@ public interface SubscribeRepository extends JpaRepository<Subscribe, UUID> {
      * @param interestId 구독을 모두 지울 관심사의 id
      */
     void deleteByInterest_Id(UUID interestId);
+
+    void deleteByUserId(UUID userId);
 }

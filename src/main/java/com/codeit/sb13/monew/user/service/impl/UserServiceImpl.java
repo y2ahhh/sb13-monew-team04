@@ -1,6 +1,11 @@
 package com.codeit.sb13.monew.user.service.impl;
 
+import com.codeit.sb13.monew.article.repository.ArticleViewRepository;
+import com.codeit.sb13.monew.comment.repository.CommentLikeRepository;
+import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
+import com.codeit.sb13.monew.interest.repository.SubscribeRepository;
+import com.codeit.sb13.monew.notification.repository.NotificationRepository;
 import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.exception.AlreadyDeletedUserException;
 import com.codeit.sb13.monew.user.exception.DuplicateEmailException;
@@ -28,6 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl implements UserService {
 
   private final UserRepository userRepository;
+  private final CommentLikeRepository commentLikeRepository;
+  private final CommentRepository commentRepository;
+  private final ArticleViewRepository articleViewRepository;
+  private final SubscribeRepository subscribeRepository;
+  private final NotificationRepository notificationRepository;
+
   private final PasswordEncoder passwordEncoder;
   private final UserMapper userMapper;
 
@@ -120,6 +131,14 @@ public class UserServiceImpl implements UserService {
   public void hardDeleteUser(UUID userId) {
     userRepository.findById(userId)
         .orElseThrow(() -> new UserNotFoundException(userId));
+    // FK 제약 순서 고려
+    // CommentLike(댓글 참조) → Comment → ArticleView → Subscribe → Notification → User
+    commentLikeRepository.deleteByLikedBy_Id(userId);
+    commentRepository.deleteByUser_Id(userId);
+    articleViewRepository.deleteByUser_Id(userId);
+    subscribeRepository.deleteByUserId(userId);
+    notificationRepository.deleteByUser_Id(userId);
+    userRepository.deleteById(userId);
   }
 
   private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
