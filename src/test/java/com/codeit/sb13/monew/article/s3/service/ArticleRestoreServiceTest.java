@@ -26,8 +26,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -100,6 +102,44 @@ class ArticleRestoreServiceTest {
                 .containsExactly(maxPreviousDate, LocalDate.MAX);
         verify(storage).find(new StorageSearchCommand(maxPreviousDate));
         verify(storage).find(new StorageSearchCommand(LocalDate.MAX));
+    }
+
+    @Test
+    @DisplayName("복구 날짜 범위가 최대 31일이면 복구 대상으로 처리한다")
+    void restoresWhenDateRangeIsExactlyMaxDays() {
+        LocalDate from = RESTORE_DATE;
+        LocalDate to = from.plusDays(30);
+        when(storage.find(any(StorageSearchCommand.class))).thenReturn(Optional.empty());
+
+        List<ArticleRestoreResult> results = service.restoreArticles(from, to);
+
+        assertThat(results).hasSize(31);
+        assertThat(results)
+                .extracting(ArticleRestoreResult::restoreDate)
+                .first()
+                .isEqualTo(from);
+        assertThat(results)
+                .extracting(ArticleRestoreResult::restoreDate)
+                .last()
+                .isEqualTo(to);
+        verify(storage, times(31)).find(any(StorageSearchCommand.class));
+    }
+
+    @Test
+    @DisplayName("복구 날짜 범위가 31일을 초과하면 실패한다")
+    void throwsDateInvalidExceptionWhenDateRangeExceedsMaxDays() {
+        LocalDate from = RESTORE_DATE;
+        LocalDate to = from.plusDays(31);
+
+        assertThatThrownBy(() -> service.restoreArticles(from, to))
+                .isInstanceOfSatisfying(ArticleRestoreDateInvalidException.class, e -> {
+                    assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_RESTORE_DATE_INVALID);
+                    assertThat(e.getDetails())
+                            .containsEntry("from", from)
+                            .containsEntry("to", to)
+                            .containsEntry("reason", "복구 날짜 범위는 최대 31일까지 가능합니다.");
+                });
+        verifyNoInteractions(storage, converter, commandService);
     }
 
     @Test

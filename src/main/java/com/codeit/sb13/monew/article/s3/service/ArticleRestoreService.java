@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -18,6 +19,8 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 @Slf4j
 public class ArticleRestoreService {
+
+    private static final long MAX_RESTORE_DAYS = 31L;
 
     private final Storage storage;
     private final ArticleBackupFileJsonConverter converter;
@@ -55,6 +58,10 @@ public class ArticleRestoreService {
         }
         if (fromInclusive.isAfter(toInclusive)) {
             throw new ArticleRestoreDateInvalidException(fromInclusive, toInclusive, "복구 시작일은 종료일보다 이후일 수 없습니다.");
+        }
+        long restoreDays = ChronoUnit.DAYS.between(fromInclusive, toInclusive) + 1;
+        if (restoreDays > MAX_RESTORE_DAYS) {
+            throw new ArticleRestoreDateInvalidException(fromInclusive, toInclusive, "복구 날짜 범위는 최대 31일까지 가능합니다.");
         }
     }
 }
