@@ -58,7 +58,7 @@ public interface CommentLikeApi {
   )
   @ApiResponses({
       @ApiResponse(
-          responseCode = "200",
+          responseCode = "204",
           description = "댓글 좋아요 취소 성공"
       ),
       @ApiResponse(
