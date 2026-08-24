@@ -4,17 +4,17 @@
 
 구독 중인 관심사 조회는 `MID4-92`의 최종 조회 로직 기준으로 `subscriptions.created_at DESC, subscriptions.id DESC` 정렬을 포함한다. 대상 사용자의 구독은 50건이지만, main query에서 `subscriptions.user_id` 조건을 처리할 인덱스가 없어 scale이 커질수록 `Seq Scan` 또는 `Parallel Seq Scan`이 발생한다.
 
-현재 `(interest_id, user_id)` unique index는 관심사별 구독자 수 subquery에는 사용되지만, 특정 사용자의 구독 목록을 찾는 main query에는 선두 컬럼이 맞지 않아 직접 사용되지 않는다. 따라서 main query는 `user_id` 접근 경로와 최신 구독순 정렬을 함께 처리할 수 있는 인덱스가 필요하다.
+현재 `(interest_id, user_id)` unique index는 관심사별 구독자 수 subquery에는 사용되지만, 특정 사용자의 구독 목록을 찾는 main query에는 선두 컬럼이 맞지 않아 직접 사용되지 않는다. 100k와 10m 실행계획을 보면 정렬 노드의 비용보다 `subscriptions.user_id` 조건을 full scan으로 처리하는 비용이 더 명확한 병목으로 보인다. 정렬 추가 전 baseline과 비교해도 예측 비용과 실행 시간이 크게 벌어지지 않아, 현재 단계에서는 정렬 자체를 큰 병목으로 보기는 어렵다.
 
 keywords batch 조회는 Hibernate가 PostgreSQL에서 `interest_id = any (?)` 형태로 실행한다. `uk_keywords_interest_keyword(interest_id, keyword)`는 조회 조건의 선두 컬럼과 맞으므로 `1m`, `10m`에서는 사용됐다. `100k`에서는 데이터가 작아 planner가 `Seq Scan`을 선택했다.
 
 ## 인덱스 후보
 
-- 1차 후보: `subscriptions(user_id, created_at DESC, id DESC)`
-- 위 후보는 대상 사용자의 구독 목록 접근과 `created_at DESC, id DESC` 정렬을 함께 해결하는지 확인한다.
-- 비교 후보 A: `subscriptions(user_id)`를 별도로 적용해 full scan 제거 효과와 인덱스 용량 증가량을 비교한다.
-- 비교 후보 B: `subscriptions(user_id, interest_id)`를 별도로 적용해 단순 FK 인덱스 대비 join 비용이나 heap 접근이 의미 있게 줄어드는지 비교한다.
-- 정렬 대응 인덱스가 유의미하면 `subscriptions(user_id)` 또는 `subscriptions(user_id, interest_id)`처럼 역할이 겹치는 인덱스는 후속 정리 후보로 본다.
+- 1차 병목은 `subscriptions.user_id` 접근 경로 부재로 본다.
+- 현재 SQL 기준 1차 후보는 `subscriptions(user_id, created_at DESC, id DESC)`로 둔다. 이 후보는 `user_id` 접근 경로를 만들면서 정렬도 함께 처리할 수 있는지 확인하기 위한 후보이지, 정렬 자체가 주요 병목이라는 의미는 아니다.
+- 정렬 추가 전 후보였던 `subscriptions(user_id)`와 `subscriptions(user_id, interest_id)`는 현재 최종 후보라기보다 용량 증가량과 개선 폭을 비교하기 위한 후보로 본다.
+- `subscriptions(user_id)`만으로 full scan이 대부분 제거되고 정렬 비용이 계속 작게 유지된다면, 정렬 포함 복합 인덱스와 인덱스 용량을 비교해 선택한다.
+- `subscriptions(user_id, interest_id)`는 단순 FK 인덱스 대비 join 비용이나 heap 접근이 의미 있게 줄어드는지 확인하는 비교 후보로 둔다.
 - 단, `uk_subscriptions_interest_user(interest_id, user_id)`는 중복 구독 방지와 관심사별 구독자 수 subquery에 필요하므로 제거 후보로 보지 않는다.
 - keywords query는 현재 unique index의 선두 컬럼을 정상적으로 사용할 수 있으므로 신규 인덱스 후보로 두지 않는다.
 - `users.deleted_at` 인덱스는 1차 후보로 두지 않고, `subscriptions.user_id` 접근 경로 개선 후 subquery 비용이 남는 경우 추가 측정한다.
@@ -133,7 +133,7 @@ WHERE k1_0.interest_id = ANY (ARRAY[
 
 - main query는 `subscriptions.user_id` 조건을 `Seq Scan`으로 처리했다.
 - `Rows Removed by Filter`: `4995`
-- `ORDER BY s1_0.created_at DESC, s1_0.id DESC`는 `Sort Method: quicksort`로 처리했다.
+- `ORDER BY s1_0.created_at DESC, s1_0.id DESC`는 `Sort Method: quicksort`로 처리했지만, 정렬 대상이 50건이라 정렬 자체보다 `subscriptions.user_id` full scan이 더 명확한 비용으로 보인다.
 - 관심사별 구독자 수 subquery는 `uk_subscriptions_interest_user`를 `interest_id = ...` 조건으로 사용했다.
 - subquery 내부 활성 사용자 확인은 `users`를 50회 `Seq Scan`했다.
 - keywords query는 `interest_id = any (...)` 조건을 `Seq Scan`으로 처리했다. 작은 scale에서는 planner가 index scan보다 sequential scan을 선택했다.
@@ -155,7 +155,7 @@ WHERE k1_0.interest_id = ANY (ARRAY[
 
 - main query는 `subscriptions.user_id` 조건을 `Parallel Seq Scan`으로 처리했다.
 - worker별 `Rows Removed by Filter`: `166665`, `loops=3`
-- `ORDER BY s1_0.created_at DESC, s1_0.id DESC`는 worker별 `Sort`와 `Gather Merge`로 처리했다.
+- `ORDER BY s1_0.created_at DESC, s1_0.id DESC`는 worker별 `Sort`와 `Gather Merge`로 처리했지만, 실행계획상 핵심 병목은 정렬보다 `subscriptions.user_id` 접근 경로 부재로 본다.
 - 관심사별 구독자 수 subquery는 `uk_subscriptions_interest_user`를 `interest_id = ...` 조건으로 사용했다.
 - keywords query는 `uk_keywords_interest_keyword`를 `interest_id = any (...)` 조건으로 사용했다.
 - 요청 1건 기준 total median은 `11.635 ms`다. 현재 scale에서는 다른 최근 활동 조회보다 낮지만, main query가 전체 subscriptions를 훑는 구조라 데이터 증가 시 병목 후보로 남는다.

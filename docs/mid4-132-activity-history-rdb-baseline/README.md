@@ -21,7 +21,7 @@
 | 최근 좋아요한 댓글 | `comment_likes.liked_by` 접근 경로 부재, 최신순 정렬 | `comment_likes(liked_by, created_at DESC, id DESC)` | 기존 `(comment_id, liked_by)` unique index는 선두 컬럼이 맞지 않음 |
 | 최근 조회 기사 | `article_views.user_id` 접근 경로 부재, 최신순 정렬 | `article_views(user_id, viewed_at DESC, id DESC)` | 기존 article_id 선두 인덱스들은 main query에 부적합, `idx_article_views_article_viewed`는 후속 사용처 확인 후 제거 검토 |
 | 최근 조회 기사 댓글 수 | `comments.article_id` 접근 경로 부재 | `comments(article_id)` | 댓글 수 subquery의 반복 full scan 제거 후보 |
-| 구독 중인 관심사 | `subscriptions.user_id` 접근 경로 부재, 최신 구독순 정렬 | `subscriptions(user_id, created_at DESC, id DESC)` | `subscriptions(user_id)`, `subscriptions(user_id, interest_id)`와 용량/효과 비교 후 중복 인덱스 제거 검토 |
+| 구독 중인 관심사 | `subscriptions.user_id` 접근 경로 부재 | `subscriptions(user_id, created_at DESC, id DESC)` | 정렬 자체보다 `user_id` full scan이 병목 후보. 정렬 전 후보였던 `subscriptions(user_id)`, `subscriptions(user_id, interest_id)`는 용량/효과 비교용 |
 
 ## 측정 기준
 
