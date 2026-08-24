@@ -1,13 +1,17 @@
 package com.codeit.sb13.monew.article.controller;
 
+import com.codeit.sb13.monew.article.controller.dto.ArticleRestoreRequest;
 import com.codeit.sb13.monew.article.controller.dto.ArticleSearchRequest;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
+import com.codeit.sb13.monew.article.s3.service.ArticleRestoreService;
+import com.codeit.sb13.monew.article.s3.service.dto.ArticleRestoreResult;
 import com.codeit.sb13.monew.article.service.ArticleService;
 import com.codeit.sb13.monew.article.service.ArticleViewService;
 import com.codeit.sb13.monew.article.service.dto.ArticleDto;
 import com.codeit.sb13.monew.article.service.dto.ArticleSearchCommand;
 import com.codeit.sb13.monew.article.service.dto.ArticleViewDto;
 import com.codeit.sb13.monew.global.MonewHttpHeaders;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +32,7 @@ public class ArticleController implements ArticleApi {
 
     private final ArticleService articleService;
     private final ArticleViewService articleViewService;
+    private final ArticleRestoreService articleRestoreService;
 
     @Override
     @GetMapping
@@ -68,5 +73,11 @@ public class ArticleController implements ArticleApi {
     @GetMapping("/sources")
     public ResponseEntity<List<ArticleSource>> getSources() {
         return ResponseEntity.ok(articleService.getSources());
+    }
+
+    @Override
+    @GetMapping("/restore")
+    public ResponseEntity<List<ArticleRestoreResult>> restore(@Valid @ModelAttribute ArticleRestoreRequest request) {
+        return ResponseEntity.ok(articleRestoreService.restoreArticles(request.toRestoreCommand()));
     }
 }
