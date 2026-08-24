@@ -17,6 +17,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -182,9 +184,12 @@ class ArticleViewServiceTest {
         verify(articleViewSaveService, never()).create(any(), any(), any());
     }
 
-    @Test
+    // 제약명 표기는 DB 벤더와 설정에 따라 대소문자가 달라진다.
+    // (PostgreSQL은 소문자, H2는 DATABASE_TO_LOWER 설정에 따라 달라짐)
+    @ParameterizedTest(name = "제약명 표기가 {0} 일 때")
+    @ValueSource(strings = {"uk_article_views_article_user", "UK_ARTICLE_VIEWS_ARTICLE_USER"})
     @DisplayName("동시 요청으로 UNIQUE 제약을 위반하면 기존 조회 기록을 갱신해 정상 응답한다")
-    void testRecordViewUniqueViolationRecovers() {
+    void testRecordViewUniqueViolationRecovers(String constraintName) {
         // given
         LocalDateTime previousViewedAt = LocalDateTime.now().minusDays(1);
         ArticleView concurrentView = ArticleView.create(testArticle, testUser, previousViewedAt);
@@ -194,7 +199,7 @@ class ArticleViewServiceTest {
         // 1회차: 기존 기록 없음 -> INSERT 시도, 2회차: 상대 트랜잭션이 커밋한 행이 보임
         when(articleViewRepository.findByArticleAndUser(testArticle, testUser))
                 .thenReturn(Optional.empty(), Optional.of(concurrentView));
-        doThrow(uniqueViolation()).when(articleViewSaveService)
+        doThrow(uniqueViolation(constraintName)).when(articleViewSaveService)
                 .create(eq(testArticleId), eq(testUserId), any(LocalDateTime.class));
         when(articleViewRepository.save(any(ArticleView.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -342,11 +347,15 @@ class ArticleViewServiceTest {
         assertThat(articleViewService.getArticleViews(testArticleId)).isEmpty();
     }
 
-    // uk_article_views_article_user 위반 상황을 재현한다.
+    // uk_article_views_article_user 위반 상황을 재현한다. (PostgreSQL 표기)
     private DataIntegrityViolationException uniqueViolation() {
+        return uniqueViolation("uk_article_views_article_user");
+    }
+
+    private DataIntegrityViolationException uniqueViolation(String constraintName) {
         return new DataIntegrityViolationException(
                 "could not execute statement",
                 new RuntimeException(
-                        "duplicate key value violates unique constraint \"uk_article_views_article_user\""));
+                        "duplicate key value violates unique constraint \"" + constraintName + "\""));
     }
 }
