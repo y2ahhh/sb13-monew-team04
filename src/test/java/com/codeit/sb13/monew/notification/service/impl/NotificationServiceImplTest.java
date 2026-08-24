@@ -398,8 +398,8 @@ class NotificationServiceImplTest {
     }
 
     @Nested
-    @DisplayName("delete")
-    class Delete {
+    @DisplayName("deleteConfirmedNotification")
+    class DeleteConfirmedNotification {
 
         @Test
         @DisplayName("확인 처리된 지 7일 경과한 알림을 삭제하고, 삭제 기준 시각으로 '지금으로부터 7일 전'을 넘긴다.")
@@ -408,7 +408,7 @@ class NotificationServiceImplTest {
             when(notificationRepository.deleteConfirmedBefore(any(LocalDateTime.class))).thenReturn(3L);
 
             // when
-            notificationServiceImpl.delete();
+            notificationServiceImpl.deleteConfirmedNotification();
 
             // then
             ArgumentCaptor<LocalDateTime> thresholdCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
@@ -426,7 +426,7 @@ class NotificationServiceImplTest {
             when(notificationRepository.deleteConfirmedBefore(any(LocalDateTime.class))).thenReturn(0L);
 
             // when & then
-            notificationServiceImpl.delete();
+            notificationServiceImpl.deleteConfirmedNotification();
 
             verify(notificationRepository).deleteConfirmedBefore(any(LocalDateTime.class));
         }

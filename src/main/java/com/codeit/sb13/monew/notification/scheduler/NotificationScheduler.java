@@ -16,7 +16,7 @@ public class NotificationScheduler {
     @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
     public void deleteNotification() {
         try {
-            notificationService.delete();
+            notificationService.deleteConfirmedNotification();
         } catch (Exception e) {
             log.error("알림 정리 배치 실행 중 오류 발생", e);
         }

@@ -21,5 +21,5 @@ public interface NotificationService {
 
     List<NotificationResult> confirmAllNotifications(UUID userId);
 
-    void delete();
+    void deleteConfirmedNotification();
 }

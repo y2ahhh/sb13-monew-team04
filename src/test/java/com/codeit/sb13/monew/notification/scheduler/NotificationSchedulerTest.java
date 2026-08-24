@@ -28,19 +28,19 @@ class NotificationSchedulerTest {
         notificationScheduler.deleteNotification();
 
         // then
-        verify(notificationService).delete();
+        verify(notificationService).deleteConfirmedNotification();
     }
 
     @Test
     @DisplayName("삭제 중 예외가 발생해도 스케줄러 밖으로 전파되지 않는다.")
     void 예외_발생해도_전파되지_않음() {
         // given
-        doThrow(new RuntimeException("DB 오류")).when(notificationService).delete();
+        doThrow(new RuntimeException("DB 오류")).when(notificationService).deleteConfirmedNotification();
 
         // when & then
         assertThatCode(() -> notificationScheduler.deleteNotification())
                 .doesNotThrowAnyException();
 
-        verify(notificationService).delete();
+        verify(notificationService).deleteConfirmedNotification();
     }
 }
