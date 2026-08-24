@@ -50,7 +50,7 @@ class NotificationRepositoryTest {
         return em.find(Notification.class, notification.getId());
     }
 
-    private Notification saveNotification(User user, String content, boolean confirmed, LocalDateTime updatedAt) {
+    private Notification saveNotification(User user, String content, boolean confirmed, LocalDateTime confirmedAt) {
         Notification notification = Notification.create(user, content, UUID.randomUUID(), ResourceType.COMMENT);
         if (confirmed) {
             notification.confirm();
@@ -59,8 +59,8 @@ class NotificationRepositoryTest {
         em.flush();
 
         em.getEntityManager()
-                .createNativeQuery("UPDATE notifications SET updated_at = ?1 WHERE id = ?2")
-                .setParameter(1, updatedAt)
+                .createNativeQuery("UPDATE notifications SET confirmed_at = ?1 WHERE id = ?2")
+                .setParameter(1, confirmedAt)
                 .setParameter(2, notification.getId())
                 .executeUpdate();
         em.clear();
@@ -187,7 +187,7 @@ class NotificationRepositoryTest {
     }
 
     @Test
-    @DisplayName("미확인 알림은 확인 시각(updatedAt)이 오래돼도 삭제 대상에서 제외된다")
+    @DisplayName("미확인 알림은 확인 시각(confirmedAt)이 오래돼도 삭제 대상에서 제외된다")
     void 미확인_알림_삭제_제외() {
         // given
         User user = saveUser("me@test.com", "나");
