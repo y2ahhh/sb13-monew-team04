@@ -458,6 +458,7 @@ public class UserServiceImplTest {
     userServiceImpl.hardDeleteUser(userId);
 
     // then
+    verify(commentLikeRepository).deleteByComment_User_Id(userId);
     verify(commentLikeRepository).deleteByLikedBy_Id(userId);
     verify(commentRepository).deleteByUser_Id(userId);
     verify(articleViewRepository).deleteByUser_Id(userId);

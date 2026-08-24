@@ -132,7 +132,8 @@ public class UserServiceImpl implements UserService {
     userRepository.findById(userId)
         .orElseThrow(() -> new UserNotFoundException(userId));
     // FK 제약 순서 고려
-    // CommentLike(댓글 참조) → Comment → ArticleView → Subscribe → Notification → User
+    // CommentLike→ Comment → ArticleView → Subscribe → Notification → User
+    commentLikeRepository.deleteByComment_User_Id(userId);
     commentLikeRepository.deleteByLikedBy_Id(userId);
     commentRepository.deleteByUser_Id(userId);
     articleViewRepository.deleteByUser_Id(userId);
