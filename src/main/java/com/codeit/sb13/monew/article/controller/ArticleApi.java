@@ -8,6 +8,7 @@ import com.codeit.sb13.monew.global.MonewHttpHeaders;
 import com.codeit.sb13.monew.global.dto.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -32,7 +33,7 @@ public interface ArticleApi {
             @ApiResponse(
                     responseCode = "200",
                     description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = ArticleDto.class))
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ArticleDto.class)))
             ),
             @ApiResponse(
                     responseCode = "400",
@@ -138,7 +139,11 @@ public interface ArticleApi {
 
     @Operation(summary = "출처 목록 조회", description = "출처 목록을 조회합니다.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ArticleSource.class)))
+            ),
             @ApiResponse(
                     responseCode = "500",
                     description = "서버 내부 오류",
