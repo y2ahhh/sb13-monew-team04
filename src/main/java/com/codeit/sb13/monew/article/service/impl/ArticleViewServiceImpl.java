@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -92,7 +93,9 @@ public class ArticleViewServiceImpl implements ArticleViewService {
 
     private boolean isArticleViewUniqueViolation(DataIntegrityViolationException e) {
         String message = e.getMostSpecificCause().getMessage();
-        return message != null && message.contains("uk_article_views_article_user");
+        // 제약명 표기는 DB 벤더와 설정에 따라 대소문자가 달라진다.
+        return message != null
+                && message.toLowerCase(Locale.ROOT).contains("uk_article_views_article_user");
     }
 
 }
