@@ -29,13 +29,13 @@ public interface ArticleViewRepository extends JpaRepository<ArticleView, UUID> 
     List<ArticleView> findByUserOrderByViewedAtDesc(User user);
 
     // 특정 기사의 조회수 집계
-    long countByArticle(Article article);
+    long countByArticleAndUser_DeletedAtIsNull(Article article);
 
     // 요청자의 조회 여부 (viewedByMe)
     boolean existsByArticle_IdAndUser_Id(UUID articleId, UUID userId);
 
-    // 기사 조회수 집계
-    long countByArticle_Id(UUID articleId);
+    // 기사 조회수 집계 (탈퇴 사용자 조회 이력 제외)
+    long countByArticle_IdAndUser_DeletedAtIsNull(UUID articleId);
 
     @Query("""
                 SELECT new com.codeit.sb13.monew.article.repository.dto.RecentArticleViewActivityProjection(
