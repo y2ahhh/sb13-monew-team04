@@ -47,7 +47,7 @@ public class NotificationRepositoryCustomImpl implements NotificationRepositoryC
                 .delete(notification)
                 .where(
                         notification.confirmed.isTrue(),
-                        notification.updatedAt.before(time)
+                        notification.confirmedAt.before(time)
                 )
                 .execute();
 
