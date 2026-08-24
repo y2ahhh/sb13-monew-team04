@@ -50,22 +50,37 @@ public interface SubscribeRepository extends JpaRepository<Subscribe, UUID> {
      */
     Optional<Subscribe> findByInterest_IdAndUserId(UUID interestId, UUID userId);
 
+    /**
+     * 사용자 활동내역의 "구독 중인 관심사" 영역에 내려줄 현재 구독 목록을 조회한다.
+     *
+     * <p>이 조회는 최근 활동 10건처럼 자르는 목록이 아니라, 요청 사용자가 현재 구독 중인
+     * 관심사 전체를 반환한다. 구독 해제는 {@code subscriptions} 행이 물리적으로 사라진
+     * 상태로 보므로, 구독 행이 없는 관심사는 자연스럽게 결과에서 제외된다.</p>
+     *
+     * <p>요청 사용자 자체가 논리삭제된 경우에는 활동내역을 보여주지 않기 위해 결과를
+     * 반환하지 않는다. 관심사별 구독자 수 역시 논리삭제되지 않은 사용자들의 구독만
+     * 집계한다.</p>
+     *
+     * @param userId 활동내역을 조회할 사용자 id
+     * @return 사용자가 현재 구독 중인 관심사 목록
+     */
     @Query("""
         SELECT new com.codeit.sb13.monew.interest.repository.dto.SubscribedInterestActivityProjection(
-            S.id,
-            I,
-            (SELECT COUNT(S2) 
-             FROM Subscribe S2 
-             JOIN User U2 ON S2.userId = U2.id 
-             JOIN S2.interest I2
-             WHERE I2.id = I.id 
-                 AND U2.deletedAt IS NULL)
+            s.id,
+            s.createdAt,
+            i,
+            (SELECT COUNT(s2)
+             FROM Subscribe s2
+             JOIN User u2 ON s2.userId = u2.id
+             JOIN s2.interest i2
+             WHERE i2.id = i.id
+                 AND u2.deletedAt IS NULL)
             )
-        FROM Subscribe S
-        JOIN S.interest I 
-        JOIN User U ON U.id = S.userId
-        WHERE S.userId = :userId
-            AND U.deletedAt IS NULL 
+        FROM Subscribe s
+        JOIN s.interest i
+        JOIN User u ON u.id = s.userId
+        WHERE s.userId = :userId
+            AND u.deletedAt IS NULL
     """)
     List<SubscribedInterestActivityProjection> findSubscribedInterestActivities(@Param("userId") UUID userId);
 }
