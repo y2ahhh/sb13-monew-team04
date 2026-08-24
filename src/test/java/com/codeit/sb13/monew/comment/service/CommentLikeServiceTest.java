@@ -275,11 +275,15 @@ public class CommentLikeServiceTest {
         .likedBy(likedBy)
         .build();
 
+    given(commentRepository.findByIdAndDeletedAtIsNull(comment.getId()))
+        .willReturn(Optional.of(comment));
+    given(userRepository.findById(likedBy.getId()))
+        .willReturn(Optional.of(likedBy));
     given(commentLikeRepository.findByCommentAndLikedBy(comment.getId(), likedBy.getId()))
         .willReturn(Optional.of(commentLike));
 
     // when
-    commentLikeService.unlikeComment(comment.getId(), likedBy.getId());
+    commentLikeService.unlikeComment(command);
 
     // then
     then(commentLikeRepository).should(times(1)).delete(commentLike);
