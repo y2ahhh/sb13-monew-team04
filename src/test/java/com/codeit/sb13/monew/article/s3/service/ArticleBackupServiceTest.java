@@ -100,6 +100,26 @@ class ArticleBackupServiceTest {
     }
 
     @Test
+    @DisplayName("저장 충돌 결과는 skip 로그와 분리해 경고 로그를 남긴다")
+    void logsConflictResultSeparately(CapturedOutput output) {
+        when(articleService.findArticleBackupItemsByDateRange(BACKUP_DATE, BACKUP_DATE.plusDays(1)))
+                .thenReturn(List.of());
+        when(converter.serialize(any(ArticleBackupFile.class))).thenReturn(CONTENT);
+        when(storage.saveIfAbsent(any(StorageCommand.class))).thenReturn(StorageSaveResult.CONFLICT);
+
+        StorageSaveResult result = service.backupArticlesByDate(BACKUP_DATE);
+
+        assertThat(result).isEqualTo(StorageSaveResult.CONFLICT);
+        assertThat(output)
+                .contains(
+                        "기사 백업 저장 중 조건부 충돌이 발생했습니다.",
+                        "backupDate=2026-08-23",
+                        "result=CONFLICT"
+                )
+                .doesNotContain("기사 백업 파일이 이미 존재하여 저장을 건너뜁니다.");
+    }
+
+    @Test
     @DisplayName("백업 기준일이 없으면 백업 날짜 검증 예외가 발생한다")
     void failsWhenBackupDateIsNull() {
         assertThatThrownBy(() -> service.backupArticlesByDate(null))

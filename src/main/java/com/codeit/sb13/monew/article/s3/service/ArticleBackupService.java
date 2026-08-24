@@ -57,6 +57,11 @@ public class ArticleBackupService {
             return;
         }
 
-        log.info("기사 백업 파일이 이미 존재하여 저장을 건너뜁니다. backupDate={}, result={}", backupDate, result);
+        if (result == StorageSaveResult.ALREADY_EXISTS) {
+            log.info("기사 백업 파일이 이미 존재하여 저장을 건너뜁니다. backupDate={}, result={}", backupDate, result);
+            return;
+        }
+
+        log.warn("기사 백업 저장 중 조건부 충돌이 발생했습니다. backupDate={}, result={}", backupDate, result);
     }
 }
