@@ -12,9 +12,11 @@ import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.comment.service.dto.CommentRegisterCommand;
 import com.codeit.sb13.monew.comment.service.impl.CommentServiceImpl;
+import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
 import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.repository.UserRepository;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
@@ -24,7 +26,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.testcontainers.shaded.org.checkerframework.checker.units.qual.C;
 
 @DisplayName("댓글 서비스 - TDD")
 @ExtendWith(MockitoExtension.class)
@@ -84,5 +89,60 @@ public class CommentServiceTest {
         () -> assertThat(result.likeCount()).isEqualTo(0L),
         () -> assertThat(result.likedByMe()).isEqualTo(false)
     );
+  }
+
+  @Test
+  @DisplayName("생성일 기준 내림차순으로 댓글 목록 조회 - RED")
+  void 생성일_내림차순_기준_댓글_목록_조회() {
+    // given
+    UUID articleId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
+
+    CommentSearchCommand command=new CommentSearchCommand(articleId, CommentOrderBy.CREATED_AT,
+        Direction.DESC, null, null, 50, requestUserId);
+
+    given(commentRepository.search(any(CommentSearchCondition.class))).willReturn(List.of());
+
+    // when
+    CursorPageResponseDto<CommentDto> result = commentService.search(command);
+
+    // then
+    then(commentRepository).should(times(1)).search(argThat(condition -> condition.articleId().equals(articleId)
+        && condition.orderBy().equals(CommentOrderBy.CREATED_AT)
+        && condition.direction().equals(Direction.DESC)
+        && condition.cursor() == null
+        && condition.after() == null
+        && condition.limit() == 50
+        && condition.requestUserId().equals(requestUserId)));
+
+    assertThat(result).isNotNull();
+  }
+
+
+  @Test
+  @DisplayName("생성일 기준 오름차순으로 댓글 목록 조회 - RED")
+  void 생성일_오름차순_기준_댓글_목록_조회() {
+    // given
+    UUID articleId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
+
+    CommentSearchCommand command=new CommentSearchCommand(articleId, CommentOrderBy.CREATED_AT,
+        Direction.ASC, null, null, 50, requestUserId);
+
+    given(commentRepository.search(any(CommentSearchCondition.class))).willReturn(List.of());
+
+    // when
+    CursorPageResponseDto<CommentDto> result = commentService.search(command);
+
+    // then
+    then(commentRepository).should(times(1)).search(argThat(condition -> condition.articleId().equals(articleId)
+        && condition.orderBy().equals(CommentOrderBy.CREATED_AT)
+        && condition.direction().equals(Direction.ASC)
+        && condition.cursor() == null
+        && condition.after() == null
+        && condition.limit() == 50
+        && condition.requestUserId().equals(requestUserId)));
+
+    assertThat(result).isNotNull();
   }
 }
