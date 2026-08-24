@@ -22,5 +22,15 @@ public interface SubscribeRepository extends JpaRepository<Subscribe, UUID> {
      */
     void deleteByInterest_Id(UUID interestId);
 
+
     void deleteByUserId(UUID userId);
+
+    /**
+     * 특정 관심사를 구독 중인 사용자 수를 센다.
+     *
+     * @param interestId 구독자 수를 셀 관심사의 id
+     * @return 해당 관심사를 구독 중인 사용자 수
+     */
+    long countByInterest_Id(UUID interestId);
+
 }

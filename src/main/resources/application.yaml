@@ -35,6 +35,13 @@ monew:
         base-url: https://www.chosun.com/arc/outboundfeeds/rss
       yonhap:
         base-url: https://www.yonhapnewstv.co.kr
+  s3:
+    bucket: ${MONEW_ARTICLE_BACKUP_S3_BUCKET}
+    region: ${MONEW_AWS_REGION}
+    endpoint: ${MONEW_AWS_ENDPOINT}
+    prefix: ${MONEW_ARTICLE_BACKUP_S3_PREFIX}
+    enabled: ${MONEW_ARTICLE_BACKUP_ENABLED}
+    cron: ${MONEW_ARTICLE_BACKUP_CRON}
 
   openapi:
     server-url: http://localhost:${server.port:8080}

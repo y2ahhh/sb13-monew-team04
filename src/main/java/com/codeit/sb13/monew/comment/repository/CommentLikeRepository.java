@@ -1,8 +1,12 @@
 package com.codeit.sb13.monew.comment.repository;
 
 import com.codeit.sb13.monew.comment.domain.CommentLike;
+
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import com.codeit.sb13.monew.comment.repository.dto.RecentCommentLikeActivityProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,7 +27,42 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> 
   """)
   Optional<CommentLike> findByCommentAndLikedBy(@Param("commentId") UUID commentId, @Param("likedById") UUID likedById);
 
+
   void deleteByComment_User_Id(UUID userId);
   void deleteByLikedBy_Id(UUID userId);
+
+
+  @Query("""
+    SELECT new com.codeit.sb13.monew.comment.repository.dto.RecentCommentLikeActivityProjection(
+        CL.id,
+        CL.createdAt,
+        C.id,
+        A.id,
+        A.title,
+        U.id,
+        U.nickname,
+        C.content,
+         (SELECT COUNT(CL2)
+          FROM CommentLike CL2
+          JOIN CL2.comment C2
+          JOIN CL2.likedBy LB2
+          WHERE C2.id = C.id
+              AND LB2.deletedAt IS NULL),
+          C.createdAt
+        )
+    FROM CommentLike CL
+    JOIN CL.comment C
+    JOIN CL.likedBy LB
+    JOIN C.user U
+    JOIN C.article A
+    WHERE LB.id = :userId
+        AND LB.deletedAt IS NULL
+        AND U.deletedAt IS NULL
+        AND A.deletedAt IS NULL
+        AND C.deletedAt IS NULL
+    ORDER BY CL.createdAt DESC, CL.id DESC
+    LIMIT 10
+    """)
+  List<RecentCommentLikeActivityProjection> findRecentCommentLikeActivity(@Param("userId") UUID userId);
 
 }
