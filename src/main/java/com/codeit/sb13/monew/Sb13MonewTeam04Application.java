@@ -6,7 +6,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableScheduling
 @SpringBootApplication
-@EnableScheduling
 public class Sb13MonewTeam04Application {
 
     public static void main(String[] args) {
