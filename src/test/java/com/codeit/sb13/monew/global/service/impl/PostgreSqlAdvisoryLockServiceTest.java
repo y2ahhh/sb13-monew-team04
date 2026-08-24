@@ -132,6 +132,24 @@ class PostgreSqlAdvisoryLockServiceTest {
     }
 
     @Test
+    @DisplayName("락 획득 결과가 비어 있으면 락 커스텀 예외로 처리한다")
+    void wrapsEmptyTryLockResult() throws Exception {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(TRY_LOCK_SQL)).thenReturn(tryLockStatement);
+        when(tryLockStatement.executeQuery()).thenReturn(tryLockResultSet);
+        when(tryLockResultSet.next()).thenReturn(false);
+
+        assertThatThrownBy(() -> service.executeWithLock(LOCK_KEY, () -> {
+        })).isInstanceOfSatisfying(ArticleAdvisoryLockException.class, e -> {
+            assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_ADVISORY_LOCK_FAILED);
+            assertThat(e.getCause()).isNull();
+            assertThat(e.getDetails())
+                    .containsEntry("lockKey", LOCK_KEY)
+                    .containsEntry("operation", "tryLockEmptyResult");
+        });
+    }
+
+    @Test
     @DisplayName("락 해제 SQL 실패는 락 커스텀 예외로 감싼다")
     void wrapsUnlockFailure() throws Exception {
         SQLException cause = new SQLException("unlock failure");
@@ -149,6 +167,48 @@ class PostgreSqlAdvisoryLockServiceTest {
         });
     }
 
+    @Test
+    @DisplayName("작업 예외와 락 해제가 모두 실패하면 원래 작업 예외에 락 해제 예외를 보관한다")
+    void addsUnlockFailureAsSuppressedWhenTaskFails() throws Exception {
+        SQLException unlockFailure = new SQLException("unlock failure");
+        RuntimeException taskFailure = new RuntimeException("task failure");
+        givenTryLockResult(true);
+        givenUnlockFailure(unlockFailure);
+
+        assertThatThrownBy(() -> service.executeWithLock(LOCK_KEY, () -> {
+            throw taskFailure;
+        })).isSameAs(taskFailure)
+                .satisfies(e -> assertThat(e.getSuppressed())
+                        .singleElement()
+                        .isInstanceOfSatisfying(ArticleAdvisoryLockException.class, suppressed -> {
+                            assertThat(suppressed.getCause()).isSameAs(unlockFailure);
+                            assertThat(suppressed.getDetails())
+                                    .containsEntry("lockKey", LOCK_KEY)
+                                    .containsEntry("operation", "unlock");
+                        }));
+    }
+
+    @Test
+    @DisplayName("작업 Error와 락 해제가 모두 실패하면 원래 Error에 락 해제 예외를 보관한다")
+    void addsUnlockFailureAsSuppressedWhenTaskThrowsError() throws Exception {
+        SQLException unlockFailure = new SQLException("unlock failure");
+        AssertionError taskFailure = new AssertionError("task error");
+        givenTryLockResult(true);
+        givenUnlockFailure(unlockFailure);
+
+        assertThatThrownBy(() -> service.executeWithLock(LOCK_KEY, () -> {
+            throw taskFailure;
+        })).isSameAs(taskFailure)
+                .satisfies(e -> assertThat(e.getSuppressed())
+                        .singleElement()
+                        .isInstanceOfSatisfying(ArticleAdvisoryLockException.class, suppressed -> {
+                            assertThat(suppressed.getCause()).isSameAs(unlockFailure);
+                            assertThat(suppressed.getDetails())
+                                    .containsEntry("lockKey", LOCK_KEY)
+                                    .containsEntry("operation", "unlock");
+                        }));
+    }
+
     private void givenTryLockResult(boolean locked) throws Exception {
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(TRY_LOCK_SQL)).thenReturn(tryLockStatement);
@@ -159,6 +219,11 @@ class PostgreSqlAdvisoryLockServiceTest {
 
     private void givenUnlockStatement() throws Exception {
         when(connection.prepareStatement(UNLOCK_SQL)).thenReturn(unlockStatement);
+    }
+
+    private void givenUnlockFailure(SQLException cause) throws Exception {
+        when(connection.prepareStatement(UNLOCK_SQL)).thenReturn(unlockStatement);
+        when(unlockStatement.executeQuery()).thenThrow(cause);
     }
 
 }
