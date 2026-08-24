@@ -115,6 +115,13 @@ public class UserServiceImpl implements UserService {
     }
   }
 
+  @Override
+  @Transactional
+  public void hardDeleteUser(UUID userId) {
+    userRepository.findById(userId)
+        .orElseThrow(() -> new UserNotFoundException(userId));
+  }
+
   private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
     String message = e.getMostSpecificCause().getMessage();
     return message != null && message.contains("uk_users_email");

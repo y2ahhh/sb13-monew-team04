@@ -93,5 +93,10 @@ public class UserController {
     return ResponseEntity.status(HttpStatus.OK).build();
   }
 
+  @DeleteMapping("/{userId}/hard")
+  public ResponseEntity<Void> hardDeleteUser(@PathVariable("userId") UUID userId) {
+    return null;
+  }
+
 
 }

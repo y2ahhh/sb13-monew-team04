@@ -409,5 +409,20 @@ public class UserServiceImplTest {
         .isInstanceOf(AlreadyDeletedUserException.class);
   }
 
+  @Test
+  @DisplayName("존재하지 않는 userId로 물리 삭제 요청시 예외를 터트린다.")
+  void 존재하지_않는_userId로_물리삭제_요청_시_예외를_던진다() {
+    // given
+    UUID userId = UUID.randomUUID();
+    when(userRepository.findById(userId))
+        .thenReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.hardDeleteUser(userId))
+        .isInstanceOf(UserNotFoundException.class);
+
+
+  }
+
 
 }
