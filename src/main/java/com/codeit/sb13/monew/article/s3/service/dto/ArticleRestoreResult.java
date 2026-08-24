@@ -22,7 +22,7 @@ public record ArticleRestoreResult(
     }
 
     public static ArticleRestoreResult of(LocalDate restoreDate, List<UUID> restoredArticleIds) {
-        return new ArticleRestoreResult(restoreDate, restoredArticleIds, restoredArticleIds.size());
+        return new ArticleRestoreResult(restoreDate, restoredArticleIds, 0L);
     }
 
     public static ArticleRestoreResult empty(LocalDate restoreDate) {

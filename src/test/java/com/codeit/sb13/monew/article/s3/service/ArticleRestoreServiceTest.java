@@ -191,6 +191,14 @@ class ArticleRestoreServiceTest {
                             .containsEntry("to", RESTORE_DATE);
                 });
 
+        assertThatThrownBy(() -> service.restoreArticles(RESTORE_DATE, null))
+                .isInstanceOfSatisfying(ArticleRestoreDateInvalidException.class, e -> {
+                    assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_RESTORE_DATE_INVALID);
+                    assertThat(e.getDetails())
+                            .containsEntry("from", RESTORE_DATE)
+                            .containsEntry("to", null);
+                });
+
         assertThatThrownBy(() -> service.restoreArticles(NEXT_DATE, RESTORE_DATE))
                 .isInstanceOfSatisfying(ArticleRestoreDateInvalidException.class, e -> {
                     assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.ARTICLE_RESTORE_DATE_INVALID);
@@ -198,6 +206,7 @@ class ArticleRestoreServiceTest {
                             .containsEntry("from", NEXT_DATE)
                             .containsEntry("to", RESTORE_DATE);
                 });
+        verifyNoInteractions(storage, converter, commandService);
     }
 
     @Test
