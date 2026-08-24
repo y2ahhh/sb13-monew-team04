@@ -20,6 +20,7 @@ import java.util.UUID;
 public class ArticleRestoreCommandService {
 
     private final ArticleRepository articleRepository;
+    private final ArticleRestoreSaveService articleRestoreSaveService;
 
     @Transactional
     public ArticleRestoreResult restore(LocalDate restoreDate, List<ArticleBackupItem> items) {
@@ -46,7 +47,7 @@ public class ArticleRestoreCommandService {
         );
 
         try {
-            Article savedArticle = articleRepository.saveAndFlush(article);
+            Article savedArticle = articleRestoreSaveService.save(article);
             return Optional.of(savedArticle.getId());
         } catch (DataIntegrityViolationException e) {
             if (articleRepository.findByLink(item.link()).isPresent()) {

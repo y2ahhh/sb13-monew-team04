@@ -43,11 +43,14 @@ class ArticleRestoreCommandServiceTest {
     @Mock
     private ArticleRepository articleRepository;
 
+    @Mock
+    private ArticleRestoreSaveService articleRestoreSaveService;
+
     private ArticleRestoreCommandService commandService;
 
     @BeforeEach
     void setUp() {
-        commandService = new ArticleRestoreCommandService(articleRepository);
+        commandService = new ArticleRestoreCommandService(articleRepository, articleRestoreSaveService);
     }
 
     @Test
@@ -63,7 +66,7 @@ class ArticleRestoreCommandServiceTest {
     void restoresNewArticleWhenLinkDoesNotExist() {
         ArticleBackupItem item = backupItem();
         when(articleRepository.findByLink(item.link())).thenReturn(Optional.empty());
-        when(articleRepository.saveAndFlush(any(Article.class))).thenAnswer(invocation -> {
+        when(articleRestoreSaveService.save(any(Article.class))).thenAnswer(invocation -> {
             Article article = invocation.getArgument(0);
             ReflectionTestUtils.setField(article, "id", RESTORED_ARTICLE_ID);
             return article;
@@ -76,7 +79,7 @@ class ArticleRestoreCommandServiceTest {
         assertThat(result.restoredArticleCount()).isEqualTo(1L);
 
         ArgumentCaptor<Article> articleCaptor = ArgumentCaptor.forClass(Article.class);
-        verify(articleRepository).saveAndFlush(articleCaptor.capture());
+        verify(articleRestoreSaveService).save(articleCaptor.capture());
         Article restoredArticle = articleCaptor.getValue();
         assertThat(restoredArticle.getLink()).isEqualTo(item.link());
         assertThat(restoredArticle.getTitle()).isEqualTo(item.title());
@@ -95,7 +98,7 @@ class ArticleRestoreCommandServiceTest {
 
         assertThat(result.restoredArticleIds()).isEmpty();
         assertThat(result.restoredArticleCount()).isZero();
-        verify(articleRepository, never()).saveAndFlush(any(Article.class));
+        verify(articleRestoreSaveService, never()).save(any(Article.class));
     }
 
     @Test
@@ -110,7 +113,7 @@ class ArticleRestoreCommandServiceTest {
 
         assertThat(result.restoredArticleIds()).isEmpty();
         assertThat(result.restoredArticleCount()).isZero();
-        verify(articleRepository, never()).saveAndFlush(any(Article.class));
+        verify(articleRestoreSaveService, never()).save(any(Article.class));
     }
 
     @Test
@@ -121,7 +124,7 @@ class ArticleRestoreCommandServiceTest {
         when(articleRepository.findByLink(item.link()))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(existingArticle(item.link())));
-        when(articleRepository.saveAndFlush(any(Article.class))).thenThrow(cause);
+        when(articleRestoreSaveService.save(any(Article.class))).thenThrow(cause);
 
         ArticleRestoreResult result = commandService.restore(RESTORE_DATE, List.of(item));
 
@@ -137,7 +140,7 @@ class ArticleRestoreCommandServiceTest {
         when(articleRepository.findByLink(item.link()))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.empty());
-        when(articleRepository.saveAndFlush(any(Article.class))).thenThrow(cause);
+        when(articleRestoreSaveService.save(any(Article.class))).thenThrow(cause);
 
         assertThatThrownBy(() -> commandService.restore(RESTORE_DATE, List.of(item)))
                 .isInstanceOfSatisfying(ArticleRestoreFailedException.class, e -> {

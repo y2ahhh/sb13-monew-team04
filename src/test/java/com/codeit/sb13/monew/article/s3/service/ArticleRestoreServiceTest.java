@@ -74,6 +74,35 @@ class ArticleRestoreServiceTest {
     }
 
     @Test
+    @DisplayName("LocalDate.MAX 단일 날짜도 오버플로 없이 복구 대상으로 처리한다")
+    void restoresSingleMaxDateWithoutOverflow() {
+        when(storage.find(new StorageSearchCommand(LocalDate.MAX))).thenReturn(Optional.empty());
+
+        List<ArticleRestoreResult> results = service.restoreArticles(LocalDate.MAX, LocalDate.MAX);
+
+        assertThat(results)
+                .extracting(ArticleRestoreResult::restoreDate)
+                .containsExactly(LocalDate.MAX);
+        verify(storage).find(new StorageSearchCommand(LocalDate.MAX));
+    }
+
+    @Test
+    @DisplayName("LocalDate.MAX로 끝나는 날짜 범위도 순서대로 복구 대상으로 처리한다")
+    void restoresRangeEndingAtMaxDateWithoutOverflow() {
+        LocalDate maxPreviousDate = LocalDate.MAX.minusDays(1);
+        when(storage.find(new StorageSearchCommand(maxPreviousDate))).thenReturn(Optional.empty());
+        when(storage.find(new StorageSearchCommand(LocalDate.MAX))).thenReturn(Optional.empty());
+
+        List<ArticleRestoreResult> results = service.restoreArticles(maxPreviousDate, LocalDate.MAX);
+
+        assertThat(results)
+                .extracting(ArticleRestoreResult::restoreDate)
+                .containsExactly(maxPreviousDate, LocalDate.MAX);
+        verify(storage).find(new StorageSearchCommand(maxPreviousDate));
+        verify(storage).find(new StorageSearchCommand(LocalDate.MAX));
+    }
+
+    @Test
     @DisplayName("백업 파일이 없는 날짜는 0건 결과로 처리한다")
     void returnsEmptyResultWhenBackupFileIsMissing() {
         when(storage.find(new StorageSearchCommand(RESTORE_DATE))).thenReturn(Optional.empty());

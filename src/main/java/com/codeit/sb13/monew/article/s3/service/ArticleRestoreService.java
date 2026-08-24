@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +26,7 @@ public class ArticleRestoreService {
     public List<ArticleRestoreResult> restoreArticles(LocalDate fromInclusive, LocalDate toInclusive) {
         validateDateRange(fromInclusive, toInclusive);
 
-        return fromInclusive.datesUntil(toInclusive.plusDays(1))
+        return Stream.concat(fromInclusive.datesUntil(toInclusive), Stream.of(toInclusive))
                 .map(this::restoreDate)
                 .toList();
     }
