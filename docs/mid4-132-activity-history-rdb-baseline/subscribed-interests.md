@@ -115,15 +115,15 @@ WHERE k1_0.interest_id = ANY (ARRAY[
 
 | Scale | 조회 | EXPLAIN Execution Time | 반복 실행 시간 5회 | Median |
 | --- | --- | ---: | --- | ---: |
-| `100k` | 구독 중인 관심사 main | `5.684 ms` | `3.969`, `4.629`, `4.421`, `4.624`, `3.963 ms` | `4.421 ms` |
-| `100k` | 구독 관심사 keywords | `0.099 ms` | `0.562`, `0.467`, `0.708`, `0.640`, `0.399 ms` | `0.562 ms` |
-| `100k` | 구독 중인 관심사 total | `-` | `4.423`, `5.391`, `4.600`, `4.491`, `4.812 ms` | `4.600 ms` |
-| `1m` | 구독 중인 관심사 main | `3.736 ms` | `6.720`, `4.189`, `4.807`, `4.521`, `6.445 ms` | `4.807 ms` |
-| `1m` | 구독 관심사 keywords | `0.160 ms` | `0.715`, `0.507`, `0.922`, `0.907`, `0.606 ms` | `0.715 ms` |
-| `1m` | 구독 중인 관심사 total | `-` | `6.709`, `5.781`, `6.371`, `5.779`, `8.755 ms` | `6.371 ms` |
-| `10m` | 구독 중인 관심사 main | `10.751 ms` | `12.189`, `10.978`, `11.564`, `10.824`, `10.946 ms` | `10.978 ms` |
-| `10m` | 구독 관심사 keywords | `0.054 ms` | `0.590`, `0.570`, `1.003`, `0.605`, `0.859 ms` | `0.605 ms` |
-| `10m` | 구독 중인 관심사 total | `-` | `13.093`, `11.224`, `11.573`, `11.310`, `11.226 ms` | `11.310 ms` |
+| `100k` | 구독 중인 관심사 main | `5.517 ms` | `3.951`, `3.803`, `4.980`, `4.414`, `4.327 ms` | `4.327 ms` |
+| `100k` | 구독 관심사 keywords | `0.099 ms` | `0.538`, `0.449`, `0.446`, `0.450`, `0.517 ms` | `0.450 ms` |
+| `100k` | 구독 중인 관심사 total | `-` | `4.472`, `4.481`, `4.332`, `4.380`, `5.195 ms` | `4.472 ms` |
+| `1m` | 구독 중인 관심사 main | `2.666 ms` | `2.961`, `2.884`, `2.772`, `2.762`, `2.634 ms` | `2.772 ms` |
+| `1m` | 구독 관심사 keywords | `0.047 ms` | `0.451`, `0.464`, `0.572`, `0.585`, `0.292 ms` | `0.464 ms` |
+| `1m` | 구독 중인 관심사 total | `-` | `4.708`, `4.280`, `3.549`, `3.453`, `3.331 ms` | `3.549 ms` |
+| `10m` | 구독 중인 관심사 main | `10.052 ms` | `11.051`, `10.541`, `10.535`, `10.878`, `10.810 ms` | `10.810 ms` |
+| `10m` | 구독 관심사 keywords | `0.050 ms` | `0.517`, `0.391`, `0.496`, `0.596`, `0.486 ms` | `0.496 ms` |
+| `10m` | 구독 중인 관심사 total | `-` | `11.635`, `11.394`, `12.454`, `14.413`, `11.481 ms` | `11.635 ms` |
 
 ## EXPLAIN 실행계획 요약
 
@@ -158,7 +158,7 @@ WHERE k1_0.interest_id = ANY (ARRAY[
 - `ORDER BY s1_0.created_at DESC, s1_0.id DESC`는 worker별 `Sort`와 `Gather Merge`로 처리했다.
 - 관심사별 구독자 수 subquery는 `uk_subscriptions_interest_user`를 `interest_id = ...` 조건으로 사용했다.
 - keywords query는 `uk_keywords_interest_keyword`를 `interest_id = any (...)` 조건으로 사용했다.
-- 요청 1건 기준 total median은 `11.310 ms`다. 현재 scale에서는 다른 최근 활동 조회보다 낮지만, main query가 전체 subscriptions를 훑는 구조라 데이터 증가 시 병목 후보로 남는다.
+- 요청 1건 기준 total median은 `11.635 ms`다. 현재 scale에서는 다른 최근 활동 조회보다 낮지만, main query가 전체 subscriptions를 훑는 구조라 데이터 증가 시 병목 후보로 남는다.
 
 ## EXPLAIN 실행계획 주요 원문
 
@@ -170,48 +170,68 @@ WHERE k1_0.interest_id = ANY (ARRAY[
 main query:
 
 ```text
-Sort  (cost=3568.96..3569.09 rows=50 width=76) (actual time=5.643..5.646 rows=50 loops=1)
+Sort  (cost=3568.96..3569.09 rows=50 width=76) (actual time=5.482..5.484 rows=50 loops=1)
   Sort Key: s1_0.created_at DESC, s1_0.id DESC
   Sort Method: quicksort  Memory: 30kB
-  Buffers: shared hit=1607
-  ->  Nested Loop  (cost=111.96..3567.55 rows=50 width=76) (actual time=0.446..5.610 rows=50 loops=1)
-        ->  Index Scan using pk_users on users u1_0
+  Buffers: shared hit=1609
+  ->  Nested Loop  (cost=116.96..3567.55 rows=50 width=76) (actual time=0.328..5.467 rows=50 loops=1)
+        Buffers: shared hit=1609
+        ->  Index Scan using pk_users on users u1_0  (cost=0.28..8.29 rows=1 width=16) (actual time=0.005..0.005 rows=1 loops=1)
               Index Cond: (id = '00000001-0000-4000-8000-000000000001'::uuid)
               Filter: (deleted_at IS NULL)
-        ->  Hash Join
+              Buffers: shared hit=3
+        ->  Hash Join  (cost=116.69..128.01 rows=50 width=84) (actual time=0.182..0.236 rows=50 loops=1)
               Hash Cond: (i1_0.id = s1_0.interest_id)
-              ->  Seq Scan on interests i1_0
-              ->  Hash
-                    ->  Seq Scan on subscriptions s1_0
+              Buffers: shared hit=58
+              ->  Seq Scan on interests i1_0  (cost=0.00..10.00 rows=500 width=44) (actual time=0.002..0.024 rows=500 loops=1)
+                    Buffers: shared hit=5
+              ->  Hash  (cost=116.06..116.06 rows=50 width=56) (actual time=0.175..0.175 rows=50 loops=1)
+                    Buckets: 1024  Batches: 1  Memory Usage: 13kB
+                    Buffers: shared hit=53
+                    ->  Seq Scan on subscriptions s1_0  (cost=0.00..116.06 rows=50 width=56) (actual time=0.002..0.170 rows=50 loops=1)
                           Filter: (user_id = '00000001-0000-4000-8000-000000000001'::uuid)
                           Rows Removed by Filter: 4995
+                          Buffers: shared hit=53
   SubPlan 1
-    ->  Aggregate  (cost=67.94..67.95 rows=1 width=8) (actual time=0.104..0.104 rows=1 loops=50)
-          Buffers: shared hit=1546
-          ->  Nested Loop
-                ->  Index Only Scan using pk_interests on interests i2_0
-                ->  Hash Join
+    ->  Aggregate  (cost=68.60..68.61 rows=1 width=8) (actual time=0.104..0.104 rows=1 loops=50)
+          Buffers: shared hit=1548
+          ->  Nested Loop  (cost=31.85..68.58 rows=10 width=16) (actual time=0.008..0.103 rows=11 loops=50)
+                Buffers: shared hit=1548
+                ->  Index Only Scan using pk_interests on interests i2_0  (cost=0.27..8.29 rows=1 width=16) (actual time=0.001..0.001 rows=1 loops=50)
+                      Index Cond: (id = i1_0.id)
+                      Heap Fetches: 50
+                      Buffers: shared hit=150
+                ->  Hash Join  (cost=31.58..60.19 rows=10 width=32) (actual time=0.007..0.101 rows=11 loops=50)
                       Hash Cond: (u2_0.id = s2_0.user_id)
-                      ->  Seq Scan on users u2_0
+                      Buffers: shared hit=1398
+                      ->  Seq Scan on users u2_0  (cost=0.00..26.00 rows=990 width=16) (actual time=0.001..0.054 rows=990 loops=50)
                             Filter: (deleted_at IS NULL)
                             Rows Removed by Filter: 10
-                      ->  Hash
-                            ->  Bitmap Heap Scan on subscriptions s2_0
+                            Buffers: shared hit=800
+                      ->  Hash  (cost=31.45..31.45 rows=10 width=48) (actual time=0.005..0.005 rows=11 loops=50)
+                            Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                            Buffers: shared hit=598
+                            ->  Bitmap Heap Scan on subscriptions s2_0  (cost=4.36..31.45 rows=10 width=48) (actual time=0.002..0.004 rows=11 loops=50)
                                   Recheck Cond: (interest_id = i1_0.id)
-                                  ->  Bitmap Index Scan on uk_subscriptions_interest_user
+                                  Heap Blocks: exact=498
+                                  Buffers: shared hit=598
+                                  ->  Bitmap Index Scan on uk_subscriptions_interest_user  (cost=0.00..4.36 rows=10 width=0) (actual time=0.001..0.001 rows=11 loops=50)
                                         Index Cond: (interest_id = i1_0.id)
-Planning Time: 0.790 ms
-Execution Time: 5.684 ms
+                                        Buffers: shared hit=100
+Planning:
+  Buffers: shared hit=18
+Planning Time: 0.213 ms
+Execution Time: 5.517 ms
 ```
 
 keywords query:
 
 ```text
-Seq Scan on keywords k1_0  (cost=0.12..37.62 rows=150 width=45) (actual time=0.008..0.081 rows=150 loops=1)
+Seq Scan on keywords k1_0  (cost=0.12..37.62 rows=150 width=45) (actual time=0.005..0.090 rows=150 loops=1)
   Filter: (interest_id = ANY ('{00000002-0000-4000-8000-000000000001,...,00000002-0000-4000-8000-000000000032}'::uuid[]))
   Rows Removed by Filter: 1350
   Buffers: shared hit=15
-Planning Time: 0.541 ms
+Planning Time: 0.070 ms
 Execution Time: 0.099 ms
 ```
 
@@ -223,49 +243,69 @@ Execution Time: 0.099 ms
 main query:
 
 ```text
-Sort  (cost=7657.67..7657.80 rows=50 width=77) (actual time=3.666..3.673 rows=50 loops=1)
+Sort  (cost=6122.16..6122.25 rows=38 width=77) (actual time=2.635..2.638 rows=50 loops=1)
   Sort Key: s1_0.created_at DESC, s1_0.id DESC
   Sort Method: quicksort  Memory: 30kB
-  Buffers: shared hit=2950
-  ->  Nested Loop  (cost=1094.66..7656.26 rows=50 width=77) (actual time=2.579..3.626 rows=50 loops=1)
-        ->  Index Scan using pk_users on users u1_0
+  Buffers: shared hit=2999
+  ->  Nested Loop  (cost=1142.32..6121.16 rows=38 width=77) (actual time=1.459..2.622 rows=50 loops=1)
+        Buffers: shared hit=2999
+        ->  Index Scan using pk_users on users u1_0  (cost=0.29..8.30 rows=1 width=16) (actual time=0.004..0.005 rows=1 loops=1)
               Index Cond: (id = '00000001-0000-4000-8000-000000000001'::uuid)
               Filter: (deleted_at IS NULL)
-        ->  Hash Join
+              Buffers: shared hit=3
+        ->  Hash Join  (cost=1142.04..1252.17 rows=38 width=85) (actual time=1.411..1.833 rows=50 loops=1)
               Hash Cond: (i1_0.id = s1_0.interest_id)
-              ->  Seq Scan on interests i1_0
-              ->  Hash
-                    ->  Seq Scan on subscriptions s1_0
+              Buffers: shared hit=563
+              ->  Seq Scan on interests i1_0  (cost=0.00..97.00 rows=5000 width=45) (actual time=0.001..0.213 rows=5000 loops=1)
+                    Buffers: shared hit=47
+              ->  Hash  (cost=1141.56..1141.56 rows=38 width=56) (actual time=1.406..1.406 rows=50 loops=1)
+                    Buckets: 1024  Batches: 1  Memory Usage: 13kB
+                    Buffers: shared hit=516
+                    ->  Seq Scan on subscriptions s1_0  (cost=0.00..1141.56 rows=38 width=56) (actual time=0.002..1.401 rows=50 loops=1)
                           Filter: (user_id = '00000001-0000-4000-8000-000000000001'::uuid)
                           Rows Removed by Filter: 49995
+                          Buffers: shared hit=516
   SubPlan 1
-    ->  Aggregate  (cost=127.68..127.69 rows=1 width=8) (actual time=0.015..0.015 rows=1 loops=50)
-          Buffers: shared hit=2431
-          ->  Nested Loop
-                ->  Index Only Scan using pk_interests on interests i2_0
-                ->  Nested Loop
-                      ->  Bitmap Heap Scan on subscriptions s2_0
+    ->  Aggregate  (cost=127.89..127.90 rows=1 width=8) (actual time=0.015..0.015 rows=1 loops=50)
+          Buffers: shared hit=2433
+          ->  Nested Loop  (cost=5.06..127.87 rows=10 width=16) (actual time=0.004..0.015 rows=11 loops=50)
+                Buffers: shared hit=2433
+                ->  Index Only Scan using pk_interests on interests i2_0  (cost=0.28..8.30 rows=1 width=16) (actual time=0.001..0.001 rows=1 loops=50)
+                      Index Cond: (id = i1_0.id)
+                      Heap Fetches: 50
+                      Buffers: shared hit=150
+                ->  Nested Loop  (cost=4.78..119.47 rows=10 width=32) (actual time=0.003..0.013 rows=11 loops=50)
+                      Buffers: shared hit=2283
+                      ->  Bitmap Heap Scan on subscriptions s2_0  (cost=4.49..40.44 rows=10 width=48) (actual time=0.002..0.005 rows=11 loops=50)
                             Recheck Cond: (interest_id = i1_0.id)
-                            ->  Bitmap Index Scan on uk_subscriptions_interest_user
+                            Heap Blocks: exact=498
+                            Buffers: shared hit=648
+                            ->  Bitmap Index Scan on uk_subscriptions_interest_user  (cost=0.00..4.49 rows=10 width=0) (actual time=0.001..0.001 rows=11 loops=50)
                                   Index Cond: (interest_id = i1_0.id)
-                      ->  Index Scan using pk_users on users u2_0
+                                  Buffers: shared hit=150
+                      ->  Index Scan using pk_users on users u2_0  (cost=0.29..7.90 rows=1 width=16) (actual time=0.001..0.001 rows=1 loops=545)
                             Index Cond: (id = s2_0.user_id)
                             Filter: (deleted_at IS NULL)
-Planning Time: 0.764 ms
-Execution Time: 3.736 ms
+                            Rows Removed by Filter: 0
+                            Buffers: shared hit=1635
+Planning:
+  Buffers: shared hit=20
+Planning Time: 0.183 ms
+Execution Time: 2.666 ms
 ```
 
 keywords query:
 
 ```text
-Bitmap Heap Scan on keywords k1_0  (cost=183.54..332.68 rows=150 width=46) (actual time=0.083..0.119 rows=150 loops=1)
+Bitmap Heap Scan on keywords k1_0  (cost=183.54..332.68 rows=150 width=46) (actual time=0.025..0.035 rows=150 loops=1)
   Recheck Cond: (interest_id = ANY ('{00000002-0000-4000-8000-000000000001,...,00000002-0000-4000-8000-000000000032}'::uuid[]))
   Heap Blocks: exact=4
   Buffers: shared hit=104
-  ->  Bitmap Index Scan on uk_keywords_interest_keyword  (cost=0.00..183.38 rows=150 width=0) (actual time=0.071..0.071 rows=150 loops=1)
+  ->  Bitmap Index Scan on uk_keywords_interest_keyword  (cost=0.00..183.38 rows=150 width=0) (actual time=0.022..0.023 rows=150 loops=1)
         Index Cond: (interest_id = ANY ('{00000002-0000-4000-8000-000000000001,...,00000002-0000-4000-8000-000000000032}'::uuid[]))
-Planning Time: 0.395 ms
-Execution Time: 0.160 ms
+        Buffers: shared hit=100
+Planning Time: 0.071 ms
+Execution Time: 0.047 ms
 ```
 
 </details>
@@ -276,47 +316,70 @@ Execution Time: 0.160 ms
 main query:
 
 ```text
-Nested Loop  (cost=9062.17..22802.62 rows=100 width=78) (actual time=8.751..10.690 rows=50 loops=1)
-  Buffers: shared hit=3570 read=4282
-  ->  Index Scan using pk_users on users u1_0
-        Index Cond: (id = '00000001-0000-4000-8000-000000000001'::uuid)
-        Filter: (deleted_at IS NULL)
-  ->  Gather Merge  (cost=9061.75..9073.40 rows=100 width=86) (actual time=8.624..9.876 rows=50 loops=1)
+Nested Loop  (cost=8777.47..9472.10 rows=5 width=78) (actual time=8.779..9.997 rows=50 loops=1)
+  Buffers: shared hit=3544 read=4820
+  ->  Gather Merge  (cost=8777.05..8777.63 rows=5 width=86) (actual time=8.692..9.227 rows=50 loops=1)
         Workers Planned: 2
         Workers Launched: 2
-        ->  Sort
+        Buffers: shared hit=516 read=4820
+        ->  Sort  (cost=7777.03..7777.03 rows=2 width=86) (actual time=7.014..7.016 rows=17 loops=3)
               Sort Key: s1_0.created_at DESC, s1_0.id DESC
               Sort Method: quicksort  Memory: 30kB
+              Buffers: shared hit=516 read=4820
               Worker 0:  Sort Method: quicksort  Memory: 25kB
               Worker 1:  Sort Method: quicksort  Memory: 25kB
-              ->  Parallel Seq Scan on subscriptions s1_0
-                    Filter: (user_id = '00000001-0000-4000-8000-000000000001'::uuid)
-                    Rows Removed by Filter: 166665
+              ->  Nested Loop  (cost=0.29..7777.02 rows=2 width=86) (actual time=4.173..6.987 rows=17 loops=3)
+                    Buffers: shared hit=486 read=4820
+                    ->  Parallel Seq Scan on subscriptions s1_0  (cost=0.00..7760.40 rows=2 width=56) (actual time=4.169..6.972 rows=17 loops=3)
+                          Filter: (user_id = '00000001-0000-4000-8000-000000000001'::uuid)
+                          Rows Removed by Filter: 166665
+                          Buffers: shared hit=336 read=4820
+                    ->  Index Scan using pk_interests on interests i1_0  (cost=0.29..8.31 rows=1 width=46) (actual time=0.001..0.001 rows=1 loops=50)
+                          Index Cond: (id = s1_0.interest_id)
+                          Buffers: shared hit=150
+  ->  Materialize  (cost=0.42..8.44 rows=1 width=16) (actual time=0.000..0.000 rows=1 loops=50)
+        Buffers: shared hit=4
+        ->  Index Scan using pk_users on users u1_0  (cost=0.42..8.44 rows=1 width=16) (actual time=0.014..0.015 rows=1 loops=1)
+              Index Cond: (id = '00000001-0000-4000-8000-000000000001'::uuid)
+              Filter: (deleted_at IS NULL)
+              Buffers: shared hit=4
   SubPlan 1
-    ->  Aggregate  (actual time=0.014..0.015 rows=1 loops=50)
-          ->  Nested Loop
-                ->  Index Only Scan using pk_interests on interests i2_0
-                ->  Nested Loop
-                      ->  Index Scan using uk_subscriptions_interest_user on subscriptions s2_0
+    ->  Aggregate  (cost=137.18..137.19 rows=1 width=8) (actual time=0.014..0.014 rows=1 loops=50)
+          Buffers: shared hit=3024
+          ->  Nested Loop  (cost=1.13..137.16 rows=10 width=16) (actual time=0.003..0.014 rows=11 loops=50)
+                Buffers: shared hit=3024
+                ->  Index Only Scan using pk_interests on interests i2_0  (cost=0.29..8.31 rows=1 width=16) (actual time=0.001..0.001 rows=1 loops=50)
+                      Index Cond: (id = i1_0.id)
+                      Heap Fetches: 50
+                      Buffers: shared hit=150
+                ->  Nested Loop  (cost=0.84..128.75 rows=10 width=32) (actual time=0.002..0.012 rows=11 loops=50)
+                      Buffers: shared hit=2874
+                      ->  Index Scan using uk_subscriptions_interest_user on subscriptions s2_0  (cost=0.42..44.40 rows=10 width=48) (actual time=0.001..0.003 rows=11 loops=50)
                             Index Cond: (interest_id = i1_0.id)
-                      ->  Index Scan using pk_users on users u2_0
+                            Buffers: shared hit=694
+                      ->  Index Scan using pk_users on users u2_0  (cost=0.42..8.44 rows=1 width=16) (actual time=0.001..0.001 rows=1 loops=545)
                             Index Cond: (id = s2_0.user_id)
                             Filter: (deleted_at IS NULL)
-Planning Time: 0.788 ms
-Execution Time: 10.751 ms
+                            Rows Removed by Filter: 0
+                            Buffers: shared hit=2180
+Planning:
+  Buffers: shared hit=22
+Planning Time: 0.298 ms
+Execution Time: 10.052 ms
 ```
 
 keywords query:
 
 ```text
-Bitmap Heap Scan on keywords k1_0  (cost=218.29..655.53 rows=150 width=47) (actual time=0.023..0.037 rows=150 loops=1)
+Bitmap Heap Scan on keywords k1_0  (cost=218.29..655.53 rows=150 width=47) (actual time=0.029..0.038 rows=150 loops=1)
   Recheck Cond: (interest_id = ANY ('{00000002-0000-4000-8000-000000000001,...,00000002-0000-4000-8000-000000000032}'::uuid[]))
   Heap Blocks: exact=4
   Buffers: shared hit=154
-  ->  Bitmap Index Scan on uk_keywords_interest_keyword  (cost=0.00..218.12 rows=150 width=0) (actual time=0.018..0.018 rows=150 loops=1)
+  ->  Bitmap Index Scan on uk_keywords_interest_keyword  (cost=0.00..218.12 rows=150 width=0) (actual time=0.026..0.027 rows=150 loops=1)
         Index Cond: (interest_id = ANY ('{00000002-0000-4000-8000-000000000001,...,00000002-0000-4000-8000-000000000032}'::uuid[]))
-Planning Time: 0.359 ms
-Execution Time: 0.054 ms
+        Buffers: shared hit=150
+Planning Time: 0.036 ms
+Execution Time: 0.050 ms
 ```
 
 </details>
