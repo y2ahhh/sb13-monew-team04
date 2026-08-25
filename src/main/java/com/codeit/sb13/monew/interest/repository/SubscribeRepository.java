@@ -68,7 +68,7 @@ public interface SubscribeRepository extends JpaRepository<Subscribe, UUID> {
      *
      * <p>신규 기사가 관심사 키워드와 매칭됐을 때, 그 관심사를 구독 중인
      * 사용자 전원에게 알림을 보내기 위해
-     * {@link com.codeit.sb13.monew.interest.service.InterestArticleNotificationService}가
+     * {@link com.codeit.sb13.monew.interest.service.InterestServiceImpl#notifyForNewArticles}가
      * 이 메서드로 알림 수신자 목록을 가져온다. {@code Subscribe}는 {@code User}를
      * 정식 연관관계로 갖지 않고 {@code userId} 값만 가지므로, 이 조회에서
      * {@code User}를 직접 조인해 논리 삭제된 사용자를 걸러낸다.</p>

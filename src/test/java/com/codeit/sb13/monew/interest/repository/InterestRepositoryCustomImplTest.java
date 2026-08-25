@@ -1,7 +1,6 @@
 package com.codeit.sb13.monew.interest.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;

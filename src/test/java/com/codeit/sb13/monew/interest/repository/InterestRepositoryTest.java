@@ -1,7 +1,6 @@
 package com.codeit.sb13.monew.interest.repository;
 
 import com.codeit.sb13.monew.global.config.QueryDslConfig;
-import com.codeit.sb13.monew.global.exception.interest.InterestKeywordRequiredException;
 import com.codeit.sb13.monew.interest.domain.Interest;
 import com.codeit.sb13.monew.interest.domain.Keyword;
 import com.codeit.sb13.monew.interest.domain.Subscribe;
