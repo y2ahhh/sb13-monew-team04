@@ -17,6 +17,7 @@ import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -67,7 +68,7 @@ public class CommentRepositoryCustomImpl implements CommentRepositoryCustom {
     return new CommentSearchResult(
         pageRows,
         hasNext,
-        totalElements == null ? 0L : totalElements
+        Objects.requireNonNullElse(totalElements, 0L)
     );
   }
 
