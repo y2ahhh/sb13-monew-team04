@@ -4,13 +4,20 @@ import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.comment.repository.CommentRepository;
+import com.codeit.sb13.monew.comment.service.CommentOrderBy;
 import com.codeit.sb13.monew.comment.service.CommentService;
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
 import com.codeit.sb13.monew.comment.service.dto.CommentRegisterCommand;
+import com.codeit.sb13.monew.comment.service.dto.CommentSearchCommand;
+import com.codeit.sb13.monew.comment.repository.dto.CommentSearchCondition;
+import com.codeit.sb13.monew.comment.repository.dto.CommentSearchResult;
+import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.repository.UserRepository;
+import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,7 +38,7 @@ public class CommentServiceImpl implements CommentService {
 
   @Transactional
   @Override
-  public CommentDto create(CommentRegisterCommand command) { // 서비스 전용객체를 사용
+  public CommentDto create(@Valid CommentRegisterCommand command) { // 서비스 전용객체를 사용
     log.debug("댓글 생성 시작 - 기사 아이디: {}", command.articleId()); // 개인 정보 또는 민감한 정보는 로그에 남기지 않음
     User user = userRepository.findById(command.userId()).orElseThrow(()->new UserNotFoundException(command.userId()));
     Article article = articleRepository.findById(command.articleId()).orElseThrow(()->new ArticleNotFoundException(command.articleId()));
@@ -41,5 +48,60 @@ public class CommentServiceImpl implements CommentService {
     Comment savedComment = commentRepository.save(comment);
     log.info("댓글 생성 완료 - 댓글 아이디: {}, 기사 아이디: {}", savedComment.getId(), savedComment.getArticle().getId());
     return CommentDto.from(savedComment, 0L, false); // 댓글 생성 직후, 좋아요 수는 0, 좋아요 여부는 false로 반환
+  }
+
+  @Override
+  public CursorPageResponseDto<CommentDto> search(CommentSearchCommand command) {
+    CommentSearchResult page=commentRepository.search(new CommentSearchCondition(
+        command.articleId(),
+        command.orderBy(),
+        command.direction(),
+        command.cursor(),
+        command.after(),
+        command.limit(),
+        command.requestUserId()
+    ));
+
+    List<CommentDto> content = page.rows().stream()
+        .map(CommentDto::from)
+        .toList();
+
+    return new CursorPageResponseDto<>(
+        content,
+        nextCursor(content, command.orderBy()),
+        nextAfter(content),
+        nextIdAfter(content), // cursor, after 모두 같은 데이터에 대한 3차 tie-breaker
+        content.size(),
+        page.totalElements(),
+        page.hasNext()
+    );
+  }
+
+  // 다음 페이지 조회에 사용할 주요 커서 값을 만든다
+  private String nextCursor(List<CommentDto> content, CommentOrderBy orderBy) {
+    if (content.isEmpty()) {
+      return null;
+    }
+
+    CommentDto last = content.get(content.size() - 1);
+    return orderBy == CommentOrderBy.CREATED_AT
+        ? last.createdAt().toString() : String.valueOf(last.likeCount());
+  }
+
+  // 다음 페이지 조회에 사용할 보조 커서
+  private String nextAfter(List<CommentDto> content) {
+    if (content.isEmpty()) {
+      return null;
+    }
+
+    return content.get(content.size() - 1).createdAt().toString();
+  }
+
+  private String nextIdAfter(List<CommentDto> content) {
+    if (content.isEmpty()) {
+      return null;
+    }
+
+    return content.get(content.size() - 1).id().toString();
   }
 }
