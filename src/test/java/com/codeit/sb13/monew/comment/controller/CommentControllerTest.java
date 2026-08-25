@@ -122,6 +122,40 @@ public class CommentControllerTest {
         .andExpect(jsonPath("$.hasNext").value(false));
   }
 
+  @Test
+  @DisplayName("완전한 cursor + after + idAfter 값으로 댓글 목록 조회 명령으로 전달한다")
+  void 댓글_목록_조회_명령으로_완전한_커서_값을_전달한다() throws Exception {
+    UUID articleId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
+    UUID idAfter = UUID.randomUUID();
+    LocalDateTime after = LocalDateTime.of(2026, 8, 25, 10, 30);
+    CursorPageResponseDto<CommentDto> response = new CursorPageResponseDto<>(
+        List.of(), null, null, null, 0, 0L, false);
+
+    given(commentService.search(argThat(command -> command != null
+        && articleId.equals(command.articleId())
+        && command.orderBy() == CommentOrderBy.CREATED_AT
+        && command.direction().isAscending()
+        && after.toString().equals(command.cursor())
+        && after.equals(command.after())
+        && idAfter.equals(command.idAfter())
+        && command.limit() == 10
+        && requestUserId.equals(command.requestUserId())))).willReturn(response);
+
+    mockMvc.perform(get("/api/comments")
+            .param("articleId", articleId.toString())
+            .param("orderBy", "createdAt")
+            .param("direction", "ASC")
+            .param("cursor", after.toString())
+            .param("after", after.toString())
+            .param("idAfter", idAfter.toString())
+            .param("limit", "10")
+            .header("Monew-Request-User-ID", requestUserId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content").isEmpty())
+        .andExpect(jsonPath("$.hasNext").value(false));
+  }
+
 
   @Test
   @DisplayName("커서 값 일부만 전달하면 댓글 목록 조회에 실패한다")
@@ -131,6 +165,23 @@ public class CommentControllerTest {
             .param("orderBy", "likeCount")
             .param("direction", "DESC")
             .param("cursor", "3")
+            .param("limit", "10")
+            .header("Monew-Request-User-ID", UUID.randomUUID()))
+        .andExpect(status().isBadRequest());
+
+    then(commentService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("idAfter 없이 cursor와 after만 전달하면 댓글 목록 조회에 실패한다")
+  void cursor와_after만_전달하면_댓글_목록_조회_실패() throws Exception {
+    LocalDateTime after = LocalDateTime.of(2026, 8, 25, 10, 30);
+    mockMvc.perform(get("/api/comments")
+            .param("articleId", UUID.randomUUID().toString())
+            .param("orderBy", "likeCount")
+            .param("direction", "DESC")
+            .param("cursor", "3")
+            .param("after", after.toString())
             .param("limit", "10")
             .header("Monew-Request-User-ID", UUID.randomUUID()))
         .andExpect(status().isBadRequest());
