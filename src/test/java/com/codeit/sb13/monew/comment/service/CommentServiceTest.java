@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.*;
 import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.repository.ArticleRepository;
+import com.codeit.sb13.monew.comment.repository.CommentLikeRepository;
 import com.codeit.sb13.monew.comment.repository.dto.CommentSearchCondition;
 import com.codeit.sb13.monew.comment.repository.dto.CommentSearchProjection;
 import com.codeit.sb13.monew.comment.repository.dto.CommentSearchResult;
@@ -45,6 +46,9 @@ public class CommentServiceTest {
 
   @Mock
   ArticleRepository articleRepository;
+
+  @Mock
+  CommentLikeRepository commentLikeRepository;
 
   @InjectMocks
   private CommentServiceImpl commentService;
@@ -249,5 +253,54 @@ public class CommentServiceTest {
         && condition.idAfter() == null
         && condition.limit() == 50
         && condition.requestUserId().equals(requestUserId)));
+  }
+
+  @Test
+  @DisplayName("댓글 내용 수정 성공 - RED")
+  void 댓글_수정_성공 () {
+    // given
+    LocalDateTime createdAt = LocalDateTime.of(2024, 6, 1, 12, 0);
+    User user = User.builder()
+        .email("test@test.com")
+        .nickname("테스트 사용자")
+        .password("Abcd!")
+        .build();
+    Article article = Article.create("기사 제목",
+        "기사 요약",
+        "https://test.com/article",
+        createdAt,
+        ArticleSource.NAVER);
+    ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
+    ReflectionTestUtils.setField(article, "id", UUID.randomUUID());
+    Comment comment=Comment.builder()
+        .article(article)
+        .user(user)
+        .content("테스트 댓글")
+        .build();
+    ReflectionTestUtils.setField(comment, "id", UUID.randomUUID());
+    ReflectionTestUtils.setField(comment, "createdAt", createdAt);
+
+    CommentUpdateCommand command=new CommentUpdateCommand(comment.getId(), user.getId(), "수정된 테스트 댓글");
+    given(commentRepository.findByIdAndDeletedAtIsNull(comment.getId())).willReturn(java.util.Optional.of(comment));
+    given(commentLikeRepository.countByCommentId(comment.getId())).willReturn(0L);
+    given(commentLikeRepository.findByCommentAndLikedBy(comment.getId(), user.getId())).willReturn(java.util.Optional.empty());
+
+    // when
+    CommentDto result=commentService.update(command);
+
+    // then
+    Assertions.assertAll(
+        () -> assertThat(comment.getContent()).isEqualTo("수정된 테스트 댓글"),
+        () -> assertThat(result.id()).isEqualTo(comment.getId()),
+        () -> assertThat(result.articleId()).isEqualTo(article.getId()),
+        () -> assertThat(result.userId()).isEqualTo(user.getId()),
+        () -> assertThat(result.userNickname()).isEqualTo("테스트 사용자"),
+        () -> assertThat(result.content()).isEqualTo("수정된 테스트 댓글"),
+        () -> assertThat(result.likeCount()).isEqualTo(0L),
+        () -> assertThat(result.likedByMe()).isFalse(),
+        () -> assertThat(result.createdAt()).isEqualTo(createdAt)
+    );
+    then(commentRepository).should(times(1)).findByIdAndDeletedAtIsNull(comment.getId());
+        
   }
 }
