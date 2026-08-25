@@ -4,11 +4,15 @@ import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.comment.domain.Comment;
+
 import com.codeit.sb13.monew.comment.repository.dto.RecentCommentActivityProjection;
+import com.codeit.sb13.monew.comment.service.CommentOrderBy;
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;
 import com.codeit.sb13.monew.global.config.QueryDslConfig;
 import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.repository.UserRepository;
+import org.hibernate.query.SortDirection;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +24,8 @@ import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Direction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -273,5 +279,89 @@ class CommentRepositoryTest {
 
     private Article createArticle(String title, String summary, String link) {
         return Article.create(title, summary, link, LocalDateTime.now(), ArticleSource.NAVER);
+    }
+
+
+    @Test
+    @DisplayName("생성일 기준 오름차순으로 댓글 조회한다 - RED")
+    void search_orderByCreatedAtAscending() {
+        // given
+        User requestUser = new User("request@eamil.com", "요청자", "testPassword!");
+        User writer = new User("writer@eamil.com", "작성자", "testPassword?");
+        Article article = articleRepository.saveAndFlush(createArticle("테스트 기사", "테스트 기사 내용", "testLink"));
+
+        Comment oldest = commentRepository.saveAndFlush(new Comment(article, writer, "오래된 댓글"));
+        Comment newest = commentRepository.saveAndFlush(new Comment(article, writer, "최신 댓글"));
+
+        LocalDateTime baseTime = LocalDateTime.of(2026, 8, 25, 12, 0);
+        updateCommentCreatedAt(oldest.getId(), baseTime);
+        updateCommentCreatedAt(newest.getId(), baseTime.plusMinutes(2));
+
+        em.clear();
+
+        CommentSearchCondition condition = new CommentSearchCondition(
+                article.getId(),
+                CommentOrderBy.CREATED_AT,
+                Direction.ASC,
+                null,
+                null,
+                10,
+                requestUser.getId()
+        );
+
+        // when
+        CommentSearchResult result = commentRepository.search(condition);
+
+        // then
+        Assertions.assertAll(
+            ()->assertThat(result.rows())
+                .hasSize(2)
+                .extracting(CommentSearchProjection::content)
+                .containsExactly("오래된 댓글", "최신 댓글"),
+            ()->assertThat(result.hasNext()).isFalse(),
+            ()->assertThat(result.totalElements()).isEqualTo(2)
+        );
+    }
+
+
+    @Test
+    @DisplayName("생성일 기준 내림차순으로 댓글 조회한다 RED")
+    void search_orderByCreatedAtDescending() {
+        // given
+        User requestUser = new User("request@eamil.com", "요청자", "testPassword!");
+        User writer = new User("writer@eamil.com", "작성자", "testPassword?");
+        Article article = articleRepository.saveAndFlush(createArticle("테스트 기사", "테스트 기사 내용", "testLink"));
+
+        Comment oldest = commentRepository.saveAndFlush(new Comment(article, writer, "오래된 댓글"));
+        Comment newest = commentRepository.saveAndFlush(new Comment(article, writer, "최신 댓글"));
+
+        LocalDateTime baseTime = LocalDateTime.of(2026, 8, 25, 12, 0);
+        updateCommentCreatedAt(oldest.getId(), baseTime);
+        updateCommentCreatedAt(newest.getId(), baseTime.plusMinutes(2));
+
+        em.clear();
+
+        CommentSearchCondition condition = new CommentSearchCondition(
+            article.getId(),
+            CommentOrderBy.CREATED_AT,
+            Direction.DESC,
+            null,
+            null,
+            10,
+            requestUser.getId()
+        );
+
+        // when
+        CommentSearchResult result = commentRepository.search(condition);
+
+        // then
+        Assertions.assertAll(
+            ()->assertThat(result.rows())
+                .hasSize(2)
+                .extracting(CommentSearchProjection::content)
+                .containsExactly("최신 댓글", "오래된 댓글"),
+            ()->assertThat(result.hasNext()).isFalse(),
+            ()->assertThat(result.totalElements()).isEqualTo(2)
+        );
     }
 }
