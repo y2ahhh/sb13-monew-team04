@@ -74,12 +74,20 @@ docker compose -f compose.k6.yaml run --rm \
 | `K6_ACTIVITY_HISTORY_PATH_TEMPLATE` | `/api/user-activities/{userId}` | 활동내역 API path 또는 전체 URL |
 | `K6_TARGET_USER_ID` | `00000001-0000-4000-8000-000000000001` | 측정 대상 사용자 ID |
 | `K6_USER_ID_HEADER_NAME` | `Monew-Request-User-ID` | 사용자 ID 전달 헤더명 |
-| `K6_EXPECTED_STATUS` | `200` | 성공으로 판단할 HTTP 상태 코드, 100-599 정수만 허용 |
+| `K6_EXPECTED_STATUS` | `200` | 성공으로 판단할 HTTP 상태 코드, 100-599 정수 중 응답 본문이 가능한 값만 허용 |
 | `K6_SCENARIO` | `smoke` | `smoke` 또는 `baseline` |
-| `K6_BASELINE_RATE` | `20` | baseline RPS 목표 |
+| `K6_SMOKE_VUS` | `1` | smoke 실행 VU 수 |
+| `K6_SMOKE_ITERATIONS` | `1` | smoke 전체 iteration 수 |
+| `K6_SMOKE_MAX_DURATION` | `30s` | smoke 최대 실행 시간 |
+| `K6_BASELINE_RATE` | `20` | baseline 요청 도착률, 단위는 `K6_BASELINE_TIME_UNIT` 기준 |
+| `K6_BASELINE_TIME_UNIT` | `1s` | baseline rate 기준 시간 단위 |
 | `K6_BASELINE_DURATION` | `1m` | baseline 지속 시간 |
 | `K6_BASELINE_PRE_ALLOCATED_VUS` | `20` | 사전 할당 VU 수 |
 | `K6_BASELINE_MAX_VUS` | `100` | 최대 VU 수 |
+| `K6_HTTP_REQ_FAILED_RATE_THRESHOLD` | `0.01` | HTTP 실패율 임계값 |
+| `K6_HTTP_REQ_DURATION_P95_THRESHOLD` | `1000` | p95 응답 시간 임계값, ms |
+| `K6_HTTP_REQ_DURATION_P99_THRESHOLD` | `2000` | p99 응답 시간 임계값, ms |
+| `K6_CHECK_RATE_THRESHOLD` | `0.99` | check 성공률 임계값 |
 | `K6_DROPPED_ITERATIONS_COUNT_THRESHOLD` | `1` | `dropped_iterations` count 미만 임계값, 기본값은 0건만 통과 |
 | `K6_SLEEP_SECONDS` | `1` | smoke iteration 사이 대기 시간, `0`이면 대기하지 않음 |
 | `K6_SUMMARY_PATH` | path 기반 자동 생성 | summary JSON 저장 경로를 직접 지정할 때 사용 |

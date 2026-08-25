@@ -227,11 +227,17 @@ function httpStatusEnv(name, defaultValue) {
 
   const parsedValue = Number(rawValue);
 
-  if (!Number.isInteger(parsedValue) || parsedValue < 100 || parsedValue > 599) {
-    throw new Error(`${name} must be an integer HTTP status code from 100 to 599. value=${rawValue}`);
+  if (!Number.isInteger(parsedValue) || parsedValue < 100 || parsedValue > 599 || isBodylessStatus(parsedValue)) {
+    throw new Error(
+      `${name} must be an integer HTTP status code from 100 to 599 that can include a response body. value=${rawValue}`
+    );
   }
 
   return parsedValue;
+}
+
+function isBodylessStatus(status) {
+  return (status >= 100 && status < 200) || status === 204 || status === 205 || status === 304;
 }
 
 function metricValue(data, metricName, statName) {
