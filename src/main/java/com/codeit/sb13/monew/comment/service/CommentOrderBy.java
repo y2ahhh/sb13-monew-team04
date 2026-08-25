@@ -5,7 +5,7 @@ import java.util.Arrays;
 
 public enum CommentOrderBy {
   CREATED_AT("createdAt"),
-  LIKE_COUNT("likeCount"),;
+  LIKE_COUNT("likeCount");
 
   private final String value;
 
