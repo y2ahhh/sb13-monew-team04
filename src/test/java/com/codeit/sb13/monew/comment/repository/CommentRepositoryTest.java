@@ -634,7 +634,8 @@ class CommentRepositoryTest {
             article.getId(), CommentOrderBy.CREATED_AT, Direction.ASC,
             null, null, null, 10, null));
 
-        assertThat(result.rows()).allSatisfy(row -> assertThat(row.likedByMe()).isFalse());
+        // allSatisfy는 result.rows()가 비어 있어도 통과하기 때문에 댓글 수나 댓글 내용을 먼저 검증한 뒤 likedByMe()를 확인하는 방향으로 개선
+        assertThat(result.rows()).hasSize(1).allSatisfy(row->assertThat(row.likedByMe()).isFalse());
     }
 
     @Test
