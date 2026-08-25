@@ -5,6 +5,7 @@ import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.comment.domain.Comment;
 
+import com.codeit.sb13.monew.comment.domain.CommentLike;
 import com.codeit.sb13.monew.comment.repository.dto.CommentSearchCondition;
 import com.codeit.sb13.monew.comment.repository.dto.CommentSearchProjection;
 import com.codeit.sb13.monew.comment.repository.dto.CommentSearchResult;
@@ -44,6 +45,9 @@ class CommentRepositoryTest {
 
     @Autowired
     private ArticleRepository articleRepository;
+
+    @Autowired
+    private CommentLikeRepository commentLikeRepository;
 
     @Autowired
     private TestEntityManager em;
@@ -367,6 +371,107 @@ class CommentRepositoryTest {
                 .containsExactly("최신 댓글", "오래된 댓글"),
             ()->assertThat(result.hasNext()).isFalse(),
             ()->assertThat(result.totalElements()).isEqualTo(2)
+        );
+    }
+
+    @Test
+    @DisplayName("좋아요 수 기준 오름차순으로 댓글 조회한다 - RED")
+    void search_orderByLikeCountAscending() {
+        // given
+        User requestUser = userRepository.saveAndFlush(new User("request@email.com", "요청자", "testPassword!"));
+        User writer = userRepository.saveAndFlush(new User("writer@email.com", "작성자", "testPassword?"));
+        User likedUser1 = userRepository.saveAndFlush(new User("liked1@email.com", "좋아요한 사용자1", "testPassword!"));
+        User likedUser2 = userRepository.saveAndFlush(new User("liked2@email.com", "좋아요한 사용자2", "testPassword@"));
+
+        Article article = articleRepository.saveAndFlush(createArticle("테스트 기사", "테스트 기사 내용", "testLink"));
+
+        Comment zeroLikes = commentRepository.saveAndFlush(new Comment(article, writer, "좋아요 없는 댓글"));
+        Comment sevenLikes = commentRepository.saveAndFlush(new Comment(article, writer, "좋아요 7개 댓글"));
+
+        commentLikeRepository.saveAndFlush(CommentLike.builder()
+            .comment(zeroLikes)
+            .likedBy(likedUser1)
+            .build());
+        commentLikeRepository.saveAndFlush(CommentLike.builder()
+            .comment(sevenLikes)
+            .likedBy(likedUser2)
+            .build());
+
+        em.clear();
+
+        CommentSearchCondition condition = new CommentSearchCondition(
+            article.getId(),
+            CommentOrderBy.LIKE_COUNT,
+            Direction.ASC,
+            null,
+            null,
+            10,
+            likedUser1.getId()
+        );
+
+        // when
+        CommentSearchResult result = commentRepository.search(condition);
+
+        // then
+        Assertions.assertAll(
+            ()->assertThat(result.rows())
+                .hasSize(2)
+                .extracting(CommentSearchProjection::content)
+                .containsExactly("좋아요 없는 댓글", "좋아요 7개 댓글"),
+            ()->assertThat(result.rows()).extracting(CommentSearchProjection::likeCount).containsExactly(0L, 7L),
+            ()->assertThat(result.hasNext()).isFalse(),
+            ()->assertThat(result.totalElements()).isEqualTo(2L)
+        );
+    }
+
+
+    @Test
+    @DisplayName("좋아요 수 기준 내림차순으로 댓글 조회한다 - RED")
+    void search_orderByLikeCountDescending() {
+        // given
+        User requestUser = userRepository.saveAndFlush(new User("request@email.com", "요청자", "testPassword!"));
+        User writer = userRepository.saveAndFlush(new User("writer@email.com", "작성자", "testPassword?"));
+        User likedUser1 = userRepository.saveAndFlush(new User("liked1@email.com", "좋아요한 사용자1", "testPassword!"));
+        User likedUser2 = userRepository.saveAndFlush(new User("liked2@email.com", "좋아요한 사용자2", "testPassword@"));
+
+        Article article = articleRepository.saveAndFlush(createArticle("테스트 기사", "테스트 기사 내용", "testLink"));
+
+        Comment zeroLikes = commentRepository.saveAndFlush(new Comment(article, writer, "좋아요 없는 댓글"));
+        Comment sevenLikes = commentRepository.saveAndFlush(new Comment(article, writer, "좋아요 7개 댓글"));
+
+        commentLikeRepository.saveAndFlush(CommentLike.builder()
+            .comment(zeroLikes)
+            .likedBy(likedUser1)
+            .build());
+        commentLikeRepository.saveAndFlush(CommentLike.builder()
+            .comment(sevenLikes)
+            .likedBy(likedUser2)
+            .build());
+
+        em.clear();
+
+        CommentSearchCondition condition = new CommentSearchCondition(
+            article.getId(),
+            CommentOrderBy.LIKE_COUNT,
+            Direction.DESC,
+            null,
+            null,
+            10,
+            requestUser.getId()
+        );
+
+        // when
+        CommentSearchResult result = commentRepository.search(condition);
+
+        // then
+        Assertions.assertAll(
+            ()->assertThat(result.rows())
+                .hasSize(2)
+                .extracting(CommentSearchProjection::content)
+                .containsExactly("좋아요 없는 댓글", "좋아요 7개 댓글"),
+            ()->assertThat(result.rows()).extracting(CommentSearchProjection::likeCount).containsExactly(7L, 0L),
+            ()->assertThat(result.hasNext()).isFalse(),
+            ()->assertThat(result.totalElements()).isEqualTo(2L)
         );
     }
 }
