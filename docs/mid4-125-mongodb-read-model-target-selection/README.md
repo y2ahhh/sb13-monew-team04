@@ -76,32 +76,29 @@ MongoDB Read Model 적용 대상은 현재 선정하지 않는다. 결론은 `�
 ## MongoDB 적용 시 범위 기준
 
 현재는 적용하지 않지만, 후속 측정에서 MongoDB 적용이 필요해질 경우 범위는 다음 기준으로 제한한다.
+아래 항목은 확정 schema가 아니라 Read Model 적용이 필요해졌을 때의 검토 기준이다.
 
 - RDB는 Source of Truth로 유지한다.
 - MongoDB는 활동내역 조회 전용 Read Model로만 사용한다.
-- `activity_histories`는 사용자별 활동내역 조회 응답을 빠르게 구성하기 위한 projection 단위로 둔다.
-- 사용자별 활동 projection 식별 키는 `userId`, `activityType`, `sourceEntityId` 조합으로 둔다.
-- 대상 표시 정보를 별도 snapshot으로 둘 경우 공용 대상 snapshot과 사용자별 활동 projection을 분리한다.
-- 공용 대상 snapshot에는 화면 응답에 필요한 최소 대상 필드만 저장하고, 사용자별 활동 시각, 정렬 기준, 노출 상태, 취소 상태는 저장하지 않는다.
-- 공용 대상 snapshot 식별 키는 `sourceEntityType`, `sourceEntityId` 조합으로 둔다.
+- `activity_histories`는 사용자별 활동내역 조회 응답을 빠르게 구성하기 위한 projection 후보로 둔다.
+- 사용자별 활동 projection이 필요하면 `userId`, `activityType`, `sourceEntityId` 조합을 식별 키 후보로 검토한다.
+- 대상 표시 정보를 별도 snapshot으로 둘 경우 공용 대상 snapshot과 사용자별 활동 projection을 분리하는 방향을 우선 검토한다.
+- 공용 대상 snapshot에는 화면 응답에 필요한 최소 대상 필드만 저장하고, 사용자별 활동 시각, 정렬 기준, 노출 상태, 취소 상태는 넣지 않는 방향을 우선 검토한다.
+- 공용 대상 snapshot 식별 키는 `sourceEntityType`, `sourceEntityId` 조합을 후보로 둔다.
 - 최근 작성 댓글, 최근 좋아요한 댓글, 최근 조회 기사처럼 최대 10건만 필요한 영역은 MongoDB 적용 전 RDB 인덱스와 SQL 구조를 먼저 재검증한다.
 - 구독 관심사는 사용자별 구독 수 또는 관심사별 구독자 수 fan-out이 SLO를 넘는 경우에만 snapshot 후보로 올린다.
 
 ## 삭제 및 Cleanup 기준
 
-MongoDB Read Model을 적용하는 경우 삭제 상태 반영 기준은 다음과 같이 둔다.
+MongoDB Read Model을 후속 적용하는 경우 삭제 상태 반영 기준은 다음 항목을 검토한다.
+현재 티켓에서는 삭제 및 cleanup 구현 계약을 확정하지 않는다.
 
 - 사용자 논리삭제: `/api/user-activities/{userId}`는 기존 RDB 동작과 동일하게 `UserNotFoundException` 기준 `404`를 반환한다. MongoDB projection에 `USER_DELETED` 상태를 저장하더라도 API 응답에는 노출하지 않는다.
 - 기사/댓글 논리삭제: 관련 활동 item은 기존 RDB 조회처럼 API 결과에서 제외하거나, 필요한 경우 `TARGET_DELETED` 상태를 내부 projection 상태로만 유지한다.
 - 물리삭제: RDB source row 삭제 시 연결된 MongoDB projection과 snapshot도 cleanup 대상에 포함한다.
 - cleanup은 RDB 삭제 정책과 같은 이벤트 또는 배치 기준으로 맞추며, MongoDB 문서만 독립적으로 정리하지 않는다.
-- projection 갱신과 cleanup은 `eventId` 기준으로 idempotent하게 처리하고, 같은 이벤트를 batch retry로 여러 번 처리해도 결과가 같아야 한다.
-- projection과 snapshot은 마지막으로 반영한 `lastAppliedVersion`, `lastAppliedEventId`를 저장한다.
-- `event.version`이 `lastAppliedVersion`보다 낮으면 오래된 이벤트로 보고 무시한다.
-- 같은 `eventId`가 다시 들어오면 이미 처리한 이벤트의 재시도로 보고 no-op으로 처리한다.
-- 같은 version의 다른 이벤트가 경합하면 `occurredAt`, `eventId` 순서로 결정하되, 같은 source entity의 삭제 이벤트는 갱신 이벤트보다 우선한다.
-- 삭제 이후 도착한 오래된 갱신 이벤트는 삭제된 projection 또는 snapshot을 재생성하지 않는다.
-- 물리삭제 cleanup은 삭제 이벤트 처리 기록을 남긴 뒤 수행해, 이후 재처리나 지연 이벤트가 들어와도 삭제 우선순위를 판별할 수 있어야 한다.
+- 지연 이벤트나 재처리 이벤트가 삭제된 projection 또는 snapshot을 재생성하지 않도록 순서 판정과 멱등성 정책을 후속 구현 티켓에서 확정한다.
+- 후속 검토 항목은 `eventId` 중복 처리, aggregate별 `version` 또는 `occurredAt` 비교, 삭제 이벤트 우선순위, tombstone 또는 삭제 처리 기록 보존 기간, retry/dead-letter 정책이다.
 
 ## Outbox Payload 기준
 
@@ -109,12 +106,11 @@ MongoDB Read Model을 적용하는 경우 삭제 상태 반영 기준은 다음�
 - MySQL: `JSON`
 - 테스트 DB: `TEXT fallback`
 - payload 내부 필드를 DB에서 직접 조회하는 요구가 없으면 JSON path/index는 만들지 않는다.
-- payload는 이벤트 재처리와 projection 갱신에 필요한 최소 정보만 담는다.
-- MongoDB Read Model 적용 시 payload에는 `eventId`, `eventType`, `aggregateType`, `aggregateId`, `occurredAt`, `version`, 삭제 여부, 영향 받는 사용자 식별 정보를 포함한다.
-- `USER_DELETED` 이벤트는 단일 `userId`를 영향 받는 사용자로 가진다.
-- 기사/댓글 삭제 이벤트는 `aggregateType`, `aggregateId`로 삭제 대상을 식별한다.
-- 기사/댓글 삭제 이벤트 처리 시 consumer는 reverse index로 관련 `userId` 또는 `activity_histories`를 찾거나, 사용자별 projection 갱신 이벤트로 fan-out해 모든 관련 사용자 활동을 반영한다.
-- Outbox consumer는 처리 완료된 `eventId`를 기준으로 중복 처리를 방지하고, 삭제 이벤트는 동일 대상의 과거 갱신 이벤트보다 우선 적용한다.
+- payload는 이벤트 재처리와 projection 갱신에 필요한 최소 정보만 담는 방향으로 검토한다.
+- MongoDB Read Model 적용 시 payload 후보에는 `eventId`, `eventType`, `aggregateType`, `aggregateId`, `occurredAt`, 삭제 여부, 영향 받는 사용자 식별 정보를 포함할 수 있다.
+- 일반 projection 갱신 이벤트의 `activityType`, 활동 record ID, `sourceEntityType`, `sourceEntityId`, 활동 시각, 화면 응답용 대상 데이터 전달 방식은 후속 구현 티켓에서 확정한다.
+- 화면 응답용 대상 데이터를 payload에 직렬화할지, worker가 RDB에서 재조회할지는 이번 티켓에서 결정하지 않는다.
+- 기사/댓글 삭제처럼 여러 사용자 활동에 영향을 줄 수 있는 이벤트는 reverse index 조회 또는 사용자별 이벤트 fan-out 중 어떤 방식을 사용할지 후속 설계에서 결정한다.
 
 ## Redis 적용 여부
 
@@ -133,8 +129,6 @@ MID4-96의 MongoDB/Redis 적용 여부 판단에는 이 문서를 근거로 연�
 | MongoDB 적용 여부 결론 | `후순위` |
 | activity_histories와 snapshot 저장 범위 | MongoDB 적용 시 범위 기준 |
 | 사용자/기사/댓글 논리삭제와 물리삭제 cleanup | 삭제 및 Cleanup 기준 |
-| 이벤트 재처리와 순서 역전 기준 | 삭제 및 Cleanup 기준, Outbox Payload 기준 |
-| 삭제 이벤트 fan-out 기준 | Outbox Payload 기준 |
 | Outbox payload 타입 | Outbox Payload 기준 |
 | JSON path/index 생성 기준 | payload 내부 필드 조회 요구가 없으면 미생성 |
 | Redis 적용 여부와 사용 목적 | Redis 적용 여부 |
