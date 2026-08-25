@@ -7,7 +7,7 @@ services:
       K6_BASE_URL: ${K6_BASE_URL:-http://host.docker.internal:8080}
       K6_ACTIVITY_HISTORY_PATH_TEMPLATE: ${K6_ACTIVITY_HISTORY_PATH_TEMPLATE:-/api/user-activities/{userId}}
       K6_TARGET_USER_ID: ${K6_TARGET_USER_ID:-00000001-0000-4000-8000-000000000001}
-      K6_USER_ID_HEADER_NAME: ${K6_USER_ID_HEADER_NAME:-MoNew-Request-User-ID}
+      K6_USER_ID_HEADER_NAME: ${K6_USER_ID_HEADER_NAME:-Monew-Request-User-ID}
       K6_EXPECTED_STATUS: ${K6_EXPECTED_STATUS:-200}
       K6_SCENARIO: ${K6_SCENARIO:-smoke}
       K6_SMOKE_VUS: ${K6_SMOKE_VUS:-1}
@@ -23,7 +23,7 @@ services:
       K6_HTTP_REQ_DURATION_P99_THRESHOLD: ${K6_HTTP_REQ_DURATION_P99_THRESHOLD:-2000}
       K6_CHECK_RATE_THRESHOLD: ${K6_CHECK_RATE_THRESHOLD:-0.99}
       K6_SLEEP_SECONDS: ${K6_SLEEP_SECONDS:-1}
-      K6_SUMMARY_PATH: ${K6_SUMMARY_PATH:-/results/activity-history-summary.json}
+      K6_SUMMARY_PATH: ${K6_SUMMARY_PATH:-}
       K6_AUTHORIZATION: ${K6_AUTHORIZATION:-}
     volumes:
       - ./scripts/performance/activity-history/k6:/scripts:ro

@@ -7,10 +7,10 @@ const SCENARIO = (__ENV.K6_SCENARIO || 'smoke').toLowerCase();
 const BASE_URL = trimTrailingSlash(__ENV.K6_BASE_URL || 'http://localhost:8080');
 const PATH_TEMPLATE = __ENV.K6_ACTIVITY_HISTORY_PATH_TEMPLATE || '/api/user-activities/{userId}';
 const TARGET_USER_ID = __ENV.K6_TARGET_USER_ID || DEFAULT_TARGET_USER_ID;
-const USER_ID_HEADER_NAME = __ENV.K6_USER_ID_HEADER_NAME || 'MoNew-Request-User-ID';
+const USER_ID_HEADER_NAME = __ENV.K6_USER_ID_HEADER_NAME || 'Monew-Request-User-ID';
 const EXPECTED_STATUS = numberEnv('K6_EXPECTED_STATUS', 200);
-const SLEEP_SECONDS = numberEnv('K6_SLEEP_SECONDS', 1);
-const SUMMARY_PATH = __ENV.K6_SUMMARY_PATH || '/results/activity-history-summary.json';
+const SLEEP_SECONDS = nonNegativeNumberEnv('K6_SLEEP_SECONDS', 1);
+const SUMMARY_PATH = summaryPath(PATH_TEMPLATE);
 const ACTIVITY_HISTORY_URL = buildUrl(PATH_TEMPLATE, TARGET_USER_ID);
 
 const scenarioConfigs = {
@@ -89,6 +89,7 @@ export function handleSummary(data) {
     `scenario: ${summary.scenario}`,
     `url: ${summary.url}`,
     `targetUserId: ${summary.targetUserId}`,
+    `summaryPath: ${SUMMARY_PATH}`,
     `requests: ${formatNumber(summary.metrics.requests, 0)}`,
     `rps: ${formatNumber(summary.metrics.rps, 2)}`,
     `errorRate: ${formatPercent(summary.metrics.errorRate)}`,
@@ -136,6 +137,48 @@ function buildUrl(pathTemplate, userId) {
   return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+function summaryPath(pathTemplate) {
+  if (__ENV.K6_SUMMARY_PATH) {
+    return __ENV.K6_SUMMARY_PATH;
+  }
+
+  return `/results/${summaryName(pathTemplate)}-summary.json`;
+}
+
+function summaryName(pathTemplate) {
+  const path = extractPath(pathTemplate);
+  const normalizedPath = normalizePath(path);
+
+  if (normalizedPath === 'user-activities') {
+    return 'activity-history';
+  }
+
+  return normalizedPath || 'k6';
+}
+
+function extractPath(pathTemplate) {
+  return pathTemplate
+    .replace(/^https?:\/\/[^/]+/i, '')
+    .split('?')[0]
+    .split('#')[0];
+}
+
+function normalizePath(path) {
+  return path
+    .split('/')
+    .filter((segment) => segment && !isPathVariable(segment))
+    .filter((segment) => segment !== 'api')
+    .join('-')
+    .replace(/[^A-Za-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+}
+
+function isPathVariable(segment) {
+  return /^\{[^}]+\}$/.test(segment);
+}
+
 function trimTrailingSlash(value) {
   return value.replace(/\/+$/, '');
 }
@@ -151,6 +194,22 @@ function numberEnv(name, defaultValue) {
 
   if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
     throw new Error(`${name} must be a positive number. value=${rawValue}`);
+  }
+
+  return parsedValue;
+}
+
+function nonNegativeNumberEnv(name, defaultValue) {
+  const rawValue = __ENV[name];
+
+  if (!rawValue) {
+    return defaultValue;
+  }
+
+  const parsedValue = Number(rawValue);
+
+  if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+    throw new Error(`${name} must be a non-negative number. value=${rawValue}`);
   }
 
   return parsedValue;
