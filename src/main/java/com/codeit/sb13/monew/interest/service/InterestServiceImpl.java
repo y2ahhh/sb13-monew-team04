@@ -208,6 +208,11 @@ public class InterestServiceImpl implements InterestService{
      * {@link SubscribeRepository#findSubscriberUsersByInterestIds}를 한 번만 호출해
      * 알림 수신자를 가져오고 관심사 id별로 묶는다. 매칭되는 관심사 수가 늘어도
      * 구독자 조회 쿼리는 항상 한 번만 실행된다.</p>
+     *
+     * <p>관심사 목록도 {@link InterestRepository#findAllWithKeywords}로 키워드까지
+     * fetch join으로 함께 가져온다. {@code findAll()}만 쓰면 매칭 판단 중
+     * {@code interest.getKeywords()}를 호출할 때마다 {@code @BatchSize(size = 100)}
+     * 지연 로딩이 걸려, 관심사가 100개를 넘을 때마다 배치 조회가 한 번씩 더 실행된다.</p>
      */
     @Override
     public void notifyForNewArticles(List<Article> newArticles) {
@@ -215,7 +220,7 @@ public class InterestServiceImpl implements InterestService{
             return;
         }
 
-        List<MatchedInterest> matchedInterests = interestRepository.findAll().stream()
+        List<MatchedInterest> matchedInterests = interestRepository.findAllWithKeywords().stream()
                 .map(interest -> new MatchedInterest(interest, countMatchedArticles(interest, newArticles)))
                 .filter(matched -> matched.matchedCount() > 0)
                 .toList();

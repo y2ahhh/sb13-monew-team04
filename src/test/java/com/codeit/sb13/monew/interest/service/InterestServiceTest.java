@@ -530,7 +530,7 @@ class InterestServiceTest {
         interestServiceImpl.notifyForNewArticles(null);
 
         verifyNoInteractions(subscribeRepository, notificationService);
-        verify(interestRepository, never()).findAll();
+        verify(interestRepository, never()).findAllWithKeywords();
     }
 
     @Test
@@ -539,7 +539,7 @@ class InterestServiceTest {
         interestServiceImpl.notifyForNewArticles(List.of());
 
         verifyNoInteractions(subscribeRepository, notificationService);
-        verify(interestRepository, never()).findAll();
+        verify(interestRepository, never()).findAllWithKeywords();
     }
 
     @Test
@@ -550,7 +550,7 @@ class InterestServiceTest {
         Article matched = article("오늘의 축구 경기 결과", "요약");
         User subscriber = userWithId();
 
-        when(interestRepository.findAll()).thenReturn(List.of(interest));
+        when(interestRepository.findAllWithKeywords()).thenReturn(List.of(interest));
         when(subscribeRepository.findSubscriberUsersByInterestIds(List.of(interest.getId())))
                 .thenReturn(subscribersOf(interest.getId(), subscriber));
 
@@ -576,7 +576,7 @@ class InterestServiceTest {
         Article matched = article("오늘의 뉴스", "축구 관련 요약입니다");
         User subscriber = userWithId();
 
-        when(interestRepository.findAll()).thenReturn(List.of(interest));
+        when(interestRepository.findAllWithKeywords()).thenReturn(List.of(interest));
         when(subscribeRepository.findSubscriberUsersByInterestIds(List.of(interest.getId())))
                 .thenReturn(subscribersOf(interest.getId(), subscriber));
 
@@ -595,7 +595,7 @@ class InterestServiceTest {
         Article matched = article("생성형 ai 기술 동향", "요약");
         User subscriber = userWithId();
 
-        when(interestRepository.findAll()).thenReturn(List.of(interest));
+        when(interestRepository.findAllWithKeywords()).thenReturn(List.of(interest));
         when(subscribeRepository.findSubscriberUsersByInterestIds(List.of(interest.getId())))
                 .thenReturn(subscribersOf(interest.getId(), subscriber));
 
@@ -613,7 +613,7 @@ class InterestServiceTest {
         Interest interest = interestWithId("스포츠", "축구");
         Article unmatched = article("오늘의 날씨", "요약");
 
-        when(interestRepository.findAll()).thenReturn(List.of(interest));
+        when(interestRepository.findAllWithKeywords()).thenReturn(List.of(interest));
 
         // when
         interestServiceImpl.notifyForNewArticles(List.of(unmatched));
@@ -630,7 +630,7 @@ class InterestServiceTest {
         Interest interest = interestWithId("스포츠", "축구");
         Article matched = article("오늘의 축구 경기 결과", "요약");
 
-        when(interestRepository.findAll()).thenReturn(List.of(interest));
+        when(interestRepository.findAllWithKeywords()).thenReturn(List.of(interest));
         when(subscribeRepository.findSubscriberUsersByInterestIds(List.of(interest.getId())))
                 .thenReturn(List.of());
 
@@ -650,7 +650,7 @@ class InterestServiceTest {
         Article matchedArticle = article("오늘의 축구 경기 결과", "요약");
         User subscriber = userWithId();
 
-        when(interestRepository.findAll()).thenReturn(List.of(matchingInterest, nonMatchingInterest));
+        when(interestRepository.findAllWithKeywords()).thenReturn(List.of(matchingInterest, nonMatchingInterest));
         when(subscribeRepository.findSubscriberUsersByInterestIds(List.of(matchingInterest.getId())))
                 .thenReturn(subscribersOf(matchingInterest.getId(), subscriber));
 
@@ -673,7 +673,7 @@ class InterestServiceTest {
         User sportsSubscriber = userWithId();
         User travelSubscriber = userWithId();
 
-        when(interestRepository.findAll()).thenReturn(List.of(sports, travel));
+        when(interestRepository.findAllWithKeywords()).thenReturn(List.of(sports, travel));
         when(subscribeRepository.findSubscriberUsersByInterestIds(List.of(sports.getId(), travel.getId())))
                 .thenReturn(List.of(
                         new InterestSubscriberRow(sports.getId(), sportsSubscriber),
@@ -698,7 +698,7 @@ class InterestServiceTest {
         Article unrelated = article("오늘의 날씨", "요약");
         User subscriber = userWithId();
 
-        when(interestRepository.findAll()).thenReturn(List.of(interest));
+        when(interestRepository.findAllWithKeywords()).thenReturn(List.of(interest));
         when(subscribeRepository.findSubscriberUsersByInterestIds(List.of(interest.getId())))
                 .thenReturn(subscribersOf(interest.getId(), subscriber));
 
@@ -724,7 +724,7 @@ class InterestServiceTest {
             Article matched = article("생성형 ai 기술 동향", "요약");
             User subscriber = userWithId();
 
-            when(interestRepository.findAll()).thenReturn(List.of(interest));
+            when(interestRepository.findAllWithKeywords()).thenReturn(List.of(interest));
             when(subscribeRepository.findSubscriberUsersByInterestIds(List.of(interest.getId())))
                     .thenReturn(subscribersOf(interest.getId(), subscriber));
 
