@@ -30,10 +30,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.testcontainers.shaded.org.checkerframework.checker.units.qual.C;
 
 @DisplayName("댓글 서비스 - TDD")
 @ExtendWith(MockitoExtension.class)
@@ -106,7 +104,7 @@ public class CommentServiceTest {
     LocalDateTime createdAt = LocalDateTime.of(2024, 6, 1, 12, 0);
 
     CommentSearchCommand command=new CommentSearchCommand(articleId, CommentOrderBy.CREATED_AT,
-        Direction.DESC, null, null, 50, requestUserId);
+        Direction.DESC, null, null, null, 50, requestUserId);
 
     CommentSearchProjection projection = new CommentSearchProjection(
         commentId,
@@ -136,8 +134,9 @@ public class CommentServiceTest {
         && condition.direction().equals(Direction.DESC)
         && condition.cursor() == null
         && condition.after() == null
+        && condition.idAfter() == null
         && condition.limit() == 50
-        && condition.requestUserId().equals(condition.requestUserId())));
+        && condition.requestUserId().equals(requestUserId)));
 
     Assertions.assertAll(
         () -> assertThat(result.content()).hasSize(1),
@@ -162,7 +161,7 @@ public class CommentServiceTest {
     UUID requestUserId = UUID.randomUUID();
 
     CommentSearchCommand command=new CommentSearchCommand(articleId, CommentOrderBy.CREATED_AT,
-        Direction.ASC, null, null, 50, requestUserId);
+        Direction.ASC, null, null, null, 50, requestUserId);
 
     given(commentRepository.search(any(CommentSearchCondition.class))).willReturn(new CommentSearchResult(List.of(), false, 0L));
 
@@ -196,7 +195,7 @@ public class CommentServiceTest {
     LocalDateTime createdAt = LocalDateTime.of(2024, 6, 1, 12, 0);
 
     CommentSearchCommand command=new CommentSearchCommand(articleId, CommentOrderBy.LIKE_COUNT,
-        Direction.ASC, null, null, 50, requestUserId);
+        Direction.ASC, null, null, null, 50, requestUserId);
 
     CommentSearchProjection first = new CommentSearchProjection(
         commentId,
@@ -208,8 +207,9 @@ public class CommentServiceTest {
         false,
         createdAt
     );
+    UUID popularCommentId = UUID.randomUUID();
     CommentSearchProjection second = new CommentSearchProjection(
-        commentId,
+        popularCommentId,
         articleId,
         writerId,
         "작성자 닉네임",
@@ -235,7 +235,7 @@ public class CommentServiceTest {
         () -> assertThat(result.content()).hasSize(2),
         () -> assertThat(result.nextCursor()).isEqualTo("100"),
         ()->assertThat(result.nextAfter()).isEqualTo(createdAt.plusMinutes(5).toString()),
-        ()->assertThat(result.nextIdAfter()).isEqualTo(commentId.toString()),
+        ()->assertThat(result.nextIdAfter()).isEqualTo(popularCommentId.toString()),
         ()->assertThat(result.size()).isEqualTo(2),
         ()->assertThat(result.totalElements()).isEqualTo(10L),
         () -> assertThat(result.hasNext()).isTrue()
@@ -246,6 +246,7 @@ public class CommentServiceTest {
         && condition.direction().equals(Direction.ASC)
         && condition.cursor() == null
         && condition.after() == null
+        && condition.idAfter() == null
         && condition.limit() == 50
         && condition.requestUserId().equals(requestUserId)));
   }
