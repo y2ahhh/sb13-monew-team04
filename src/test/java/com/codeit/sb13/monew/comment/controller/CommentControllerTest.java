@@ -23,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @WebMvcTest(CommentController.class)
 @DisplayName("댓글 컨트롤러 - TDD")
@@ -33,6 +34,11 @@ public class CommentControllerTest {
 
   @MockitoBean
   private CommentService commentService;
+
+  private MockHttpServletRequestBuilder commentSearchRequestWithRequestUserHeader() {
+    return get("/api/comments")
+        .header("Monew-Request-User-ID", UUID.randomUUID());
+  }
 
   @Test
   @DisplayName("댓글 생성 성공 - GREEN")
@@ -127,6 +133,55 @@ public class CommentControllerTest {
             .param("cursor", "3")
             .param("limit", "10")
             .header("Monew-Request-User-ID", UUID.randomUUID()))
+        .andExpect(status().isBadRequest());
+
+    then(commentService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("articleId 없이 댓글 목록을 조회하면 실패한다")
+  void articleId_없이_댓글_목록_조회시_실패() throws Exception {
+    mockMvc.perform(commentSearchRequestWithRequestUserHeader()
+            .param("orderBy", "createdAt")
+            .param("direction", "DESC")
+            .param("limit", "10"))
+        .andExpect(status().isBadRequest());
+
+    then(commentService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("orderBy 없이 댓글 목록을 조회하면 실패한다")
+  void orderBy_없이_댓글_목록_조회시_실패() throws Exception {
+    mockMvc.perform(commentSearchRequestWithRequestUserHeader()
+            .param("articleId", UUID.randomUUID().toString())
+            .param("direction", "DESC")
+            .param("limit", "10"))
+        .andExpect(status().isBadRequest());
+
+    then(commentService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("direction 없이 댓글 목록을 조회하면 실패한다")
+  void direction_없이_댓글_목록_조회시_실패() throws Exception {
+    mockMvc.perform(commentSearchRequestWithRequestUserHeader()
+            .param("articleId", UUID.randomUUID().toString())
+            .param("orderBy", "createdAt")
+            .param("limit", "10"))
+        .andExpect(status().isBadRequest());
+
+    then(commentService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("limit이 0이면 댓글 목록 조회에 실패한다")
+  void limit이_0이면_댓글_목록_조회시_실패() throws Exception {
+    mockMvc.perform(commentSearchRequestWithRequestUserHeader()
+            .param("articleId", UUID.randomUUID().toString())
+            .param("orderBy", "createdAt")
+            .param("direction", "DESC")
+            .param("limit", "0"))
         .andExpect(status().isBadRequest());
 
     then(commentService).shouldHaveNoInteractions();
