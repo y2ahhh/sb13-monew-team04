@@ -11,6 +11,7 @@ public record CommentSearchCommand (
     Sort.Direction direction,
     String cursor,
     LocalDateTime after,
+    UUID idAfter,
     int limit,
     UUID requestUserId
 ){}

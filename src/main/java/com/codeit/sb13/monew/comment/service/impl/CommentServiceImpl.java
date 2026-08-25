@@ -58,6 +58,7 @@ public class CommentServiceImpl implements CommentService {
         command.direction(),
         command.cursor(),
         command.after(),
+        command.idAfter(),
         command.limit(),
         command.requestUserId()
     ));
