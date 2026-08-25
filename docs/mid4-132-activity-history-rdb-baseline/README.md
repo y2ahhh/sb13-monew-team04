@@ -4,11 +4,23 @@
 
 활동내역 RDB 조회의 SQL baseline, 단일 사용자 활동내역 API baseline, 병목 후보를 정리한다. SQL 원문과 EXPLAIN은 조회별 상세 문서에 남기고, API p95/p99, error rate, DB 부하는 [api-baseline.md](api-baseline.md)에 기록한다.
 
+## Seed Scale 정의
+
+이 문서의 `100k`, `1m`, `10m`은 각 테이블 row 수가 아니라 `seed_activity_history(scale_count)`에 전달한 seed scale이다. 실제 row 수는 seed 함수에서 도메인 분포에 맞춰 파생된다.
+
+- `articles`: `scale_count / 5`
+- `comments`: `scale_count * 0.4`
+- `comment_likes`: `scale_count * 0.3`
+- `article_views`: `scale_count - comments - comment_likes`
+- target user의 최근 댓글, 좋아요, 조회 row 수: `scale_count / 100`, 최소 `1,000`, 최대 `10,000`
+
+따라서 `10m seed scale`은 각 테이블이 1,000만 건이라는 뜻이 아니며, 실제 테이블별 row count는 Seed 결과 표에 따로 기록한다.
+
 ## 상세 문서
 
 | 구분 | 상세 문서 | 기준 결과 | 1차 후보 또는 판단 |
 | --- | --- | ---: | --- |
-| 단일 활동내역 API | [api-baseline.md](api-baseline.md) | `1m p95 474.02 ms`, `10m dropped 979` | 100k/1m은 20 rps 통과, 10m은 처리량/latency 기준 실패 |
+| 단일 활동내역 API | [api-baseline.md](api-baseline.md) | `1m p95 474.02 ms`, `10m dropped 979` | 100k/1m seed scale은 20 rps 통과, 10m seed scale은 처리량/latency 기준 실패 |
 | 최근 작성 댓글 | [recent-comments.md](recent-comments.md) | `10m median 82.747 ms` | `comments(user_id, created_at DESC, id DESC)` |
 | 최근 좋아요한 댓글 | [recent-liked-comments.md](recent-liked-comments.md) | `10m median 45.905 ms` | `comment_likes(liked_by, created_at DESC, id DESC)` |
 | 최근 조회 기사 | [recent-article-views.md](recent-article-views.md) | `10m median 1825.932 ms` | `article_views(user_id, viewed_at DESC, id DESC)`, `comments(article_id)` |
@@ -18,13 +30,13 @@
 
 측정 대상은 `GET /api/user-activities/{userId}`이며, PR #69의 k6 스크립트를 파일 diff에 포함하지 않고 stdin으로 주입해 실행했다.
 
-| scale | seed 소요 시간 | requests | RPS | duration avg | duration p95 | duration p99 | error rate | dropped iterations | 판단 |
+| seed scale | seed 소요 시간 | requests | RPS | duration avg | duration p95 | duration p99 | error rate | dropped iterations | 판단 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | `100k` | `3.497 s` | `1201` | `20.01` | `46.20 ms` | `53.58 ms` | `63.40 ms` | `0.00%` | `0` | pass |
 | `1m` | `15.027 s` | `1201` | `19.97` | `379.20 ms` | `474.02 ms` | `657.60 ms` | `0.00%` | `0` | pass |
 | `10m` | `129.231 s` | `222` | `3.11` | `28084.62 ms` | `32353.24 ms` | `43167.63 ms` | `0.00%` | `979` | fail |
 
-10m baseline은 k6가 max VUs `100`에 도달했고 `droppedIterations=979`가 발생해 20 req/s 요청 스케줄을 따라가지 못했다. baseline 실행 중 PostgreSQL 컨테이너는 1m에서 `CPU 1020.92%`, 10m에서 `CPU 939.03%`, `MEM 2.344 GiB / 30.91 GiB`까지 관측됐다. scale별 DB stats는 [api-baseline.md](api-baseline.md)에 기록한다.
+10m seed scale baseline은 k6가 max VUs `100`에 도달했고 `droppedIterations=979`가 발생해 20 req/s 요청 스케줄을 따라가지 못했다. baseline 실행 중 PostgreSQL 컨테이너는 1m에서 `CPU 1020.92%`, 10m에서 `CPU 939.03%`, `MEM 2.344 GiB / 30.91 GiB`까지 관측됐다. seed scale별 DB stats는 [api-baseline.md](api-baseline.md)에 기록한다.
 
 요청 1건 기준 SQL은 코드 경로상 6개로 본다.
 
@@ -149,7 +161,7 @@ MySQL InnoDB는 PostgreSQL과 다르게 FK referencing column에 적절한 인�
 
 ## 측정 방법
 
-각 scale마다 아래 순서로 진행했다.
+각 seed scale마다 아래 순서로 진행했다.
 
 1. `postgres-seed`로 데이터를 처음부터 재생성한다.
 2. seed 함수 끝에서 대상 테이블을 `ANALYZE`해 통계 정보를 갱신한다.
@@ -175,7 +187,7 @@ docker compose -p monew-perf-rerun --env-file .env.perf.local --profile perf-see
 
 ## Seed 결과
 
-| Scale | Seed 소요 시간 | DB size | users | interests | keywords | subscriptions | articles | comments | comment_likes | article_views | target rows |
+| Seed scale | Seed 소요 시간 | DB size | users | interests | keywords | subscriptions | articles | comments | comment_likes | article_views | target recent rows per activity |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `100k` | `3.254 s` | `36 MB` | `1,000` | `500` | `1,500` | `5,045` | `20,000` | `40,000` | `30,000` | `30,000` | `1,000` |
 | `1m` | `15.047 s` | `283 MB` | `10,000` | `5,000` | `15,000` | `50,045` | `200,000` | `400,000` | `300,000` | `300,000` | `10,000` |
@@ -183,7 +195,7 @@ docker compose -p monew-perf-rerun --env-file .env.perf.local --profile perf-see
 
 주요 테이블 크기:
 
-| Scale | articles | comments | comment_likes | article_views | users | subscriptions |
+| Seed scale | articles | comments | comment_likes | article_views | users | subscriptions |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `100k` | `8624 kB` | `5920 kB` | `4992 kB` | `7136 kB` | `304 kB` | `1048 kB` |
 | `1m` | `85 MB` | `57 MB` | `48 MB` | `69 MB` | `2456 kB` | `9728 kB` |
@@ -191,7 +203,7 @@ docker compose -p monew-perf-rerun --env-file .env.perf.local --profile perf-see
 
 구독 관심사 조회 대상 데이터:
 
-| Scale | target subscriptions | target keywords | DB size |
+| Seed scale | target subscriptions | target keywords | DB size |
 | --- | ---: | ---: | ---: |
 | `100k` | `50` | `150` | `36 MB` |
 | `1m` | `50` | `150` | `283 MB` |
@@ -199,7 +211,7 @@ docker compose -p monew-perf-rerun --env-file .env.perf.local --profile perf-see
 
 API baseline 직전 seed row count:
 
-| scale | users | interests | subscriptions | articles | comments | comment_likes | article_views |
+| seed scale | users | interests | subscriptions | articles | comments | comment_likes | article_views |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `100k` | `1,000` | `500` | `5,045` | `20,000` | `40,000` | `30,000` | `30,000` |
 | `1m` | `10,000` | `5,000` | `50,045` | `200,000` | `400,000` | `300,000` | `300,000` |
@@ -207,7 +219,7 @@ API baseline 직전 seed row count:
 
 ## SQL 실행 시간 요약
 
-| Scale | 조회 | EXPLAIN Execution Time | 반복 실행 시간 5회 | Median |
+| Seed scale | 조회 | EXPLAIN Execution Time | 반복 실행 시간 5회 | Median |
 | --- | --- | ---: | --- | ---: |
 | `100k` | 최근 작성 댓글 | `7.736 ms` | `8.953`, `8.983`, `11.553`, `9.165`, `8.712 ms` | `8.983 ms` |
 | `100k` | 최근 좋아요한 댓글 | `8.936 ms` | `9.066`, `9.725`, `11.235`, `9.524`, `8.936 ms` | `9.524 ms` |
@@ -230,14 +242,14 @@ API baseline 직전 seed row count:
 
 ## MID4-125 연결 판단
 
-100k와 1m API baseline은 20 req/s에서 dropped iteration 없이 통과했다. 단, 1m은 p95가 `474.02 ms`까지 증가하고 PostgreSQL CPU가 `1020.92%`까지 관측되어 여유가 크다고 보기는 어렵다.
+100k와 1m seed scale API baseline은 20 req/s에서 dropped iteration 없이 통과했다. 단, 1m seed scale은 p95가 `474.02 ms`까지 증가하고 PostgreSQL CPU가 `1020.92%`까지 관측되어 여유가 크다고 보기는 어렵다.
 
-10m API baseline은 같은 조건에서 `requests=222`, `RPS=3.11`, `droppedIterations=979`, `p95=32353.24 ms`로 측정되어 20 req/s를 처리하지 못했다. error rate는 `0.00%`였으므로 응답 성공 여부가 아니라 처리량과 latency가 병목이다.
+10m seed scale API baseline은 같은 조건에서 `requests=222`, `RPS=3.11`, `droppedIterations=979`, `p95=32353.24 ms`로 측정되어 20 req/s를 처리하지 못했다. error rate는 `0.00%`였으므로 응답 성공 여부가 아니라 처리량과 latency가 병목이다.
 
-10m SQL baseline에서는 최근 조회 기사 쿼리가 `1825.932 ms` median으로 가장 큰 병목 후보이며, `article_views.user_id` 접근 경로와 `comments.article_id` 반복 scan을 먼저 RDB 인덱스 후보로 검증해야 한다.
+10m seed scale SQL baseline에서는 최근 조회 기사 쿼리가 `1825.932 ms` median으로 가장 큰 병목 후보이며, `article_views.user_id` 접근 경로와 `comments.article_id` 반복 scan을 먼저 RDB 인덱스 후보로 검증해야 한다.
 
 따라서 MID4-125 판단에는 다음 순서로 연결한다.
 
 1. MID4-133에서 RDB 인덱스 후보를 먼저 반영한다.
-2. 같은 seed와 k6 조건으로 10m API baseline을 재측정한다.
-3. RDB 최적화 이후에도 10m에서 p95/p99, dropped iterations, DB 부하가 목표를 넘으면 병목 조회를 MongoDB Read Model 후보로 올린다.
+2. 같은 seed scale과 k6 조건으로 10m API baseline을 재측정한다.
+3. RDB 최적화 이후에도 10m seed scale에서 p95/p99, dropped iterations, DB 부하가 목표를 넘으면 병목 조회를 MongoDB Read Model 후보로 올린다.

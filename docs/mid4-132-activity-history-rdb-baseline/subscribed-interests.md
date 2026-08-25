@@ -2,11 +2,13 @@
 
 ## 해석
 
-구독 중인 관심사 조회는 `MID4-92`의 최종 조회 로직 기준으로 `subscriptions.created_at DESC, subscriptions.id DESC` 정렬을 포함한다. 대상 사용자의 구독은 50건이지만, main query에서 `subscriptions.user_id` 조건을 처리할 인덱스가 없어 scale이 커질수록 `Seq Scan` 또는 `Parallel Seq Scan`이 발생한다.
+이 문서의 `100k`, `1m`, `10m`은 각 테이블 row 수가 아니라 `seed_activity_history(scale_count)`에 전달한 seed scale이다. 실제 테이블별 row count는 README의 Seed 결과 표를 기준으로 본다.
 
-현재 `(interest_id, user_id)` unique index는 관심사별 구독자 수 subquery에는 사용되지만, 특정 사용자의 구독 목록을 찾는 main query에는 선두 컬럼이 맞지 않아 직접 사용되지 않는다. 100k와 10m 실행계획을 보면 정렬 노드의 비용보다 `subscriptions.user_id` 조건을 full scan으로 처리하는 비용이 더 명확한 병목으로 보인다. 정렬 추가 전 baseline과 비교해도 예측 비용과 실행 시간이 크게 벌어지지 않아, 현재 단계에서는 정렬 자체를 큰 병목으로 보기는 어렵다.
+구독 중인 관심사 조회는 `MID4-92`의 최종 조회 로직 기준으로 `subscriptions.created_at DESC, subscriptions.id DESC` 정렬을 포함한다. 대상 사용자의 구독은 50건이지만, main query에서 `subscriptions.user_id` 조건을 처리할 인덱스가 없어 seed scale이 커질수록 `Seq Scan` 또는 `Parallel Seq Scan`이 발생한다.
 
-keywords batch 조회는 Hibernate가 PostgreSQL에서 `interest_id = any (?)` 형태로 실행한다. `uk_keywords_interest_keyword(interest_id, keyword)`는 조회 조건의 선두 컬럼과 맞으므로 `1m`, `10m`에서는 사용됐다. `100k`에서는 데이터가 작아 planner가 `Seq Scan`을 선택했다.
+현재 `(interest_id, user_id)` unique index는 관심사별 구독자 수 subquery에는 사용되지만, 특정 사용자의 구독 목록을 찾는 main query에는 선두 컬럼이 맞지 않아 직접 사용되지 않는다. 100k와 10m seed scale 실행계획을 보면 정렬 노드의 비용보다 `subscriptions.user_id` 조건을 full scan으로 처리하는 비용이 더 명확한 병목으로 보인다. 정렬 추가 전 baseline과 비교해도 예측 비용과 실행 시간이 크게 벌어지지 않아, 현재 단계에서는 정렬 자체를 큰 병목으로 보기는 어렵다.
+
+keywords batch 조회는 Hibernate가 PostgreSQL에서 `interest_id = any (?)` 형태로 실행한다. `uk_keywords_interest_keyword(interest_id, keyword)`는 조회 조건의 선두 컬럼과 맞으므로 `1m`, `10m` seed scale에서는 사용됐다. `100k` seed scale에서는 keywords row 수가 작아 planner가 `Seq Scan`을 선택했다.
 
 ## 인덱스 후보
 
@@ -113,7 +115,7 @@ WHERE k1_0.interest_id = ANY (ARRAY[
 
 ## 실행 시간
 
-| Scale | 조회 | EXPLAIN Execution Time | 반복 실행 시간 5회 | Median |
+| Seed scale | 조회 | EXPLAIN Execution Time | 반복 실행 시간 5회 | Median |
 | --- | --- | ---: | --- | ---: |
 | `100k` | 구독 중인 관심사 main | `5.517 ms` | `3.951`, `3.803`, `4.980`, `4.414`, `4.327 ms` | `4.327 ms` |
 | `100k` | 구독 관심사 keywords | `0.099 ms` | `0.538`, `0.449`, `0.446`, `0.450`, `0.517 ms` | `0.450 ms` |
@@ -158,7 +160,7 @@ WHERE k1_0.interest_id = ANY (ARRAY[
 - `ORDER BY s1_0.created_at DESC, s1_0.id DESC`는 worker별 `Sort`와 `Gather Merge`로 처리했지만, 실행계획상 핵심 병목은 정렬보다 `subscriptions.user_id` 접근 경로 부재로 본다.
 - 관심사별 구독자 수 subquery는 `uk_subscriptions_interest_user`를 `interest_id = ...` 조건으로 사용했다.
 - keywords query는 `uk_keywords_interest_keyword`를 `interest_id = any (...)` 조건으로 사용했다.
-- 요청 1건 기준 total median은 `11.635 ms`다. 현재 scale에서는 다른 최근 활동 조회보다 낮지만, main query가 전체 subscriptions를 훑는 구조라 데이터 증가 시 병목 후보로 남는다.
+- 요청 1건 기준 total median은 `11.635 ms`다. 현재 seed scale에서는 다른 최근 활동 조회보다 낮지만, main query가 전체 subscriptions를 훑는 구조라 데이터 증가 시 병목 후보로 남는다.
 
 ## EXPLAIN 실행계획 주요 원문
 

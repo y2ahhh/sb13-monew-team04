@@ -9,9 +9,13 @@
 - k6 실행 방식: PR #69 스크립트를 stdin으로 주입, MID4-132 PR diff에는 k6 파일을 포함하지 않음
 - DB: `monew-perf-132-postgres-1`, PostgreSQL 16.14, port `5433 -> 5432`
 
-측정 scale:
+## Seed Scale 정의
 
-| scale | seed 소요 시간 | DB size | users | interests | subscriptions | articles | comments | comment_likes | article_views |
+이 문서의 `100k`, `1m`, `10m`은 각 테이블 row 수가 아니라 `seed_activity_history(scale_count)`에 전달한 seed scale이다. 실제 row 수는 seed 함수에서 도메인 분포에 맞춰 파생되며, 아래 표에 측정 직전 row count를 함께 기록한다.
+
+target user의 최근 댓글, 좋아요, 조회 row 수는 `scale_count / 100`이고 최소 `1,000`, 최대 `10,000`으로 제한된다. 따라서 `10m seed scale`은 각 테이블 1,000만 건이 아니라 `articles=2,000,000`, `comments=4,000,000`, `comment_likes=3,000,000`, `article_views=3,000,000`인 분포형 seed다.
+
+| seed scale | seed 소요 시간 | DB size | users | interests | subscriptions | articles | comments | comment_likes | article_views |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `100k` | `3.497 s` | `36 MB` | `1,000` | `500` | `5,045` | `20,000` | `40,000` | `30,000` | `30,000` |
 | `1m` | `15.027 s` | `283 MB` | `10,000` | `5,000` | `50,045` | `200,000` | `400,000` | `300,000` | `300,000` |
@@ -21,7 +25,7 @@
 
 smoke는 서버 기동 직후 단일 요청 검증이며, baseline 판단값으로 사용하지 않는다. `1m`, `10m` smoke는 HTTP 상태와 body check는 통과했지만 기본 duration threshold `p95 < 1000 ms`를 넘어서 k6 exit code는 실패였다.
 
-| scale | requests | RPS | dropped iterations | error rate | duration avg | duration p95 | duration p99 | checks rate | threshold |
+| seed scale | requests | RPS | dropped iterations | error rate | duration avg | duration p95 | duration p99 | checks rate | threshold |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | `100k` | `1` | `1.73` | `0` | `0.00%` | `573.67 ms` | `573.67 ms` | `573.67 ms` | `100.00%` | pass |
 | `1m` | `1` | `0.45` | `0` | `0.00%` | `1206.74 ms` | `1206.74 ms` | `1206.74 ms` | `100.00%` | duration threshold fail |
@@ -42,7 +46,7 @@ smoke는 서버 기동 직후 단일 요청 검증이며, baseline 판단값으�
 
 결과:
 
-| scale | summary path | requests | RPS | dropped iterations | error rate | duration avg | duration p95 | duration p99 | checks rate | threshold |
+| seed scale | summary path | requests | RPS | dropped iterations | error rate | duration avg | duration p95 | duration p99 | checks rate | threshold |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | `100k` | `/results/activity-history-100k-baseline-summary.json` | `1201` | `20.01` | `0` | `0.00%` | `46.20 ms` | `53.58 ms` | `63.40 ms` | `100.00%` | pass |
 | `1m` | `/results/activity-history-1m-baseline-summary.json` | `1201` | `19.97` | `0` | `0.00%` | `379.20 ms` | `474.02 ms` | `657.60 ms` | `100.00%` | pass |
@@ -109,7 +113,7 @@ baseline 직전 `pg_stat_reset()`을 실행해 통계를 분리했다.
 
 중간 Docker stats:
 
-| scale | CPU | MEM | NET I/O | BLOCK I/O | PIDS |
+| seed scale | CPU | MEM | NET I/O | BLOCK I/O | PIDS |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `100k` | `66.67%` | `78.62MiB / 30.91GiB` | `2.99MB / 17.7MB` | `52.7MB / 188MB` | `16` |
 | `1m` | `1020.92%` | `425.5MiB / 30.91GiB` | `3.06MB / 18.4MB` | `235MB / 1.32GB` | `21` |
@@ -117,7 +121,7 @@ baseline 직전 `pg_stat_reset()`을 실행해 통계를 분리했다.
 
 중간 `pg_stat_activity`:
 
-| scale | state | wait_event_type | count |
+| seed scale | state | wait_event_type | count |
 | --- | --- | --- | ---: |
 | `100k` | active |  | `1` |
 | `100k` | idle | `Client` | `10` |
@@ -130,7 +134,7 @@ baseline 직전 `pg_stat_reset()`을 실행해 통계를 분리했다.
 
 baseline 직후 `pg_stat_database`:
 
-| scale | xact_commit | xact_rollback | blks_read | blks_hit | cache_hit_pct | tup_returned | tup_fetched | temp_files | temp_bytes | deadlocks |
+| seed scale | xact_commit | xact_rollback | blks_read | blks_hit | cache_hit_pct | tup_returned | tup_fetched | temp_files | temp_bytes | deadlocks |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `100k` | `6040` | `0` | `4` | `25,672,054` | `100.00` | `699,736,085` | `5,636,161` | `0` | `0` | `0` |
 | `1m` | `20,517` | `0` | `971,241` | `89,681,578` | `98.93` | `6,068,642,963` | `2,964,713` | `0` | `0` | `0` |
@@ -138,7 +142,7 @@ baseline 직후 `pg_stat_database`:
 
 baseline 직후 Docker stats:
 
-| scale | CPU | MEM | NET I/O | BLOCK I/O | PIDS |
+| seed scale | CPU | MEM | NET I/O | BLOCK I/O | PIDS |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `100k` | `0.17%` | `79.13MiB / 30.91GiB` | `4.52MB / 26.9MB` | `52.7MB / 206MB` | `16` |
 | `1m` | `0.02%` | `395.1MiB / 30.91GiB` | `4.56MB / 27.7MB` | `236MB / 1.36GB` | `16` |
@@ -161,8 +165,8 @@ Spring transaction 경계는 상위 활동내역 서비스 전체에 하나로 �
 
 ## 병목 판단
 
-100k와 1m API baseline은 20 req/s에서 dropped iteration 없이 통과했다. 단, 1m에서는 p95가 `474.02 ms`까지 증가하고 PostgreSQL CPU가 약 `1020.92%`까지 올라가므로 여유가 크다고 보기는 어렵다.
+100k와 1m seed scale API baseline은 20 req/s에서 dropped iteration 없이 통과했다. 단, 1m seed scale에서는 p95가 `474.02 ms`까지 증가하고 PostgreSQL CPU가 약 `1020.92%`까지 올라가므로 여유가 크다고 보기는 어렵다.
 
-10m API baseline은 같은 조건에서 요청 스케줄을 따라가지 못했다. k6가 max VUs `100`에 도달했고 `droppedIterations=979`, `RPS=3.11`, `p95=32353.24 ms`로 측정됐다. error rate는 `0.00%`였으므로 응답 자체는 성공했지만, 처리량과 latency 기준으로는 RDB 직접 조회 baseline을 통과하지 못한 결과다.
+10m seed scale API baseline은 같은 조건에서 요청 스케줄을 따라가지 못했다. k6가 max VUs `100`에 도달했고 `droppedIterations=979`, `RPS=3.11`, `p95=32353.24 ms`로 측정됐다. error rate는 `0.00%`였으므로 응답 자체는 성공했지만, 처리량과 latency 기준으로는 RDB 직접 조회 baseline을 통과하지 못한 결과다.
 
-SQL 단위 10m baseline에서는 최근 조회 기사가 `1825.932 ms` median으로 가장 크다. 병목 후보는 `article_views.user_id` 접근 경로 부재와 댓글 수 subquery의 `comments.article_id` 반복 scan이다. MongoDB Read Model 적용 판단 전 MID4-133에서 RDB 인덱스 후보를 먼저 검증해야 한다.
+SQL 단위 10m seed scale baseline에서는 최근 조회 기사가 `1825.932 ms` median으로 가장 크다. 병목 후보는 `article_views.user_id` 접근 경로 부재와 댓글 수 subquery의 `comments.article_id` 반복 scan이다. MongoDB Read Model 적용 판단 전 MID4-133에서 RDB 인덱스 후보를 먼저 검증해야 한다.

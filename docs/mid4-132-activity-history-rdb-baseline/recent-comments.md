@@ -2,6 +2,8 @@
 
 ## 해석
 
+이 문서의 `100k`, `1m`, `10m`은 각 테이블 row 수가 아니라 `seed_activity_history(scale_count)`에 전달한 seed scale이다. 실제 테이블별 row count는 README의 Seed 결과 표를 기준으로 본다.
+
 최근 작성 댓글은 `comments.user_id` FK 제약은 있지만 PostgreSQL에서 해당 FK 컬럼 기준 인덱스가 자동 생성되지 않아 사용자 조건으로 먼저 좁히지 못하고, 이후 `created_at DESC, id DESC` 정렬 비용이 발생한다. `deleted_at IS NULL` filter는 남지만 현재 실행계획에서는 조회 경로와 정렬 비용이 더 큰 병목으로 보이므로 1차 인덱스 후보에서는 제외한다.
 
 ## 인덱스 후보
@@ -45,7 +47,7 @@ FETCH FIRST 10 ROWS ONLY;
 
 ## 실행 시간
 
-| Scale | 조회 | EXPLAIN Execution Time | 반복 실행 시간 5회 | Median |
+| Seed scale | 조회 | EXPLAIN Execution Time | 반복 실행 시간 5회 | Median |
 | --- | --- | ---: | --- | ---: |
 | `100k` | 최근 작성 댓글 | `7.736 ms` | `8.953`, `8.983`, `11.553`, `9.165`, `8.712 ms` | `8.983 ms` |
 | `1m` | 최근 작성 댓글 | `12.836 ms` | `14.151`, `13.587`, `13.720`, `17.696`, `14.005 ms` | `14.005 ms` |
