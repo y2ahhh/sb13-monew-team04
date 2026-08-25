@@ -6,11 +6,13 @@ import com.codeit.sb13.monew.interest.domain.Interest;
 import com.codeit.sb13.monew.interest.domain.Keyword;
 import com.codeit.sb13.monew.interest.domain.Subscribe;
 import com.codeit.sb13.monew.interest.service.InterestServiceImpl;
+import com.codeit.sb13.monew.notification.service.NotificationService;
 import com.codeit.sb13.monew.user.domain.User;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
@@ -138,7 +140,9 @@ class InterestRepositoryTest {
         em.flush();
         em.clear();
 
-        InterestServiceImpl interestService = new InterestServiceImpl(interestRepository, subscribeRepository);
+        // notifyForNewArticles()는 이 테스트와 무관해 실제 빈 대신 목으로 채운다.
+        InterestServiceImpl interestService = new InterestServiceImpl(
+                interestRepository, subscribeRepository, Mockito.mock(NotificationService.class));
 
         // when
         interestService.delete(interest.getId());

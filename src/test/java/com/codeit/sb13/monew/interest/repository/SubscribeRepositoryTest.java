@@ -116,6 +116,50 @@ class SubscribeRepositoryTest {
         }
     }
 
+    @Nested
+    @DisplayName("findSubscriberUsersByInterestId()")
+    class FindSubscriberUsersByInterestId {
+
+        @Test
+        @DisplayName("해당 관심사를 구독 중인 사용자만 반환한다")
+        void returnsOnlySubscribersOfThatInterest() {
+            Interest target = persistInterest("스포츠", "축구");
+            Interest other = persistInterest("여행", "국내여행");
+            User subscriber = persistUser("구독자");
+            User otherInterestSubscriber = persistUser("다른관심사구독자");
+            persistSubscribe(target, subscriber);
+            persistSubscribe(other, otherInterestSubscriber);
+
+            List<User> result = subscribeRepository.findSubscriberUsersByInterestId(target.getId());
+
+            assertThat(result).extracting(User::getId).containsExactly(subscriber.getId());
+        }
+
+        @Test
+        @DisplayName("논리 삭제된 사용자는 제외한다")
+        void excludesDeletedUsers() {
+            Interest interest = persistInterest("스포츠", "축구");
+            User active = persistUser("활성사용자");
+            User deleted = persistDeletedUser("삭제사용자");
+            persistSubscribe(interest, active);
+            persistSubscribe(interest, deleted);
+
+            List<User> result = subscribeRepository.findSubscriberUsersByInterestId(interest.getId());
+
+            assertThat(result).extracting(User::getId).containsExactly(active.getId());
+        }
+
+        @Test
+        @DisplayName("구독자가 없으면 빈 목록을 반환한다")
+        void noSubscribers_returnsEmptyList() {
+            Interest interest = persistInterest("스포츠", "축구");
+
+            List<User> result = subscribeRepository.findSubscriberUsersByInterestId(interest.getId());
+
+            assertThat(result).isEmpty();
+        }
+    }
+
     @Test
     @DisplayName("countByInterest_Id()는 해당 관심사를 구독 중인 사용자 수만 센다")
     void countByInterest_Id_countsOnlyThatInterestsSubscriptions() {
