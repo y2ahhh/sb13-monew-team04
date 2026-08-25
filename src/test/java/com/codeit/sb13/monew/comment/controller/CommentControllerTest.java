@@ -8,9 +8,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.comment.service.CommentService;
+import com.codeit.sb13.monew.comment.service.CommentOrderBy;
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
+import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
 import com.codeit.sb13.monew.user.domain.User;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -72,4 +75,45 @@ public class CommentControllerTest {
         .andExpect(jsonPath("$.likeCount").value(0))
         .andExpect(jsonPath("$.likedByMe").value(false));
   }
+
+  @Test
+  @DisplayName("댓글 목록 조회 성공 - RED")
+  void 댓글_목록_조회_성공() throws Exception {
+    // given
+    UUID articleId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
+    UUID commentId = UUID.randomUUID();
+    LocalDateTime createdAt = LocalDateTime.of(2026, 8, 25, 10, 30);
+    CommentDto comment = new CommentDto(
+        commentId, articleId, UUID.randomUUID(), "작성자", "댓글 내용", 2L, true, createdAt);
+    CursorPageResponseDto<CommentDto> response = new CursorPageResponseDto<>(
+        List.of(comment), createdAt.toString(), createdAt.toString(), commentId.toString(), 1, 1L, false);
+
+    given(commentService.search(argThat(command -> command != null
+        && articleId.equals(command.articleId())
+        && command.orderBy() == CommentOrderBy.CREATED_AT
+        && command.direction().isDescending()
+        && command.cursor() == null
+        && command.after() == null
+        && command.idAfter() == null
+        && command.limit() == 10
+        && requestUserId.equals(command.requestUserId())))).willReturn(response);
+
+    // when & then
+    mockMvc.perform(get("/api/comments")
+            .param("articleId", articleId.toString())
+            .param("orderBy", "createdAt")
+            .param("direction", "DESC")
+            .param("limit", "10")
+            .header("Monew-Request-User-ID", requestUserId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].id").value(commentId.toString()))
+        .andExpect(jsonPath("$.content[0].likeCount").value(2))
+        .andExpect(jsonPath("$.content[0].likedByMe").value(true))
+        .andExpect(jsonPath("$.nextCursor").value(createdAt.toString()))
+        .andExpect(jsonPath("$.nextAfter").value(createdAt.toString()))
+        .andExpect(jsonPath("$.nextIdAfter").value(commentId.toString()))
+        .andExpect(jsonPath("$.hasNext").value(false));
+  }
+
 }
