@@ -5,6 +5,9 @@ import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.comment.domain.Comment;
 
+import com.codeit.sb13.monew.comment.repository.dto.CommentSearchCondition;
+import com.codeit.sb13.monew.comment.repository.dto.CommentSearchProjection;
+import com.codeit.sb13.monew.comment.repository.dto.CommentSearchResult;
 import com.codeit.sb13.monew.comment.repository.dto.RecentCommentActivityProjection;
 import com.codeit.sb13.monew.comment.service.CommentOrderBy;
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;
@@ -282,12 +285,14 @@ class CommentRepositoryTest {
     }
 
 
+
+    // 댓글 목록 조회 ---------
     @Test
-    @DisplayName("생성일 기준 오름차순으로 댓글 조회한다 - RED")
+    @DisplayName("생성일 기준 오름차순으로 댓글 조회한다 - GREEN")
     void search_orderByCreatedAtAscending() {
         // given
-        User requestUser = new User("request@eamil.com", "요청자", "testPassword!");
-        User writer = new User("writer@eamil.com", "작성자", "testPassword?");
+        User requestUser = userRepository.saveAndFlush(new User("request@email.com", "요청자", "testPassword!"));
+        User writer = userRepository.saveAndFlush(new User("writer@email.com", "작성자", "testPassword?"));
         Article article = articleRepository.saveAndFlush(createArticle("테스트 기사", "테스트 기사 내용", "testLink"));
 
         Comment oldest = commentRepository.saveAndFlush(new Comment(article, writer, "오래된 댓글"));
@@ -325,11 +330,11 @@ class CommentRepositoryTest {
 
 
     @Test
-    @DisplayName("생성일 기준 내림차순으로 댓글 조회한다 RED")
+    @DisplayName("생성일 기준 내림차순으로 댓글 조회한다 - GREEN")
     void search_orderByCreatedAtDescending() {
         // given
-        User requestUser = new User("request@eamil.com", "요청자", "testPassword!");
-        User writer = new User("writer@eamil.com", "작성자", "testPassword?");
+        User requestUser = userRepository.saveAndFlush(new User("request@email.com", "요청자", "testPassword!"));
+        User writer = userRepository.saveAndFlush(new User("writer@email.com", "작성자", "testPassword?"));
         Article article = articleRepository.saveAndFlush(createArticle("테스트 기사", "테스트 기사 내용", "testLink"));
 
         Comment oldest = commentRepository.saveAndFlush(new Comment(article, writer, "오래된 댓글"));

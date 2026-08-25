@@ -7,10 +7,14 @@ import static org.mockito.BDDMockito.*;
 import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.repository.ArticleRepository;
+import com.codeit.sb13.monew.comment.repository.dto.CommentSearchCondition;
+import com.codeit.sb13.monew.comment.repository.dto.CommentSearchProjection;
+import com.codeit.sb13.monew.comment.repository.dto.CommentSearchResult;
 import com.codeit.sb13.monew.comment.service.dto.CommentDto;
 import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.comment.service.dto.CommentRegisterCommand;
+import com.codeit.sb13.monew.comment.service.dto.CommentSearchCommand;
 import com.codeit.sb13.monew.comment.service.impl.CommentServiceImpl;
 import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
 import com.codeit.sb13.monew.user.domain.User;
@@ -92,16 +96,36 @@ public class CommentServiceTest {
   }
 
   @Test
-  @DisplayName("생성일 기준 내림차순으로 댓글 목록 조회 - RED")
+  @DisplayName("생성일 기준 내림차순으로 댓글 목록 조회 - GREEN")
   void 생성일_내림차순_기준_댓글_목록_조회() {
     // given
     UUID articleId = UUID.randomUUID();
     UUID requestUserId = UUID.randomUUID();
+    UUID commentId = UUID.randomUUID();
+    UUID writerId = UUID.randomUUID();
+    LocalDateTime createdAt = LocalDateTime.of(2024, 6, 1, 12, 0);
 
     CommentSearchCommand command=new CommentSearchCommand(articleId, CommentOrderBy.CREATED_AT,
         Direction.DESC, null, null, 50, requestUserId);
 
-    given(commentRepository.search(any(CommentSearchCondition.class))).willReturn(List.of());
+    CommentSearchProjection projection = new CommentSearchProjection(
+        commentId,
+        articleId,
+        writerId,
+        "작성자 닉네임",
+        "테스트 댓글 내용",
+        3L,
+        true,
+        createdAt
+    );
+
+    CommentSearchResult page=new CommentSearchResult(
+        List.of(projection),
+        false,
+        1L
+    );
+
+    given(commentRepository.search(any(CommentSearchCondition.class))).willReturn(page);
 
     // when
     CursorPageResponseDto<CommentDto> result = commentService.search(command);
@@ -113,14 +137,25 @@ public class CommentServiceTest {
         && condition.cursor() == null
         && condition.after() == null
         && condition.limit() == 50
-        && condition.requestUserId().equals(requestUserId)));
+        && condition.requestUserId().equals(condition.requestUserId())));
 
-    assertThat(result).isNotNull();
+    Assertions.assertAll(
+        () -> assertThat(result.content()).hasSize(1),
+        () -> assertThat(result.content().get(0).id()).isEqualTo(commentId),
+        () -> assertThat(result.content().get(0).likeCount()).isEqualTo(3L),
+        () -> assertThat(result.content().get(0).likedByMe()).isTrue(),
+        () -> assertThat(result.nextCursor()).isEqualTo(createdAt.toString()),
+        ()->assertThat(result.nextAfter()).isEqualTo(createdAt.toString()),
+        ()->assertThat(result.nextIdAfter()).isEqualTo(commentId.toString()),
+        ()->assertThat(result.size()).isEqualTo(1),
+        ()->assertThat(result.totalElements()).isEqualTo(1L),
+        () -> assertThat(result.hasNext()).isFalse()
+    );
   }
 
 
   @Test
-  @DisplayName("생성일 기준 오름차순으로 댓글 목록 조회 - RED")
+  @DisplayName("생성일 기준 오름차순으로 댓글 목록 조회 - GREEN")
   void 생성일_오름차순_기준_댓글_목록_조회() {
     // given
     UUID articleId = UUID.randomUUID();
@@ -129,20 +164,23 @@ public class CommentServiceTest {
     CommentSearchCommand command=new CommentSearchCommand(articleId, CommentOrderBy.CREATED_AT,
         Direction.ASC, null, null, 50, requestUserId);
 
-    given(commentRepository.search(any(CommentSearchCondition.class))).willReturn(List.of());
+    given(commentRepository.search(any(CommentSearchCondition.class))).willReturn(new CommentSearchResult(List.of(), false, 0L));
 
     // when
     CursorPageResponseDto<CommentDto> result = commentService.search(command);
 
     // then
-    then(commentRepository).should(times(1)).search(argThat(condition -> condition.articleId().equals(articleId)
-        && condition.orderBy().equals(CommentOrderBy.CREATED_AT)
-        && condition.direction().equals(Direction.ASC)
-        && condition.cursor() == null
-        && condition.after() == null
-        && condition.limit() == 50
-        && condition.requestUserId().equals(requestUserId)));
+    then(commentRepository).should().search(argThat(condition -> condition.orderBy()==CommentOrderBy.CREATED_AT
+        && condition.direction().equals(Direction.ASC)));
 
-    assertThat(result).isNotNull();
+    Assertions.assertAll(
+        () -> assertThat(result.content()).isEmpty(),
+        () -> assertThat(result.nextCursor()).isNull(),
+        ()->assertThat(result.nextAfter()).isNull(),
+        ()->assertThat(result.nextIdAfter()).isNull(),
+        ()->assertThat(result.size()).isZero(),
+        ()->assertThat(result.totalElements()).isZero(),
+        () -> assertThat(result.hasNext()).isFalse()
+    );
   }
 }
