@@ -185,7 +185,7 @@ public class CommentServiceTest {
 
 
   @Test
-  @DisplayName("좋아요 수 기준 오름차순으로 댓글 목록 조회 - RED")
+  @DisplayName("좋아요 수 기준 오름차순으로 댓글 목록 조회 - GREEN")
   void 좋아요_오름차순_기준_댓글_목록_조회() {
     // given
     UUID articleId = UUID.randomUUID();

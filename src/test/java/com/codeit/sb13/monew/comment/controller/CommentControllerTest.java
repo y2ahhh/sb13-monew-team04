@@ -77,7 +77,7 @@ public class CommentControllerTest {
   }
 
   @Test
-  @DisplayName("댓글 목록 조회 성공 - RED")
+  @DisplayName("댓글 목록 조회 성공 - GREEN")
   void 댓글_목록_조회_성공() throws Exception {
     // given
     UUID articleId = UUID.randomUUID();
@@ -114,6 +114,36 @@ public class CommentControllerTest {
         .andExpect(jsonPath("$.nextAfter").value(createdAt.toString()))
         .andExpect(jsonPath("$.nextIdAfter").value(commentId.toString()))
         .andExpect(jsonPath("$.hasNext").value(false));
+  }
+
+
+  @Test
+  @DisplayName("커서 값 일부만 전달하면 댓글 목록 조회에 실패한다")
+  void 커서_값_일부_전달시_댓글_목록_조회_실패() throws Exception {
+    mockMvc.perform(get("/api/comments")
+            .param("articleId", UUID.randomUUID().toString())
+            .param("orderBy", "likeCount")
+            .param("direction", "DESC")
+            .param("cursor", "3")
+            .param("limit", "10")
+            .header("Monew-Request-User-ID", UUID.randomUUID()))
+        .andExpect(status().isBadRequest());
+
+    then(commentService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("지원하지 않는 정렬 기준이면 댓글 목록 조회에 실패한다")
+  void 지원하지_않는_정렬_기준이면_댓글_목록_조회_실패() throws Exception {
+    mockMvc.perform(get("/api/comments")
+            .param("articleId", UUID.randomUUID().toString())
+            .param("orderBy", "unknown")
+            .param("direction", "DESC")
+            .param("limit", "10")
+            .header("Monew-Request-User-ID", UUID.randomUUID()))
+        .andExpect(status().isBadRequest());
+
+    then(commentService).shouldHaveNoInteractions();
   }
 
 }
