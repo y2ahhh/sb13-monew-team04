@@ -13,7 +13,7 @@ import com.codeit.sb13.monew.notification.service.dto.CommentLikedDto;
 import com.codeit.sb13.monew.notification.service.dto.NotificationFindDto;
 import com.codeit.sb13.monew.notification.service.dto.NotificationResult;
 import com.codeit.sb13.monew.user.domain.User;
-import com.codeit.sb13.monew.user.repository.UserRepository;
+import com.codeit.sb13.monew.user.service.UserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -26,12 +26,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -48,7 +50,7 @@ class NotificationServiceImplTest {
     ArgumentCaptor<List<Notification>> notificationsCaptor;
 
     @Mock
-    UserRepository userRepository;
+    UserService userService;
 
     @Mock
     NotificationMapper mapper;
@@ -172,7 +174,6 @@ class NotificationServiceImplTest {
             Notification notification = Notification.create(user, "내용", UUID.randomUUID(), ResourceType.COMMENT);
 
             when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
-            when(userRepository.existsById(userId)).thenReturn(true);
 
             NotificationResult expectedResult = new NotificationResult(
                     notification.getId(), userId, "내용", notification.getResourceId(),
@@ -196,7 +197,6 @@ class NotificationServiceImplTest {
             UUID notificationId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
 
-            when(userRepository.existsById(userId)).thenReturn(true);
             when(notificationRepository.findById(notificationId)).thenReturn(Optional.empty());
 
             // when & then
@@ -210,7 +210,7 @@ class NotificationServiceImplTest {
             // given
             UUID notificationId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
-            when(userRepository.existsById(userId)).thenReturn(false);
+            doThrow(new UserNotFoundException(userId)).when(userService).validateExists(userId);
 
             // when & then
             assertThatThrownBy(() -> notificationServiceImpl.confirmNotification(notificationId, userId))
@@ -236,7 +236,6 @@ class NotificationServiceImplTest {
             Notification notification = Notification.create(owner, "내용", UUID.randomUUID(), ResourceType.COMMENT);
 
             when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(notification));
-            when(userRepository.existsById(otherId)).thenReturn(true);
 
             // when & then
             assertThatThrownBy(() -> notificationServiceImpl.confirmNotification(notificationId, otherId))
@@ -262,7 +261,6 @@ class NotificationServiceImplTest {
             Notification notification2 = Notification.create(user, "알림2", UUID.randomUUID(), ResourceType.INTEREST);
             List<Notification> notifications = List.of(notification1, notification2);
 
-            when(userRepository.existsById(userId)).thenReturn(true);
             when(notificationRepository.findByUser_IdAndConfirmedFalse(userId)).thenReturn(notifications);
 
             NotificationResult notificationResult = new NotificationResult(
@@ -287,7 +285,7 @@ class NotificationServiceImplTest {
         void 요청자_없으면_예외() {
             // given
             UUID userId = UUID.randomUUID();
-            when(userRepository.existsById(userId)).thenReturn(false);
+            doThrow(new UserNotFoundException(userId)).when(userService).validateExists(userId);
 
             // when & then
             assertThatThrownBy(() -> notificationServiceImpl.confirmAllNotifications(userId))
@@ -322,7 +320,6 @@ class NotificationServiceImplTest {
 
             NotificationFindDto request = new NotificationFindDto(null, null, limit, userId);
 
-            when(userRepository.existsById(userId)).thenReturn(true);
             when(notificationRepository.findUnconfirmedByUserWithCursor(
                     new NotificationFindCondition(userId, null, null, limit + 1)))
                     .thenReturn(List.of(n1, n2, n3));
@@ -359,7 +356,6 @@ class NotificationServiceImplTest {
 
             NotificationFindDto request = new NotificationFindDto(null, null, limit, userId);
 
-            when(userRepository.existsById(userId)).thenReturn(true);
             when(notificationRepository.findUnconfirmedByUserWithCursor(
                     new NotificationFindCondition(userId, null, null, limit + 1)))
                     .thenReturn(List.of(n1));
@@ -384,7 +380,7 @@ class NotificationServiceImplTest {
             // given
             UUID userId = UUID.randomUUID();
             NotificationFindDto request = new NotificationFindDto(null, null, 10, userId);
-            when(userRepository.existsById(userId)).thenReturn(false);
+            doThrow(new UserNotFoundException(userId)).when(userService).validateExists(userId);
 
             // when & then
             assertThatThrownBy(() -> notificationServiceImpl.findAllNotifications(request))
@@ -393,5 +389,40 @@ class NotificationServiceImplTest {
             verify(notificationRepository, never()).findUnconfirmedByUserWithCursor(any(NotificationFindCondition.class));
         }
 
+    }
+
+    @Nested
+    @DisplayName("deleteConfirmedNotification")
+    class DeleteConfirmedNotification {
+
+        @Test
+        @DisplayName("확인 처리된 지 7일 경과한 알림을 삭제하고, 삭제 기준 시각으로 '지금으로부터 7일 전'을 넘긴다.")
+        void 만료된_확인_알림_삭제() {
+            // given
+            when(notificationRepository.deleteConfirmedBefore(any(LocalDateTime.class))).thenReturn(3L);
+
+            // when
+            notificationServiceImpl.deleteConfirmedNotification();
+
+            // then
+            ArgumentCaptor<LocalDateTime> thresholdCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+            verify(notificationRepository).deleteConfirmedBefore(thresholdCaptor.capture());
+
+            LocalDateTime threshold = thresholdCaptor.getValue();
+            LocalDateTime expected = LocalDateTime.now().minusDays(7);
+            assertThat(threshold).isCloseTo(expected, within(2, ChronoUnit.SECONDS));
+        }
+
+        @Test
+        @DisplayName("삭제 건수가 0이어도 예외 없이 정상 종료된다.")
+        void 삭제_건수_0이어도_정상_종료() {
+            // given
+            when(notificationRepository.deleteConfirmedBefore(any(LocalDateTime.class))).thenReturn(0L);
+
+            // when & then
+            notificationServiceImpl.deleteConfirmedNotification();
+
+            verify(notificationRepository).deleteConfirmedBefore(any(LocalDateTime.class));
+        }
     }
 }
