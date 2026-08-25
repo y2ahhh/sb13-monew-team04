@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | idx_subscriptions_user_created_id | subscriptions(user_id, created_at DESC, id DESC) | 사용자 필터와 최신순 정렬 |
 
-keywords 조회는 기존 uk_keywords_interest_keyword 인덱스를 함께 사용한다.
+keywords 조회는 100k scale에서는 Seq Scan을 선택했고, 1m/10m scale에서는 기존 uk_keywords_interest_keyword 인덱스를 사용한다.
 
 ## 측정 기준
 

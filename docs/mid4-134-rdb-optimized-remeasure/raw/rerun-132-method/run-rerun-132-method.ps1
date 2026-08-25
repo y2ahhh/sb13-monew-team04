@@ -6,7 +6,7 @@ param(
     [string] $DbPort = '15434'
 )
 
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'
 
 $RawDir = $PSScriptRoot
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..')).Path
