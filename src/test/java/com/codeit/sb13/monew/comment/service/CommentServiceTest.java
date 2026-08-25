@@ -183,4 +183,70 @@ public class CommentServiceTest {
         () -> assertThat(result.hasNext()).isFalse()
     );
   }
+
+
+  @Test
+  @DisplayName("좋아요 수 기준 오름차순으로 댓글 목록 조회 - RED")
+  void 좋아요_오름차순_기준_댓글_목록_조회() {
+    // given
+    UUID articleId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
+    UUID commentId = UUID.randomUUID();
+    UUID writerId = UUID.randomUUID();
+    LocalDateTime createdAt = LocalDateTime.of(2024, 6, 1, 12, 0);
+
+    CommentSearchCommand command=new CommentSearchCommand(articleId, CommentOrderBy.LIKE_COUNT,
+        Direction.ASC, null, null, 50, requestUserId);
+
+    CommentSearchProjection first = new CommentSearchProjection(
+        commentId,
+        articleId,
+        writerId,
+        "작성자 닉네임",
+        "비인기 댓글",
+        1L, // 비인기  댓글 좋아요 수 가정
+        false,
+        createdAt
+    );
+    CommentSearchProjection second = new CommentSearchProjection(
+        commentId,
+        articleId,
+        writerId,
+        "작성자 닉네임",
+        "인기 댓글",
+        100L, // 인기 댓글 좋아요 수 가정
+        true,
+        createdAt.plusMinutes(5)
+    );
+
+    CommentSearchResult searchResult=new CommentSearchResult(
+        List.of(first, second),
+        true,
+        10L
+    );
+
+    given(commentRepository.search(any(CommentSearchCondition.class))).willReturn(searchResult);
+
+    // when
+    CursorPageResponseDto<CommentDto> result = commentService.search(command);
+
+    // then
+    Assertions.assertAll(
+        () -> assertThat(result.content()).hasSize(2),
+        () -> assertThat(result.nextCursor()).isEqualTo("100"),
+        ()->assertThat(result.nextAfter()).isEqualTo(createdAt.plusMinutes(5).toString()),
+        ()->assertThat(result.nextIdAfter()).isEqualTo(commentId.toString()),
+        ()->assertThat(result.size()).isEqualTo(2),
+        ()->assertThat(result.totalElements()).isEqualTo(10L),
+        () -> assertThat(result.hasNext()).isTrue()
+    );
+
+    then(commentRepository).should(times(1)).search(argThat(condition -> condition.articleId().equals(articleId)
+        && condition.orderBy().equals(CommentOrderBy.LIKE_COUNT)
+        && condition.direction().equals(Direction.ASC)
+        && condition.cursor() == null
+        && condition.after() == null
+        && condition.limit() == 50
+        && condition.requestUserId().equals(requestUserId)));
+  }
 }
