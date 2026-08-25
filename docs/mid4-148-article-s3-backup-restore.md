@@ -165,6 +165,8 @@ S3 object 존재 여부나 conditional put은 scheduler 동시성 제어 수단�
 ## 복구 기준
 
 복구 API는 지정 날짜 범위의 S3 백업 파일을 읽고, 현재 DB에 없는 기사만 새로 저장한다.
+정적 웹 프론트 리소스가 GET 요청으로 복구를 호출하는 계약을 사용하므로, 현재 복구 API는 GET을 유지한다.
+복구는 상태 변경 작업이므로 응답에는 `Cache-Control: no-store`를 설정한다.
 
 ```http
 GET /api/articles/restore?from=2026-08-23&to=2026-08-24

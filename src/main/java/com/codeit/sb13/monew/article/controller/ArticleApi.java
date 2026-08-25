@@ -155,7 +155,10 @@ public interface ArticleApi {
     })
     ResponseEntity<List<ArticleSource>> getSources();
 
-    @Operation(summary = "뉴스 기사 복구", description = "지정한 from/to 날짜 범위의 백업 파일을 읽어 유실된 기사를 복구합니다.")
+    @Operation(
+            summary = "뉴스 기사 복구",
+            description = "지정한 from/to 날짜 범위의 백업 파일을 읽어 유실된 기사를 복구합니다. 정적 웹 프론트 호환성을 위해 GET 계약을 유지하며, 응답은 캐시하지 않습니다."
+    )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",

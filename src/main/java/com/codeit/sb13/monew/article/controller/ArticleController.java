@@ -13,6 +13,7 @@ import com.codeit.sb13.monew.article.service.dto.ArticleViewDto;
 import com.codeit.sb13.monew.global.MonewHttpHeaders;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -78,6 +79,8 @@ public class ArticleController implements ArticleApi {
     @Override
     @GetMapping("/restore")
     public ResponseEntity<List<ArticleRestoreResult>> restore(@Valid @ModelAttribute ArticleRestoreRequest request) {
-        return ResponseEntity.ok(articleRestoreService.restoreArticles(request.toRestoreCommand()));
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(articleRestoreService.restoreArticles(request.toRestoreCommand()));
     }
 }
