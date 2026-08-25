@@ -2,16 +2,49 @@
 
 ## 요약
 
-활동내역 RDB 조회 작업의 인덱스 적용 전 baseline과 후속 인덱스 후보를 정리한다. 이 문서는 전체 요약 진입점이며, 조회별 SQL과 EXPLAIN 원문은 상세 문서로 분리한다.
+활동내역 RDB 조회의 SQL baseline, 단일 사용자 활동내역 API baseline, 병목 후보를 정리한다. SQL 원문과 EXPLAIN은 조회별 상세 문서에 남기고, API p95/p99, error rate, DB 부하는 [api-baseline.md](api-baseline.md)에 기록한다.
 
 ## 상세 문서
 
-| 조회 | 상세 문서 | 10m median | 1차 후보 |
+| 구분 | 상세 문서 | 기준 결과 | 1차 후보 또는 판단 |
 | --- | --- | ---: | --- |
-| 최근 작성 댓글 | [recent-comments.md](recent-comments.md) | `82.747 ms` | `comments(user_id, created_at DESC, id DESC)` |
-| 최근 좋아요한 댓글 | [recent-liked-comments.md](recent-liked-comments.md) | `45.905 ms` | `comment_likes(liked_by, created_at DESC, id DESC)` |
-| 최근 조회 기사 | [recent-article-views.md](recent-article-views.md) | `1825.932 ms` | `article_views(user_id, viewed_at DESC, id DESC)`, `comments(article_id)` |
-| 구독 중인 관심사 | [subscribed-interests.md](subscribed-interests.md) | `11.635 ms` | `subscriptions(user_id, created_at DESC, id DESC)` |
+| 단일 활동내역 API | [api-baseline.md](api-baseline.md) | `p95 53.58 ms`, `p99 63.40 ms`, `error 0.00%` | 100k/20 rps 기준 RDB 직접 조회 통과 |
+| 최근 작성 댓글 | [recent-comments.md](recent-comments.md) | `10m median 82.747 ms` | `comments(user_id, created_at DESC, id DESC)` |
+| 최근 좋아요한 댓글 | [recent-liked-comments.md](recent-liked-comments.md) | `10m median 45.905 ms` | `comment_likes(liked_by, created_at DESC, id DESC)` |
+| 최근 조회 기사 | [recent-article-views.md](recent-article-views.md) | `10m median 1825.932 ms` | `article_views(user_id, viewed_at DESC, id DESC)`, `comments(article_id)` |
+| 구독 중인 관심사 | [subscribed-interests.md](subscribed-interests.md) | `10m median 11.635 ms` | `subscriptions(user_id, created_at DESC, id DESC)` |
+
+## API Baseline 요약
+
+측정 대상은 `GET /api/user-activities/{userId}`이며, PR #69의 k6 스크립트를 파일 diff에 포함하지 않고 stdin으로 주입해 실행했다.
+
+| 항목 | 값 |
+| --- | ---: |
+| scale | `100k` |
+| seed 소요 시간 | `3.497 s` |
+| baseline rate | `20 req/s` |
+| duration | `1m` |
+| requests | `1201` |
+| RPS | `20.01` |
+| duration avg | `46.20 ms` |
+| duration p95 | `53.58 ms` |
+| duration p99 | `63.40 ms` |
+| error rate | `0.00%` |
+| checks rate | `100.00%` |
+| dropped iterations | `0` |
+
+baseline 실행 중 PostgreSQL 컨테이너는 `CPU 66.67%`, `MEM 78.62 MiB / 30.91 GiB`까지 관측됐다. baseline 직후 `pg_stat_database` 기준 `xact_commit=6040`, `xact_rollback=0`, `blks_read=4`, `blks_hit=25,672,054`, `cache_hit_pct=100.00`, `temp_files=0`, `deadlocks=0`이다.
+
+요청 1건 기준 SQL은 코드 경로상 6개로 본다.
+
+| 순서 | 조회 | 주요 join 또는 subquery |
+| ---: | --- | --- |
+| 1 | 사용자 조회 | `users` PK 조회, `deleted_at` 확인 |
+| 2 | 최근 본 기사 | `article_views -> articles -> users`, 댓글 수 subquery, 조회수 subquery |
+| 3 | 최근 작성 댓글 | `comments -> users -> articles`, 좋아요 수 subquery |
+| 4 | 최근 좋아요 댓글 | `comment_likes -> comments -> users -> articles`, 좋아요 수 subquery |
+| 5 | 구독 관심사 main | `subscriptions -> interests -> users`, 관심사별 구독자 수 subquery |
+| 6 | 구독 관심사 keywords | `keywords.interest_id = any (?)` batch 조회 |
 
 ## 인덱스 후보 요약
 
@@ -25,37 +58,44 @@
 
 ## 측정 기준
 
-- seed/table snapshot 시각: 2026-08-24 13:27:19 +09:00
-- 최근 활동 3종 actual SQL 측정 시각: 2026-08-23 10:23:40 +09:00
-- 구독 중인 관심사 actual SQL 측정 시각: 2026-08-24 14:08:45 +09:00
-- 문서 브랜치: `docs/MID4-132-activity-history-rdb-baseline`
-- 최근 활동 3종 기준 커밋: `f7b198a`
-- 구독 중인 관심사 기준 커밋: `6ae5754`
 - 대표 Jira: `MID4-132`
 - Parent: `MID4-77`
 - 관련 Jira: `MID4-92` 구독 중인 관심사 조회, `MID4-130` 시드 데이터
-- 후속 Jira: `MID4-133` 인덱스 후보 판별 및 최적화
-- 측정 DB project: `monew-perf-rerun`
-- 대상 사용자 ID: `00000001-0000-4000-8000-000000000001`
-- PostgreSQL container: `monew-perf-rerun-postgres-1`
+- 후속 Jira: `MID4-125`, `MID4-133`
+- 문서 브랜치: `docs/MID4-132-activity-history-rdb-baseline`
+- seed/table snapshot 시각: 2026-08-24 13:27:19 +09:00
+- 최근 활동 3종 actual SQL 측정 시각: 2026-08-23 10:23:40 +09:00
+- 구독 중인 관심사 actual SQL 측정 시각: 2026-08-24 14:08:45 +09:00
+- API baseline 측정 시각: 2026-08-25 17:00 KST
+- 최근 활동 3종 기준 커밋: `f7b198a`
+- 구독 중인 관심사 기준 커밋: `6ae5754`
+- API baseline 앱 기준: `origin/develop` `ffed6e1` 위에 MID4-132 문서 브랜치 rebase
+- k6 스크립트 기준: PR #69 `test/MID4-131-k6-baseline-script` `5a5d761`
+- SQL baseline 측정 DB project: `monew-perf-rerun`
+- SQL baseline PostgreSQL container: `monew-perf-rerun-postgres-1`
+- SQL baseline Port: `5435 -> 5432`
+- API baseline 측정 DB project: `monew-perf-132`
+- API baseline PostgreSQL container: `monew-perf-132-postgres-1`
+- API baseline Port: `5433 -> 5432`
 - Docker image: `postgres:16`
 - PostgreSQL version: `PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1)`
-- Port: `5435 -> 5432`
-- Docker engine: `linux x86_64`, CPU `24`, memory `33185484800 bytes` 약 `30.9 GiB`
+- Docker engine: `linux x86_64`, CPU `24`, memory 약 `30.9 GiB`
+- 대상 사용자 ID: `00000001-0000-4000-8000-000000000001`
 
 측정 실행 세트:
 
-| 측정 세트 | 대상 | SQL 출처 | 측정 시각 | seed 소요 시간 |
+| 측정 세트 | 대상 | 출처 | 측정 시각 | seed 소요 시간 |
 | --- | --- | --- | --- | --- |
-| seed/table snapshot | Seed 결과, 테이블 크기 | DB catalog 조회 | 2026-08-24 13:27:19 +09:00 | `100k` `3.254 s`, `1m` `15.047 s`, `10m` `129.118 s` |
-| 최근 활동 3종 actual SQL | 최근 작성 댓글, 최근 좋아요한 댓글, 최근 조회 기사 | Hibernate SQL 로그 | 2026-08-23 10:23:40 +09:00 | `100k` `3.214 s`, `1m` `14.048 s`, `10m` `124.057 s` |
-| 구독 중인 관심사 actual SQL | 구독 중인 관심사 main, keywords | Hibernate SQL 로그 | 2026-08-24 14:08:45 +09:00 | `100k` `3.254 s`, `1m` `15.047 s`, `10m` `129.118 s` |
+| seed/table snapshot | Seed 결과, 테이블 크기 | DB catalog 조회 | 2026-08-24 13:27 KST | `100k` `3.254 s`, `1m` `15.047 s`, `10m` `129.118 s` |
+| 최근 활동 3종 actual SQL | 최근 작성 댓글, 최근 좋아요한 댓글, 최근 조회 기사 | Hibernate SQL 로그 | 2026-08-23 10:23 KST | `100k` `3.214 s`, `1m` `14.048 s`, `10m` `124.057 s` |
+| 구독 중인 관심사 actual SQL | 구독 중인 관심사 main, keywords | Hibernate SQL 로그 | 2026-08-24 14:08 KST | `100k` `3.254 s`, `1m` `15.047 s`, `10m` `129.118 s` |
+| 단일 API baseline | `/api/user-activities/{userId}` | k6 summary, PostgreSQL stats | 2026-08-25 17:00 KST | `100k` `3.497 s` |
 
 아래 Seed 결과 테이블은 `subscriptions.created_at` 반영 후 데이터를 다시 생성한 snapshot 실행값이다. 실제 조회 SQL 측정은 각 query set마다 데이터를 다시 생성한 뒤 수행했으므로 최근 활동 3종의 seed 소요 시간은 snapshot과 약간 다르다.
 
 최근 활동 3종 조회는 Hibernate SQL 로그로 확인한 actual SQL 기준으로 측정했다.
 
-구독 중인 관심사 조회도 Hibernate SQL 로그로 확인한 actual SQL 기준으로 측정했다. 구독 생성일자 정렬 반영 후 다시 측정했으며, main query와 keywords batch query를 요청 1건 기준으로 함께 기록했다.
+구독 중인 관심사 조회도 Hibernate SQL 로그로 확인한 actual SQL 기준으로 측정했다. 구독 생성일자 정렬 반영 후 다시 측정했으며, main query와 keywords batch query를 요청 1건 기준으로 함께 기록했다. 현재 구현은 develop에 반영된 `SubscribeRepository.findSubscribedInterestActivities()` 기준이다.
 
 PostgreSQL 주요 설정:
 
@@ -131,7 +171,7 @@ MySQL InnoDB는 PostgreSQL과 다르게 FK referencing column에 적절한 인�
 
 최근 작성 댓글, 최근 좋아요한 댓글, 최근 조회 기사 조회는 `test/MID4-77-activity-history-integration-check` 브랜치의 repository 메서드를 임시 Spring Boot test에서 실행한 뒤 Hibernate SQL 로그로 캡처한 actual SQL 기준으로 측정했다. 실제 SQL은 `LIMIT 10`이 아니라 `fetch first 10 rows only`로 렌더링된다.
 
-`MID4-92` 구독 중인 관심사 조회는 아직 develop에 반영되지 않은 `feat/MID4-92-subscribed-interest-activity`의 `SubscribeRepository.findSubscribedInterestActivities()` JPQL을 임시 Spring Boot test에서 실행한 뒤 Hibernate SQL 로그로 캡처해 측정했다. `subscriptions.created_at` 컬럼과 `created_at DESC, id DESC` 정렬이 반영된 SQL 기준이다. API 조립 전 단계이므로 p95/p99, error rate가 아니라 SQL 단위 실행 시간과 실행계획만 기록한다.
+구독 중인 관심사 조회는 `SubscribeRepository.findSubscribedInterestActivities()` JPQL을 임시 Spring Boot test에서 실행한 뒤 Hibernate SQL 로그로 캡처해 측정했다. `subscriptions.created_at` 컬럼과 `created_at DESC, id DESC` 정렬이 반영된 SQL 기준이다. API 조립 전 단계의 SQL baseline이므로 p95/p99, error rate는 이번 API baseline에서 별도로 기록한다.
 
 Seed 실행 명령:
 
@@ -166,7 +206,19 @@ docker compose -p monew-perf-rerun --env-file .env.perf.local --profile perf-see
 | `1m` | `50` | `150` | `283 MB` |
 | `10m` | `50` | `150` | `2778 MB` |
 
-## 실행 시간 요약
+API baseline 직전 100k seed row count:
+
+| table | rows |
+| --- | ---: |
+| `users` | `1,000` |
+| `interests` | `500` |
+| `subscriptions` | `5,045` |
+| `articles` | `20,000` |
+| `comments` | `40,000` |
+| `comment_likes` | `30,000` |
+| `article_views` | `30,000` |
+
+## SQL 실행 시간 요약
 
 | Scale | 조회 | EXPLAIN Execution Time | 반복 실행 시간 5회 | Median |
 | --- | --- | ---: | --- | ---: |
@@ -188,3 +240,13 @@ docker compose -p monew-perf-rerun --env-file .env.perf.local --profile perf-see
 | `10m` | 구독 중인 관심사 main | `10.052 ms` | `11.051`, `10.541`, `10.535`, `10.878`, `10.810 ms` | `10.810 ms` |
 | `10m` | 구독 관심사 keywords | `0.050 ms` | `0.517`, `0.391`, `0.496`, `0.596`, `0.486 ms` | `0.496 ms` |
 | `10m` | 구독 중인 관심사 total | `-` | `11.635`, `11.394`, `12.454`, `14.413`, `11.481 ms` | `11.635 ms` |
+
+## MID4-125 연결 판단
+
+100k API baseline은 20 req/s에서 p95/p99와 error rate가 안정적이므로, 현재 결과만으로 MongoDB Read Model을 바로 적용할 근거는 부족하다. 다만 10m SQL baseline에서는 최근 조회 기사 쿼리가 `1825.932 ms` median으로 가장 큰 병목 후보이며, `article_views.user_id` 접근 경로와 `comments.article_id` 반복 scan을 먼저 RDB 인덱스 후보로 검증해야 한다.
+
+따라서 MID4-125 판단에는 다음 순서로 연결한다.
+
+1. MID4-133에서 RDB 인덱스 후보를 먼저 반영한다.
+2. 같은 seed와 k6 조건으로 API baseline을 재측정한다.
+3. RDB 최적화 이후에도 p95/p99 또는 DB 부하가 목표를 넘는 조회가 남으면 해당 조회만 MongoDB Read Model 후보로 올린다.
