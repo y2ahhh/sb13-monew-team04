@@ -411,6 +411,31 @@ class CommentRepositoryTest {
     }
 
     @Test
+    @DisplayName("완전하지 않은 커서 조건은 첫 페이지 조회 조건으로 처리한다")
+    void search_treats_incomplete_cursor_condition_as_first_page() {
+        User writer = userRepository.saveAndFlush(new User("partial-cursor-writer@email.com", "작성자", "testPassword?"));
+        Article article = articleRepository.saveAndFlush(createArticle("테스트 기사", "테스트 기사 내용", "testLink"));
+        Comment comment = commentRepository.saveAndFlush(new Comment(article, writer, "댓글"));
+        LocalDateTime after = LocalDateTime.of(2026, 8, 25, 12, 0);
+        updateCommentCreatedAt(comment.getId(), after);
+        em.clear();
+
+        CommentSearchResult withoutAfter = commentRepository.search(new CommentSearchCondition(
+            article.getId(), CommentOrderBy.CREATED_AT, Direction.ASC,
+            after.toString(), null, UUID.randomUUID(), 10, null));
+        CommentSearchResult withoutIdAfter = commentRepository.search(new CommentSearchCondition(
+            article.getId(), CommentOrderBy.CREATED_AT, Direction.ASC,
+            after.toString(), after, null, 10, null));
+
+        Assertions.assertAll(
+            () -> assertThat(withoutAfter.rows()).extracting(CommentSearchProjection::id)
+                .containsExactly(comment.getId()),
+            () -> assertThat(withoutIdAfter.rows()).extracting(CommentSearchProjection::id)
+                .containsExactly(comment.getId())
+        );
+    }
+
+    @Test
     @DisplayName("생성일 내림차순 커서로 다음 페이지를 조회한다")
     void search_next_page_by_created_at_desc_cursor() {
         User requestUser = userRepository.saveAndFlush(new User("request-desc@email.com", "요청자", "testPassword!"));
