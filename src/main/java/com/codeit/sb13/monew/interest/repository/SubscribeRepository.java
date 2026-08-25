@@ -1,6 +1,7 @@
 package com.codeit.sb13.monew.interest.repository;
 
 import com.codeit.sb13.monew.interest.domain.Subscribe;
+import com.codeit.sb13.monew.interest.repository.dto.InterestSubscriberRow;
 import com.codeit.sb13.monew.interest.repository.dto.SubscribedInterestActivityProjection;
 import com.codeit.sb13.monew.user.domain.User;
 import java.util.List;
@@ -64,26 +65,28 @@ public interface SubscribeRepository extends JpaRepository<Subscribe, UUID> {
     Optional<Subscribe> findByInterest_IdAndUserId(UUID interestId, UUID userId);
 
     /**
-     * 특정 관심사를 구독 중인 (논리 삭제되지 않은) 사용자 목록을 조회한다.
+     * 여러 관심사를 구독 중인 (논리 삭제되지 않은) 사용자들을, 관심사 id와 사용자를
+     * 한 쌍씩 묶어 한 번의 쿼리로 조회한다.
      *
-     * <p>신규 기사가 관심사 키워드와 매칭됐을 때, 그 관심사를 구독 중인
-     * 사용자 전원에게 알림을 보내기 위해
+     * <p>신규 기사가 여러 관심사의 키워드와 동시에 매칭됐을 때,
      * {@link com.codeit.sb13.monew.interest.service.InterestServiceImpl#notifyForNewArticles}가
-     * 이 메서드로 알림 수신자 목록을 가져온다. {@code Subscribe}는 {@code User}를
+     * 매칭된 관심사 수만큼 이 조회를 반복하지 않고, 매칭된 관심사 id 전체를 모아 이
+     * 메서드를 한 번만 호출해 알림 수신자를 가져온다. {@code Subscribe}는 {@code User}를
      * 정식 연관관계로 갖지 않고 {@code userId} 값만 가지므로, 이 조회에서
      * {@code User}를 직접 조인해 논리 삭제된 사용자를 걸러낸다.</p>
      *
-     * @param interestId 구독자를 조회할 관심사의 id
-     * @return 해당 관심사를 구독 중인, 논리 삭제되지 않은 사용자 목록
+     * @param interestIds 구독자를 조회할 관심사 id 목록
+     * @return 관심사 id와 그 관심사를 구독 중인, 논리 삭제되지 않은 사용자를 한 쌍씩 담은 목록.
+     *         호출부에서 {@code interestId} 기준으로 그룹화해 사용한다.
      */
     @Query("""
-        SELECT u
+        SELECT new com.codeit.sb13.monew.interest.repository.dto.InterestSubscriberRow(s.interest.id, u)
         FROM Subscribe s
         JOIN User u ON u.id = s.userId
-        WHERE s.interest.id = :interestId
+        WHERE s.interest.id IN :interestIds
             AND u.deletedAt IS NULL
     """)
-    List<User> findSubscriberUsersByInterestId(@Param("interestId") UUID interestId);
+    List<InterestSubscriberRow> findSubscriberUsersByInterestIds(@Param("interestIds") List<UUID> interestIds);
 
     /**
      * 사용자 활동내역의 "구독 중인 관심사" 영역에 내려줄 현재 구독 목록을 조회한다.

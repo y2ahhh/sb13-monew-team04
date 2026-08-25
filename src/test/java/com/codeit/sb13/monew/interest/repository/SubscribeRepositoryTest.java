@@ -2,11 +2,13 @@ package com.codeit.sb13.monew.interest.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;
 import com.codeit.sb13.monew.global.config.QueryDslConfig;
 import com.codeit.sb13.monew.interest.domain.Interest;
 import com.codeit.sb13.monew.interest.domain.Subscribe;
+import com.codeit.sb13.monew.interest.repository.dto.InterestSubscriberRow;
 import com.codeit.sb13.monew.interest.repository.dto.SubscribedInterestActivityProjection;
 import com.codeit.sb13.monew.interest.service.dto.SubscribedInterestActivity;
 import com.codeit.sb13.monew.user.domain.User;
@@ -117,12 +119,12 @@ class SubscribeRepositoryTest {
     }
 
     @Nested
-    @DisplayName("findSubscriberUsersByInterestId()")
-    class FindSubscriberUsersByInterestId {
+    @DisplayName("findSubscriberUsersByInterestIds()")
+    class FindSubscriberUsersByInterestIds {
 
         @Test
-        @DisplayName("해당 관심사를 구독 중인 사용자만 반환한다")
-        void returnsOnlySubscribersOfThatInterest() {
+        @DisplayName("전달한 관심사들을 구독 중인 사용자만 반환한다")
+        void returnsOnlySubscribersOfRequestedInterests() {
             Interest target = persistInterest("스포츠", "축구");
             Interest other = persistInterest("여행", "국내여행");
             User subscriber = persistUser("구독자");
@@ -130,9 +132,10 @@ class SubscribeRepositoryTest {
             persistSubscribe(target, subscriber);
             persistSubscribe(other, otherInterestSubscriber);
 
-            List<User> result = subscribeRepository.findSubscriberUsersByInterestId(target.getId());
+            List<InterestSubscriberRow> result =
+                    subscribeRepository.findSubscriberUsersByInterestIds(List.of(target.getId()));
 
-            assertThat(result).extracting(User::getId).containsExactly(subscriber.getId());
+            assertThat(result).extracting(row -> row.user().getId()).containsExactly(subscriber.getId());
         }
 
         @Test
@@ -144,9 +147,10 @@ class SubscribeRepositoryTest {
             persistSubscribe(interest, active);
             persistSubscribe(interest, deleted);
 
-            List<User> result = subscribeRepository.findSubscriberUsersByInterestId(interest.getId());
+            List<InterestSubscriberRow> result =
+                    subscribeRepository.findSubscriberUsersByInterestIds(List.of(interest.getId()));
 
-            assertThat(result).extracting(User::getId).containsExactly(active.getId());
+            assertThat(result).extracting(row -> row.user().getId()).containsExactly(active.getId());
         }
 
         @Test
@@ -154,9 +158,30 @@ class SubscribeRepositoryTest {
         void noSubscribers_returnsEmptyList() {
             Interest interest = persistInterest("스포츠", "축구");
 
-            List<User> result = subscribeRepository.findSubscriberUsersByInterestId(interest.getId());
+            List<InterestSubscriberRow> result =
+                    subscribeRepository.findSubscriberUsersByInterestIds(List.of(interest.getId()));
 
             assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("여러 관심사 id를 한 번에 넘기면, 각 결과 행이 어느 관심사의 구독자인지 관심사 id로 구분된다")
+        void multipleInterestIds_pairsEachUserWithItsOwnInterestId() {
+            Interest sports = persistInterest("스포츠", "축구");
+            Interest travel = persistInterest("여행", "국내여행");
+            User sportsSubscriber = persistUser("스포츠구독자");
+            User travelSubscriber = persistUser("여행구독자");
+            persistSubscribe(sports, sportsSubscriber);
+            persistSubscribe(travel, travelSubscriber);
+
+            List<InterestSubscriberRow> result = subscribeRepository
+                    .findSubscriberUsersByInterestIds(List.of(sports.getId(), travel.getId()));
+
+            assertThat(result)
+                    .extracting(InterestSubscriberRow::interestId, row -> row.user().getId())
+                    .containsExactlyInAnyOrder(
+                            tuple(sports.getId(), sportsSubscriber.getId()),
+                            tuple(travel.getId(), travelSubscriber.getId()));
         }
     }
 
