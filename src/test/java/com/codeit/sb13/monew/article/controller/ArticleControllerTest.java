@@ -30,6 +30,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.mockito.Mockito.doThrow;
 import static com.codeit.sb13.monew.global.MonewHttpHeaders.REQUEST_USER_ID;
 
 @WebMvcTest(ArticleController.class)
@@ -319,5 +321,55 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.code").value("GLB_001"));
 
         verify(articleService, never()).searchArticles(any());
+    }
+
+    @Test
+    @DisplayName("논리 삭제 성공 시 204를 반환한다")
+    void softDeleteArticle() throws Exception {
+        mockMvc.perform(delete("/api/articles/{articleId}", articleId))
+                .andExpect(status().isNoContent());
+
+        verify(articleService).softDelete(articleId);
+    }
+
+    @Test
+    @DisplayName("논리 삭제 시 기사가 없으면 404와 ART_001을 반환한다")
+    void softDeleteArticleNotFound() throws Exception {
+        doThrow(new ArticleNotFoundException(articleId))
+                .when(articleService).softDelete(articleId);
+
+        mockMvc.perform(delete("/api/articles/{articleId}", articleId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ART_001"));
+    }
+
+    @Test
+    @DisplayName("물리 삭제 성공 시 204를 반환한다")
+    void hardDeleteArticle() throws Exception {
+        mockMvc.perform(delete("/api/articles/{articleId}/hard", articleId))
+                .andExpect(status().isNoContent());
+
+        verify(articleService).hardDelete(articleId);
+    }
+
+    @Test
+    @DisplayName("물리 삭제 시 기사가 없으면 404와 ART_001을 반환한다")
+    void hardDeleteArticleNotFound() throws Exception {
+        doThrow(new ArticleNotFoundException(articleId))
+                .when(articleService).hardDelete(articleId);
+
+        mockMvc.perform(delete("/api/articles/{articleId}/hard", articleId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ART_001"));
+    }
+
+    @Test
+    @DisplayName("삭제 시 잘못된 UUID 형식이면 400을 반환한다")
+    void deleteArticleWithInvalidUuid() throws Exception {
+        mockMvc.perform(delete("/api/articles/{articleId}", "not-a-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("GLB_001"));
+
+        verify(articleService, never()).softDelete(any(UUID.class));
     }
 }
