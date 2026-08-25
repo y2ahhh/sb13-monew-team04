@@ -8,7 +8,7 @@
 
 | 구분 | 상세 문서 | 기준 결과 | 1차 후보 또는 판단 |
 | --- | --- | ---: | --- |
-| 단일 활동내역 API | [api-baseline.md](api-baseline.md) | `p95 53.58 ms`, `p99 63.40 ms`, `error 0.00%` | 100k/20 rps 기준 RDB 직접 조회 통과 |
+| 단일 활동내역 API | [api-baseline.md](api-baseline.md) | `1m p95 474.02 ms`, `10m dropped 979` | 100k/1m은 20 rps 통과, 10m은 처리량/latency 기준 실패 |
 | 최근 작성 댓글 | [recent-comments.md](recent-comments.md) | `10m median 82.747 ms` | `comments(user_id, created_at DESC, id DESC)` |
 | 최근 좋아요한 댓글 | [recent-liked-comments.md](recent-liked-comments.md) | `10m median 45.905 ms` | `comment_likes(liked_by, created_at DESC, id DESC)` |
 | 최근 조회 기사 | [recent-article-views.md](recent-article-views.md) | `10m median 1825.932 ms` | `article_views(user_id, viewed_at DESC, id DESC)`, `comments(article_id)` |
@@ -18,22 +18,13 @@
 
 측정 대상은 `GET /api/user-activities/{userId}`이며, PR #69의 k6 스크립트를 파일 diff에 포함하지 않고 stdin으로 주입해 실행했다.
 
-| 항목 | 값 |
-| --- | ---: |
-| scale | `100k` |
-| seed 소요 시간 | `3.497 s` |
-| baseline rate | `20 req/s` |
-| duration | `1m` |
-| requests | `1201` |
-| RPS | `20.01` |
-| duration avg | `46.20 ms` |
-| duration p95 | `53.58 ms` |
-| duration p99 | `63.40 ms` |
-| error rate | `0.00%` |
-| checks rate | `100.00%` |
-| dropped iterations | `0` |
+| scale | seed 소요 시간 | requests | RPS | duration avg | duration p95 | duration p99 | error rate | dropped iterations | 판단 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `100k` | `3.497 s` | `1201` | `20.01` | `46.20 ms` | `53.58 ms` | `63.40 ms` | `0.00%` | `0` | pass |
+| `1m` | `15.027 s` | `1201` | `19.97` | `379.20 ms` | `474.02 ms` | `657.60 ms` | `0.00%` | `0` | pass |
+| `10m` | `129.231 s` | `222` | `3.11` | `28084.62 ms` | `32353.24 ms` | `43167.63 ms` | `0.00%` | `979` | fail |
 
-baseline 실행 중 PostgreSQL 컨테이너는 `CPU 66.67%`, `MEM 78.62 MiB / 30.91 GiB`까지 관측됐다. baseline 직후 `pg_stat_database` 기준 `xact_commit=6040`, `xact_rollback=0`, `blks_read=4`, `blks_hit=25,672,054`, `cache_hit_pct=100.00`, `temp_files=0`, `deadlocks=0`이다.
+10m baseline은 k6가 max VUs `100`에 도달했고 `droppedIterations=979`가 발생해 20 req/s 요청 스케줄을 따라가지 못했다. baseline 실행 중 PostgreSQL 컨테이너는 1m에서 `CPU 1020.92%`, 10m에서 `CPU 939.03%`, `MEM 2.344 GiB / 30.91 GiB`까지 관측됐다. scale별 DB stats는 [api-baseline.md](api-baseline.md)에 기록한다.
 
 요청 1건 기준 SQL은 코드 경로상 6개로 본다.
 
@@ -66,7 +57,7 @@ baseline 실행 중 PostgreSQL 컨테이너는 `CPU 66.67%`, `MEM 78.62 MiB / 30
 - seed/table snapshot 시각: 2026-08-24 13:27:19 +09:00
 - 최근 활동 3종 actual SQL 측정 시각: 2026-08-23 10:23:40 +09:00
 - 구독 중인 관심사 actual SQL 측정 시각: 2026-08-24 14:08:45 +09:00
-- API baseline 측정 시각: 2026-08-25 17:00 KST
+- API baseline 측정 시각: 2026-08-25 17:00-17:57 KST
 - 최근 활동 3종 기준 커밋: `f7b198a`
 - 구독 중인 관심사 기준 커밋: `6ae5754`
 - API baseline 앱 기준: `origin/develop` `ffed6e1` 위에 MID4-132 문서 브랜치 rebase
@@ -89,7 +80,7 @@ baseline 실행 중 PostgreSQL 컨테이너는 `CPU 66.67%`, `MEM 78.62 MiB / 30
 | seed/table snapshot | Seed 결과, 테이블 크기 | DB catalog 조회 | 2026-08-24 13:27 KST | `100k` `3.254 s`, `1m` `15.047 s`, `10m` `129.118 s` |
 | 최근 활동 3종 actual SQL | 최근 작성 댓글, 최근 좋아요한 댓글, 최근 조회 기사 | Hibernate SQL 로그 | 2026-08-23 10:23 KST | `100k` `3.214 s`, `1m` `14.048 s`, `10m` `124.057 s` |
 | 구독 중인 관심사 actual SQL | 구독 중인 관심사 main, keywords | Hibernate SQL 로그 | 2026-08-24 14:08 KST | `100k` `3.254 s`, `1m` `15.047 s`, `10m` `129.118 s` |
-| 단일 API baseline | `/api/user-activities/{userId}` | k6 summary, PostgreSQL stats | 2026-08-25 17:00 KST | `100k` `3.497 s` |
+| 단일 API baseline | `/api/user-activities/{userId}` | k6 summary, PostgreSQL stats | 2026-08-25 17:00-17:57 KST | `100k` `3.497 s`, `1m` `15.027 s`, `10m` `129.231 s` |
 
 아래 Seed 결과 테이블은 `subscriptions.created_at` 반영 후 데이터를 다시 생성한 snapshot 실행값이다. 실제 조회 SQL 측정은 각 query set마다 데이터를 다시 생성한 뒤 수행했으므로 최근 활동 3종의 seed 소요 시간은 snapshot과 약간 다르다.
 
@@ -206,17 +197,13 @@ docker compose -p monew-perf-rerun --env-file .env.perf.local --profile perf-see
 | `1m` | `50` | `150` | `283 MB` |
 | `10m` | `50` | `150` | `2778 MB` |
 
-API baseline 직전 100k seed row count:
+API baseline 직전 seed row count:
 
-| table | rows |
-| --- | ---: |
-| `users` | `1,000` |
-| `interests` | `500` |
-| `subscriptions` | `5,045` |
-| `articles` | `20,000` |
-| `comments` | `40,000` |
-| `comment_likes` | `30,000` |
-| `article_views` | `30,000` |
+| scale | users | interests | subscriptions | articles | comments | comment_likes | article_views |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `100k` | `1,000` | `500` | `5,045` | `20,000` | `40,000` | `30,000` | `30,000` |
+| `1m` | `10,000` | `5,000` | `50,045` | `200,000` | `400,000` | `300,000` | `300,000` |
+| `10m` | `100,000` | `50,000` | `500,045` | `2,000,000` | `4,000,000` | `3,000,000` | `3,000,000` |
 
 ## SQL 실행 시간 요약
 
@@ -243,10 +230,14 @@ API baseline 직전 100k seed row count:
 
 ## MID4-125 연결 판단
 
-100k API baseline은 20 req/s에서 p95/p99와 error rate가 안정적이므로, 현재 결과만으로 MongoDB Read Model을 바로 적용할 근거는 부족하다. 다만 10m SQL baseline에서는 최근 조회 기사 쿼리가 `1825.932 ms` median으로 가장 큰 병목 후보이며, `article_views.user_id` 접근 경로와 `comments.article_id` 반복 scan을 먼저 RDB 인덱스 후보로 검증해야 한다.
+100k와 1m API baseline은 20 req/s에서 dropped iteration 없이 통과했다. 단, 1m은 p95가 `474.02 ms`까지 증가하고 PostgreSQL CPU가 `1020.92%`까지 관측되어 여유가 크다고 보기는 어렵다.
+
+10m API baseline은 같은 조건에서 `requests=222`, `RPS=3.11`, `droppedIterations=979`, `p95=32353.24 ms`로 측정되어 20 req/s를 처리하지 못했다. error rate는 `0.00%`였으므로 응답 성공 여부가 아니라 처리량과 latency가 병목이다.
+
+10m SQL baseline에서는 최근 조회 기사 쿼리가 `1825.932 ms` median으로 가장 큰 병목 후보이며, `article_views.user_id` 접근 경로와 `comments.article_id` 반복 scan을 먼저 RDB 인덱스 후보로 검증해야 한다.
 
 따라서 MID4-125 판단에는 다음 순서로 연결한다.
 
 1. MID4-133에서 RDB 인덱스 후보를 먼저 반영한다.
-2. 같은 seed와 k6 조건으로 API baseline을 재측정한다.
-3. RDB 최적화 이후에도 p95/p99 또는 DB 부하가 목표를 넘는 조회가 남으면 해당 조회만 MongoDB Read Model 후보로 올린다.
+2. 같은 seed와 k6 조건으로 10m API baseline을 재측정한다.
+3. RDB 최적화 이후에도 10m에서 p95/p99, dropped iterations, DB 부하가 목표를 넘으면 병목 조회를 MongoDB Read Model 후보로 올린다.
