@@ -57,7 +57,6 @@ public class CommentLikeServiceImpl implements CommentLikeService {
     try {
       commentLikeSaveService.create(comment.getId(), likedByUser.getId());
       log.info("댓글 좋아요 등록 완료 - 댓글 아이디: {}", comment.getId());
-      notificationService.notifyCommentLiked(new CommentLikedDto(likedByUser, comment.getUser(), comment.getId()));
 
     } catch (DataIntegrityViolationException e) {
       return commentLikeRepository.findByCommentAndLikedBy(comment.getId(), likedByUser.getId())
@@ -66,6 +65,13 @@ public class CommentLikeServiceImpl implements CommentLikeService {
             return toDto(existingLike);
           })
           .orElseThrow(() -> e);
+    }
+
+    try {
+      notificationService.notifyCommentLiked(new CommentLikedDto(likedByUser, comment.getUser(), comment.getId()));
+    } catch (RuntimeException e) {
+      log.error("댓글 좋아요 알림 저장 실패 - 좋아요 자체는 정상 등록됨. commentId={}, senderId={}, recipientId={}",
+              comment.getId(), likedByUser.getId(), comment.getUser().getId(), e);
     }
 
     return commentLikeRepository.findByCommentAndLikedBy(comment.getId(), likedByUser.getId())
