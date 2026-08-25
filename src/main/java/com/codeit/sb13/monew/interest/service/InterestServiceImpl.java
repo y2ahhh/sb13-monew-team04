@@ -1,10 +1,12 @@
 package com.codeit.sb13.monew.interest.service;
 
+import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
 import com.codeit.sb13.monew.global.exception.interest.InterestNameDuplicatedException;
 import com.codeit.sb13.monew.global.exception.interest.InterestNotFoundException;
 import com.codeit.sb13.monew.interest.controller.dto.InterestResponse;
 import com.codeit.sb13.monew.interest.domain.Interest;
+import com.codeit.sb13.monew.interest.domain.Keyword;
 import com.codeit.sb13.monew.interest.repository.InterestRepository;
 import com.codeit.sb13.monew.interest.repository.SubscribeRepository;
 import com.codeit.sb13.monew.interest.repository.dto.InterestSearchCondition;
@@ -13,6 +15,9 @@ import com.codeit.sb13.monew.interest.service.dto.InterestCreateCommand;
 import com.codeit.sb13.monew.interest.service.dto.InterestOrderBy;
 import com.codeit.sb13.monew.interest.service.dto.InterestSearchCommand;
 import com.codeit.sb13.monew.interest.service.dto.InterestUpdateCommand;
+import com.codeit.sb13.monew.notification.service.NotificationService;
+import com.codeit.sb13.monew.notification.service.dto.ArticlesForInterestDto;
+import com.codeit.sb13.monew.user.domain.User;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -45,6 +50,7 @@ public class InterestServiceImpl implements InterestService{
 
     private final InterestRepository interestRepository;
     private final SubscribeRepository subscribeRepository;
+    private final NotificationService notificationService;
 
     /**
      * {@inheritDoc}
@@ -183,6 +189,60 @@ public class InterestServiceImpl implements InterestService{
 
         subscribeRepository.deleteByInterest_Id(interestId);
         interestRepository.delete(interest);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>모든 관심사를 순회하며 매칭을 판단한다. 매칭 자체는 DB 쿼리가 아니라
+     * 이미 넘겨받은 {@code newArticles}를 대상으로 애플리케이션 메모리에서
+     * 비교한다. 새로 수집되는 기사 수와 관심사 수가 이 비교를 감당 못 할
+     * 정도로 커지면, 그때는 DB 쪽 매칭으로 옮기는 걸 고려해야 한다.</p>
+     */
+    @Override
+    public void notifyForNewArticles(List<Article> newArticles) {
+        if (newArticles == null || newArticles.isEmpty()) {
+            return;
+        }
+
+        interestRepository.findAll()
+                .forEach(interest -> notifyInterestIfMatched(interest, newArticles));
+    }
+
+    private void notifyInterestIfMatched(Interest interest, List<Article> newArticles) {
+        long matchedCount = countMatchedArticles(interest, newArticles);
+        if (matchedCount == 0) {
+            return;
+        }
+
+        List<User> recipients = subscribeRepository.findSubscriberUsersByInterestId(interest.getId());
+        if (recipients.isEmpty()) {
+            return;
+        }
+
+        notificationService.notifyArticlesForInterest(
+                new ArticlesForInterestDto(recipients, interest.getId(), interest.getName(), (int) matchedCount)
+        );
+    }
+
+    private long countMatchedArticles(Interest interest, List<Article> newArticles) {
+        List<String> keywords = interest.getKeywords().stream()
+                .map(Keyword::getKeyword)
+                .toList();
+
+        return newArticles.stream()
+                .filter(article -> matchesAnyKeyword(article, keywords))
+                .count();
+    }
+
+    private boolean matchesAnyKeyword(Article article, List<String> keywords) {
+        return keywords.stream().anyMatch(keyword ->
+                containsIgnoreCase(article.getTitle(), keyword)
+                        || containsIgnoreCase(article.getSummary(), keyword));
+    }
+
+    private boolean containsIgnoreCase(String text, String keyword) {
+        return text != null && keyword != null && text.toLowerCase().contains(keyword.toLowerCase());
     }
 
     /**

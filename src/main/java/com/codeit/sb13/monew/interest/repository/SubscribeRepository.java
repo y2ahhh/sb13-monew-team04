@@ -2,6 +2,7 @@ package com.codeit.sb13.monew.interest.repository;
 
 import com.codeit.sb13.monew.interest.domain.Subscribe;
 import com.codeit.sb13.monew.interest.repository.dto.SubscribedInterestActivityProjection;
+import com.codeit.sb13.monew.user.domain.User;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -61,6 +62,28 @@ public interface SubscribeRepository extends JpaRepository<Subscribe, UUID> {
      * @return 이미 존재하는 구독. 없으면 빈 {@link Optional}
      */
     Optional<Subscribe> findByInterest_IdAndUserId(UUID interestId, UUID userId);
+
+    /**
+     * 특정 관심사를 구독 중인 (논리 삭제되지 않은) 사용자 목록을 조회한다.
+     *
+     * <p>신규 기사가 관심사 키워드와 매칭됐을 때, 그 관심사를 구독 중인
+     * 사용자 전원에게 알림을 보내기 위해
+     * {@link com.codeit.sb13.monew.interest.service.InterestArticleNotificationService}가
+     * 이 메서드로 알림 수신자 목록을 가져온다. {@code Subscribe}는 {@code User}를
+     * 정식 연관관계로 갖지 않고 {@code userId} 값만 가지므로, 이 조회에서
+     * {@code User}를 직접 조인해 논리 삭제된 사용자를 걸러낸다.</p>
+     *
+     * @param interestId 구독자를 조회할 관심사의 id
+     * @return 해당 관심사를 구독 중인, 논리 삭제되지 않은 사용자 목록
+     */
+    @Query("""
+        SELECT u
+        FROM Subscribe s
+        JOIN User u ON u.id = s.userId
+        WHERE s.interest.id = :interestId
+            AND u.deletedAt IS NULL
+    """)
+    List<User> findSubscriberUsersByInterestId(@Param("interestId") UUID interestId);
 
     /**
      * 사용자 활동내역의 "구독 중인 관심사" 영역에 내려줄 현재 구독 목록을 조회한다.
