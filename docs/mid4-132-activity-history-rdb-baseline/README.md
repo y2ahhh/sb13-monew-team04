@@ -28,7 +28,7 @@
 
 ## API Baseline 요약
 
-측정 대상은 `GET /api/user-activities/{userId}`이며, PR #69의 k6 스크립트를 파일 diff에 포함하지 않고 stdin으로 주입해 실행했다.
+측정 대상은 `GET /api/user-activities/{userId}`이다. 측정 당시에는 PR #69의 k6 스크립트를 stdin으로 주입해 실행했고, 현재 해당 스크립트는 develop에 병합되어 `scripts/performance/activity-history/k6/activity-history-baseline.js`에 포함되어 있다.
 
 | seed scale | seed 소요 시간 | requests | RPS | duration avg | duration p95 | duration p99 | error rate | dropped iterations | 판단 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
@@ -72,8 +72,9 @@
 - API baseline 측정 시각: 2026-08-25 17:00-17:57 KST
 - 최근 활동 3종 기준 커밋: `f7b198a`
 - 구독 중인 관심사 기준 커밋: `6ae5754`
-- API baseline 앱 기준: `origin/develop` `ffed6e1` 위에 MID4-132 문서 브랜치 rebase
-- k6 스크립트 기준: PR #69 `test/MID4-131-k6-baseline-script` `5a5d761`
+- API baseline 측정 당시 앱 기준: `origin/develop` `ffed6e1` 위에 MID4-132 문서 브랜치 rebase
+- 현재 문서 브랜치 base: `origin/develop` `5bc6c4e` (PR #69, PR #71 반영)
+- k6 스크립트 기준: `scripts/performance/activity-history/k6/activity-history-baseline.js` (PR #69 병합, 측정 당시 source `5a5d761`)
 - SQL baseline 측정 DB project: `monew-perf-rerun`
 - SQL baseline PostgreSQL container: `monew-perf-rerun-postgres-1`
 - SQL baseline Port: `5435 -> 5432`

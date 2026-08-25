@@ -4,9 +4,10 @@
 
 - API: `GET /api/user-activities/{userId}`
 - userId: `00000001-0000-4000-8000-000000000001`
-- app source: `origin/develop` `ffed6e1` 기준 MID4-132 브랜치
-- k6 source: PR #69 `test/MID4-131-k6-baseline-script` `5a5d761`
-- k6 실행 방식: PR #69 스크립트를 stdin으로 주입, MID4-132 PR diff에는 k6 파일을 포함하지 않음
+- app source: 측정 당시 `origin/develop` `ffed6e1` 기준 MID4-132 브랜치
+- current branch base: `origin/develop` `5bc6c4e` (PR #69, PR #71 반영)
+- k6 source: `scripts/performance/activity-history/k6/activity-history-baseline.js` (PR #69 병합, 측정 당시 source `5a5d761`)
+- k6 실행 방식: 측정 당시에는 PR #69 스크립트를 stdin으로 주입했고, 현재 develop에는 같은 k6 스크립트가 포함됨
 - DB: `monew-perf-132-postgres-1`, PostgreSQL 16.14, port `5433 -> 5432`
 
 ## Seed Scale 정의
