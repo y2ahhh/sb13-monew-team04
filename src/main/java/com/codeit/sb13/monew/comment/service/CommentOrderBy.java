@@ -1,5 +1,6 @@
 package com.codeit.sb13.monew.comment.service;
 
+import com.codeit.sb13.monew.global.exception.comment.CommentSearchConditionInvalidException;
 import java.util.Arrays;
 
 public enum CommentOrderBy {
@@ -16,6 +17,6 @@ public enum CommentOrderBy {
     return Arrays.stream(values())
         .filter(orderBy -> orderBy.value.equals(value))
         .findFirst()
-        .orElseThrow(() -> new IllegalArgumentException("지원하지 않는 정렬 기준입니다: " + value));
+        .orElseThrow(() -> new CommentSearchConditionInvalidException("지원하지 않는 정렬 기준입니다: " + value));
   }
 }
