@@ -1,89 +1,135 @@
-# 단일 사용자 활동내역 API 재측정
+# 단일 사용자 활동내역 API optimized 재측정
 
 ## 측정 대상
 
-- API: `GET /api/user-activities/{userId}`
-- userId: `00000001-0000-4000-8000-000000000001`
-- k6 source: `scripts/performance/activity-history/k6/activity-history-baseline.js`
-- summary JSON:
-  - [raw/activity-history-100k-optimized-summary.json](raw/activity-history-100k-optimized-summary.json)
-  - [raw/activity-history-1m-optimized-summary.json](raw/activity-history-1m-optimized-summary.json)
-  - [raw/activity-history-10m-optimized-summary.json](raw/activity-history-10m-optimized-summary.json)
+- API: GET /api/user-activities/{userId}
+- userId: 00000001-0000-4000-8000-000000000001
+- app profile: dev
+- app port: 8080
+- DB project: monew-perf-134-rerun
+- PostgreSQL container: monew-perf-134-rerun-postgres-1
+- PostgreSQL port: 15434 -> 5432
+- k6 source: scripts/performance/activity-history/k6/activity-history-baseline.js
+- raw: [raw/rerun-132-method](raw/rerun-132-method)
 
-## Seed 결과
+## Seed Scale 정의
 
-| seed scale | seed duration | users | interests | subscriptions | articles | comments | comment_likes | article_views |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `100k` | `3.793 s` | `1,000` | `500` | `5,045` | `20,000` | `40,000` | `30,000` | `30,000` |
-| `1m` | `17.043 s` | `10,000` | `5,000` | `50,045` | `200,000` | `400,000` | `300,000` | `300,000` |
-| `10m` | `150.175 s` | `100,000` | `50,000` | `500,045` | `2,000,000` | `4,000,000` | `3,000,000` | `3,000,000` |
+100k, 1m, 10m는 각 테이블 row 수가 아니라 seed_activity_history(scale_count)에 전달한 seed scale이다. 실제 row count는 seed 함수의 분포를 따른다.
 
-## k6 조건
+| seed scale | seed duration | DB size | users | interests | keywords | subscriptions | articles | comments | comment_likes | article_views | target recent rows |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 100k | 3.650 s | 44 MB | 1,000 | 500 | 1,500 | 5,045 | 20,000 | 40,000 | 30,000 | 30,000 | 1,000 |
+| 1m | 17.483 s | 367 MB | 10,000 | 5,000 | 15,000 | 50,045 | 200,000 | 400,000 | 300,000 | 300,000 | 10,000 |
+| 10m | 148.312 s | 3655 MB | 100,000 | 50,000 | 150,000 | 500,045 | 2,000,000 | 4,000,000 | 3,000,000 | 3,000,000 | 10,000 |
 
-| setting | value |
-| --- | --- |
-| scenario | `baseline` |
-| rate | `20` |
-| timeUnit | `1s` |
-| duration | `1m` |
-| preAllocatedVUs | `20` |
-| maxVUs | `100` |
+snapshot 원문:
+
+- [snapshot-100k.txt](raw/rerun-132-method/snapshot-100k.txt)
+- [snapshot-1m.txt](raw/rerun-132-method/snapshot-1m.txt)
+- [snapshot-10m.txt](raw/rerun-132-method/snapshot-10m.txt)
+
+## Smoke 결과
+
+smoke는 서버 기동 및 API 응답 검증용 단일 요청이며 baseline 판단값으로 사용하지 않는다.
+
+| seed scale | requests | RPS | dropped iterations | error rate | duration avg | duration p95 | duration p99 | checks rate | threshold |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `100k` | `1` | `0.73` | `0` | `0.00`% | `367.76` ms | `367.76` ms | `367.76` ms | `100.00`% | pass |
+| `1m` | `1` | `0.97` | `0` | `0.00`% | `23.02` ms | `23.02` ms | `23.02` ms | `100.00`% | pass |
+| `10m` | `1` | `0.98` | `0` | `0.00`% | `21.09` ms | `21.09` ms | `21.09` ms | `100.00`% | pass |
 
 ## Optimized 결과
 
-| seed scale | summary path | requests | RPS | dropped iterations | error rate | duration avg | duration p95 | duration p99 | checks rate |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `100k` | `/results/activity-history-100k-optimized-summary.json` | `1200` | `20.82` | `0` | `0.00%` | `24.23 ms` | `32.39 ms` | `38.22 ms` | `100.00%` |
-| `1m` | `/results/activity-history-1m-optimized-summary.json` | `1201` | `20.83` | `0` | `0.00%` | `19.84 ms` | `26.25 ms` | `33.43 ms` | `100.00%` |
-| `10m` | `/results/activity-history-10m-optimized-summary.json` | `1200` | `20.83` | `0` | `0.00%` | `20.74 ms` | `30.00 ms` | `32.23 ms` | `100.00%` |
+실행 조건:
 
-## Baseline 대비 p95/p99
+| setting | value |
+| --- | --- |
+| scenario | baseline |
+| rate | 20 |
+| timeUnit | 1s |
+| duration | 1m |
+| preAllocatedVUs | 20 |
+| maxVUs | 100 |
 
-| seed scale | p95 baseline | p95 optimized | p95 delta | p95 change | p99 baseline | p99 optimized | p99 delta | p99 change |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `100k` | `53.58 ms` | `32.39 ms` | `-21.187 ms` | `-39.54%` | `63.40 ms` | `38.22 ms` | `-25.179 ms` | `-39.71%` |
-| `1m` | `474.02 ms` | `26.25 ms` | `-447.774 ms` | `-94.46%` | `657.60 ms` | `33.43 ms` | `-624.166 ms` | `-94.92%` |
-| `10m` | `32353.24 ms` | `30.00 ms` | `-32323.246 ms` | `-99.91%` | `43167.63 ms` | `32.23 ms` | `-43135.401 ms` | `-99.93%` |
+결과:
 
-## DB 부하 원자료 요약
+| seed scale | requests | RPS | dropped iterations | error rate | duration avg | duration p95 | duration p99 | checks rate | threshold |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `100k` | `1201` | `21.01` | `0` | `0.00`% | `19.49` ms | `24.29` ms | `28.53` ms | `100.00`% | pass |
+| `1m` | `1201` | `21.01` | `0` | `0.00`% | `17.73` ms | `21.82` ms | `25.69` ms | `100.00`% | pass |
+| `10m` | `1201` | `21.02` | `0` | `0.00`% | `16.34` ms | `19.25` ms | `22.63` ms | `100.00`% | pass |
 
-Docker stats mid-run 원문:
+summary JSON:
 
-- [raw/docker-stats-mid-100k.txt](raw/docker-stats-mid-100k.txt)
-- [raw/docker-stats-mid-1m.txt](raw/docker-stats-mid-1m.txt)
-- [raw/docker-stats-mid-10m.txt](raw/docker-stats-mid-10m.txt)
+- [activity-history-100k-smoke-summary.json](raw/rerun-132-method/activity-history-100k-smoke-summary.json)
+- [activity-history-1m-smoke-summary.json](raw/rerun-132-method/activity-history-1m-smoke-summary.json)
+- [activity-history-10m-smoke-summary.json](raw/rerun-132-method/activity-history-10m-smoke-summary.json)
+- [activity-history-100k-optimized-summary.json](raw/rerun-132-method/activity-history-100k-optimized-summary.json)
+- [activity-history-1m-optimized-summary.json](raw/rerun-132-method/activity-history-1m-optimized-summary.json)
+- [activity-history-10m-optimized-summary.json](raw/rerun-132-method/activity-history-10m-optimized-summary.json)
+
+## Baseline 비교
+
+| seed scale | baseline p95 | optimized p95 | p95 delta | p95 change | baseline p99 | optimized p99 | p99 delta | p99 change | baseline RPS | optimized RPS | baseline dropped | optimized dropped |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 100k | 53.58 ms | 24.29 ms | -29.286 ms | -54.66% | 63.40 ms | 28.53 ms | -34.869 ms | -55.00% | 20.01 | 21.01 | 0 | 0 |
+| 1m | 474.02 ms | 21.82 ms | -452.204 ms | -95.40% | 657.60 ms | 25.69 ms | -631.908 ms | -96.09% | 19.97 | 21.01 | 0 | 0 |
+| 10m | 32353.24 ms | 19.25 ms | -32333.998 ms | -99.94% | 43167.63 ms | 22.63 ms | -43145.003 ms | -99.95% | 3.11 | 21.02 | 979 | 0 |
+
+## DB 부하
+
+baseline 직전 pg_stat_reset()을 실행해 통계를 분리했다.
+
+중간 Docker stats:
 
 | seed scale | CPU | MEM | NET I/O | BLOCK I/O | PIDS |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `100k` | `11.75%` | `88.21MiB / 30.91GiB` | `2.38MB / 14.3MB` | `24.9MB / 227MB` | `16` |
-| `1m` | `9.90%` | `284.3MiB / 30.91GiB` | `6.66MB / 41MB` | `29.4MB / 2.11GB` | `16` |
-| `10m` | `10.05%` | `2.32GiB / 30.91GiB` | `11MB / 67.8MB` | `106MB / 18.5GB` | `16` |
+| 100k | 10.89% | 137.8MiB / 30.91GiB | 2.38MB / 14.3MB | 18.7MB / 401MB | 16 |
+| 1m | 6.73% | 296.3MiB / 30.91GiB | 6.61MB / 41.1MB | 18.7MB / 2.32GB | 16 |
+| 10m | 9.63% | 2.329GiB / 30.91GiB | 10.8MB / 67.8MB | 93.6MB / 18.3GB | 16 |
 
-`pg_stat_database` 원문:
+중간 pg_stat_activity:
 
-- [raw/pg-stat-database-after-100k.txt](raw/pg-stat-database-after-100k.txt)
-- [raw/pg-stat-database-after-1m.txt](raw/pg-stat-database-after-1m.txt)
-- [raw/pg-stat-database-after-10m.txt](raw/pg-stat-database-after-10m.txt)
+| seed scale | state | wait_event_type | wait_event | count |
+| --- | --- | --- | --- | ---: |
+| 100k | active |  |  | 1 |
+| 100k | idle | Client | ClientRead | 10 |
+| 1m | active |  |  | 1 |
+| 1m | idle | Client | ClientRead | 10 |
+| 10m | active |  |  | 1 |
+| 10m | idle | Client | ClientRead | 10 |
 
-| seed scale | xact_commit | blks_read | blks_hit | cache_hit_pct | tup_returned | tup_fetched | temp_files | temp_bytes | deadlocks |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `100k` | `5,934` | `4` | `2,627,252` | `100.00` | `62,634,188` | `1,117,218` | `0` | `0` | `0` |
-| `1m` | `5,992` | `58` | `4,125,654` | `100.00` | `2,005,382` | `2,004,412` | `0` | `0` | `0` |
-| `10m` | `5,997` | `66,299` | `5,027,425` | `98.70` | `1,976,304` | `1,970,019` | `0` | `0` | `0` |
+baseline 직후 pg_stat_database:
 
-## 요청당 SQL 수
+| seed scale | xact_commit | xact_rollback | blks_read | blks_hit | cache_hit_pct | tup_returned | tup_fetched | temp_files | temp_bytes | deadlocks |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 100k | 5,933 | 0 | 3 | 2,628,465 | 100.00 | 62,686,693 | 1,117,700 | 0 | 0 | 0 |
+| 1m | 5,934 | 0 | 88 | 4,090,783 | 100.00 | 1,988,451 | 1,987,461 | 0 | 0 | 0 |
+| 10m | 5,931 | 0 | 114 | 4,909,284 | 100.00 | 1,955,135 | 1,954,140 | 0 | 0 | 0 |
 
-MID4-132와 같은 코드 경로 기준으로 요청 1건은 6개 SQL로 본다. 이번 작업에서는 JPQL, fetch 전략, 서비스 조립 로직을 변경하지 않았다.
+baseline 직후 Docker stats:
 
-| 순서 | 조회 |
-| ---: | --- |
-| 1 | 사용자 조회 |
-| 2 | 최근 조회 기사 |
-| 3 | 최근 작성 댓글 |
-| 4 | 최근 좋아요 댓글 |
-| 5 | 구독 관심사 main |
-| 6 | 구독 관심사 keywords |
+| seed scale | CPU | MEM | NET I/O | BLOCK I/O | PIDS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 100k | 0.12% | 138.6MiB / 30.91GiB | 4.36MB / 26.9MB | 18.7MB / 406MB | 16 |
+| 1m | 0.17% | 296.2MiB / 30.91GiB | 8.59MB / 53.6MB | 18.7MB / 2.32GB | 16 |
+| 10m | 3.42% | 2.328GiB / 30.91GiB | 12.8MB / 80.4MB | 93.6MB / 18.3GB | 16 |
 
-## 해석 보류
+## 요청 1건당 SQL
 
-최적화 후 병목 후보와 MID4-125 연결 판단은 사용자 해석 예정.
+코드 경로 기준 요청 1건은 6개 SQL로 구성된다. 이번 작업에서는 API method, repository method, JPQL, fetch 전략, 서비스 조립 로직을 변경하지 않았다.
+
+| 순서 | SQL | 주요 비용 |
+| ---: | --- | --- |
+| 1 | 사용자 조회 | users PK 조회, deleted_at 확인 |
+| 2 | 최근 조회 기사 | article_views, articles, users join, 댓글 수 subquery, 조회 수 subquery |
+| 3 | 최근 작성 댓글 | comments, users, articles join, 좋아요 수 subquery |
+| 4 | 최근 좋아요한 댓글 | comment_likes, comments, users, articles join, 좋아요 수 subquery |
+| 5 | 구독 관심사 main | subscriptions, interests, users join, 관심사별 구독자 수 subquery |
+| 6 | 구독 관심사 keywords | keywords.interest_id = any (?) batch 조회 |
+
+## 병목 판단
+
+MID4-133 인덱스 적용 후 100k, 1m, 10m 모두 20 rps, 1m 조건에서 dropped iteration 0, error rate 0.00%로 통과했다. 10m seed scale에서도 p95는 19.25 ms, p99는 22.63 ms다.
+
+따라서 현재 측정 조건만으로는 활동내역 RDB 조회가 병목이라고 단정하기 어렵다. 병목 판단에는 목표 처리량, p95/p99 SLO, 허용 error rate, dropped iteration 허용 기준이 먼저 필요하다.
