@@ -8,7 +8,7 @@ const BASE_URL = trimTrailingSlash(__ENV.K6_BASE_URL || 'http://localhost:8080')
 const PATH_TEMPLATE = __ENV.K6_ACTIVITY_HISTORY_PATH_TEMPLATE || '/api/user-activities/{userId}';
 const TARGET_USER_ID = __ENV.K6_TARGET_USER_ID || DEFAULT_TARGET_USER_ID;
 const USER_ID_HEADER_NAME = __ENV.K6_USER_ID_HEADER_NAME || 'Monew-Request-User-ID';
-const EXPECTED_STATUS = numberEnv('K6_EXPECTED_STATUS', 200);
+const EXPECTED_STATUS = httpStatusEnv('K6_EXPECTED_STATUS', 200);
 const SLEEP_SECONDS = nonNegativeNumberEnv('K6_SLEEP_SECONDS', 1);
 const SUMMARY_PATH = summaryPath(PATH_TEMPLATE);
 const ACTIVITY_HISTORY_URL = buildUrl(PATH_TEMPLATE, TARGET_USER_ID);
@@ -48,6 +48,7 @@ export const options = {
       `p(99)<${__ENV.K6_HTTP_REQ_DURATION_P99_THRESHOLD || '2000'}`,
     ],
     checks: [`rate>${__ENV.K6_CHECK_RATE_THRESHOLD || '0.99'}`],
+    dropped_iterations: [`count<${__ENV.K6_DROPPED_ITERATIONS_COUNT_THRESHOLD || '1'}`],
   },
 };
 
@@ -61,7 +62,7 @@ export default function () {
     });
   });
 
-  if (SLEEP_SECONDS > 0) {
+  if (SCENARIO === 'smoke' && SLEEP_SECONDS > 0) {
     sleep(SLEEP_SECONDS);
   }
 }
@@ -75,6 +76,7 @@ export function handleSummary(data) {
     metrics: {
       requests: metricValue(data, 'http_reqs', 'count'),
       rps: metricValue(data, 'http_reqs', 'rate'),
+      droppedIterations: metricValue(data, 'dropped_iterations', 'count'),
       errorRate: metricValue(data, 'http_req_failed', 'rate'),
       durationAvgMs: metricValue(data, 'http_req_duration', 'avg'),
       durationP95Ms: metricValue(data, 'http_req_duration', 'p(95)'),
@@ -92,6 +94,7 @@ export function handleSummary(data) {
     `summaryPath: ${SUMMARY_PATH}`,
     `requests: ${formatNumber(summary.metrics.requests, 0)}`,
     `rps: ${formatNumber(summary.metrics.rps, 2)}`,
+    `droppedIterations: ${formatNumber(summary.metrics.droppedIterations, 0)}`,
     `errorRate: ${formatPercent(summary.metrics.errorRate)}`,
     `duration.avg: ${formatNumber(summary.metrics.durationAvgMs, 2)} ms`,
     `duration.p95: ${formatNumber(summary.metrics.durationP95Ms, 2)} ms`,
@@ -210,6 +213,22 @@ function nonNegativeNumberEnv(name, defaultValue) {
 
   if (!Number.isFinite(parsedValue) || parsedValue < 0) {
     throw new Error(`${name} must be a non-negative number. value=${rawValue}`);
+  }
+
+  return parsedValue;
+}
+
+function httpStatusEnv(name, defaultValue) {
+  const rawValue = __ENV[name];
+
+  if (!rawValue) {
+    return defaultValue;
+  }
+
+  const parsedValue = Number(rawValue);
+
+  if (!Number.isInteger(parsedValue) || parsedValue < 100 || parsedValue > 599) {
+    throw new Error(`${name} must be an integer HTTP status code from 100 to 599. value=${rawValue}`);
   }
 
   return parsedValue;

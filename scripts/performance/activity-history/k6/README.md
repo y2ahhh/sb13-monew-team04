@@ -46,6 +46,8 @@ docker compose -f compose.k6.yaml run --rm `
 
 ## Baseline 실행
 
+Baseline 시나리오는 `constant-arrival-rate` 기준으로 요청 도착률을 맞추므로 `K6_SLEEP_SECONDS`를 적용하지 않습니다.
+
 ```powershell
 docker compose -f compose.k6.yaml run --rm `
   -e K6_SCENARIO=baseline `
@@ -72,13 +74,14 @@ docker compose -f compose.k6.yaml run --rm \
 | `K6_ACTIVITY_HISTORY_PATH_TEMPLATE` | `/api/user-activities/{userId}` | 활동내역 API path 또는 전체 URL |
 | `K6_TARGET_USER_ID` | `00000001-0000-4000-8000-000000000001` | 측정 대상 사용자 ID |
 | `K6_USER_ID_HEADER_NAME` | `Monew-Request-User-ID` | 사용자 ID 전달 헤더명 |
-| `K6_EXPECTED_STATUS` | `200` | 성공으로 판단할 HTTP 상태 코드 |
+| `K6_EXPECTED_STATUS` | `200` | 성공으로 판단할 HTTP 상태 코드, 100-599 정수만 허용 |
 | `K6_SCENARIO` | `smoke` | `smoke` 또는 `baseline` |
 | `K6_BASELINE_RATE` | `20` | baseline RPS 목표 |
 | `K6_BASELINE_DURATION` | `1m` | baseline 지속 시간 |
 | `K6_BASELINE_PRE_ALLOCATED_VUS` | `20` | 사전 할당 VU 수 |
 | `K6_BASELINE_MAX_VUS` | `100` | 최대 VU 수 |
-| `K6_SLEEP_SECONDS` | `1` | iteration 사이 대기 시간, `0`이면 대기하지 않음 |
+| `K6_DROPPED_ITERATIONS_COUNT_THRESHOLD` | `1` | `dropped_iterations` count 미만 임계값, 기본값은 0건만 통과 |
+| `K6_SLEEP_SECONDS` | `1` | smoke iteration 사이 대기 시간, `0`이면 대기하지 않음 |
 | `K6_SUMMARY_PATH` | path 기반 자동 생성 | summary JSON 저장 경로를 직접 지정할 때 사용 |
 | `K6_AUTHORIZATION` | 없음 | 인증이 필요할 때 Authorization 헤더 값 |
 
@@ -90,6 +93,7 @@ docker compose -f compose.k6.yaml run --rm \
 - p99
 - error rate
 - RPS
+- dropped iterations
 
 summary JSON은 기본적으로 아래 경로에 저장됩니다.
 
