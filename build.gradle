@@ -139,9 +139,6 @@ tasks.register('s3DevExternalTest', Test) {
     useJUnitPlatform {
         includeTags 's3-dev-external'
     }
-    filter {
-        includeTestsMatching 'com.codeit.sb13.monew.article.s3.service.ArticleS3DevExternalSmokeTest'
-    }
 
     shouldRunAfter tasks.named('test')
 }

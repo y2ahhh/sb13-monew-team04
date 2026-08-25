@@ -168,7 +168,7 @@ class ArticleS3DevExternalSmokeTest {
             Files.readAllLines(envDevPath).forEach(line -> putEnvValue(values, line));
             return values;
         } catch (IOException e) {
-            return Map.of();
+            throw new IllegalStateException(".env.dev 파일을 읽지 못했습니다. path=" + envDevPath, e);
         }
     }
 

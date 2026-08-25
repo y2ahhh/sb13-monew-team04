@@ -334,15 +334,16 @@ class ArticleControllerTest {
     @Test
     @DisplayName("기사 복구 성공 시 200과 날짜별 복구 결과를 반환한다")
     void restoreArticlesSuccess() throws Exception {
-        LocalDate restoreDate = LocalDate.of(2026, 8, 23);
+        LocalDate restoreFrom = LocalDate.of(2026, 8, 23);
+        LocalDate restoreTo = LocalDate.of(2026, 8, 25);
         UUID restoredArticleId = UUID.randomUUID();
-        ArticleRestoreResult restoreResult = ArticleRestoreResult.of(restoreDate, List.of(restoredArticleId));
+        ArticleRestoreResult restoreResult = ArticleRestoreResult.of(restoreFrom, List.of(restoredArticleId));
         when(articleRestoreService.restoreArticles(any(ArticleRestoreCommand.class)))
                 .thenReturn(List.of(restoreResult));
 
         mockMvc.perform(get("/api/articles/restore")
                         .param("from", "2026-08-23")
-                        .param("to", "2026-08-23"))
+                        .param("to", "2026-08-25"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.length()").value(1))
@@ -352,8 +353,8 @@ class ArticleControllerTest {
 
         ArgumentCaptor<ArticleRestoreCommand> captor = ArgumentCaptor.forClass(ArticleRestoreCommand.class);
         verify(articleRestoreService).restoreArticles(captor.capture());
-        assertThat(captor.getValue().from()).isEqualTo(restoreDate);
-        assertThat(captor.getValue().to()).isEqualTo(restoreDate);
+        assertThat(captor.getValue().from()).isEqualTo(restoreFrom);
+        assertThat(captor.getValue().to()).isEqualTo(restoreTo);
     }
 
     @Test
