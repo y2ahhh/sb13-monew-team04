@@ -8,7 +8,9 @@ import static com.codeit.sb13.monew.user.domain.QUser.user;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.repository.dto.ArticleSearchCondition;
 import com.codeit.sb13.monew.article.repository.dto.ArticleSearchRow;
+import com.codeit.sb13.monew.article.service.dto.ArticleOrderBy;
 import com.codeit.sb13.monew.user.domain.QUser;
+import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
@@ -16,6 +18,7 @@ import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -48,7 +51,9 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
                         publishDateGoe(condition.publishDateFrom()),
                         publishDateLoe(condition.publishDateTo())
                 )
-                .orderBy(article.date.desc(), article.createdAt.desc(), article.id.desc())
+                .orderBy(orderSpecifiers(
+                        condition.orderBy(), condition.direction(),
+                        commentCountExpr, viewCountExpr))
                 .fetch();
     }
 
@@ -84,6 +89,49 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
                 .from(articleView)
                 .where(articleView.article.eq(article), articleView.user.id.eq(requestUserId))
                 .exists();
+    }
+
+    /**
+     * 정렬 기준 값, 생성 시각, id 순으로 3단 정렬한다.
+     *
+     * <p>정렬 기준 값만으로는 동점인 기사들의 순서가 확정되지 않는다. 순서가 매 조회마다
+     * 달라지면 커서 페이지네이션에서 항목이 중복되거나 누락되므로, 항상 유일한
+     * {@code id}까지 내려가 순서를 확정한다. 세 기준을 모두 같은 방향으로 정렬해야
+     * 페이지가 진행될수록 한쪽으로만 나아가는 유일한 순서가 유지된다.
+     *
+     * <p>MID4-109 관심사 목록 조회({@code InterestRepositoryCustomImpl})와 같은 구조다.
+     * API마다 페이지네이션 동작이 달라지지 않도록 맞췄다.
+     */
+    private OrderSpecifier<?>[] orderSpecifiers(
+            ArticleOrderBy orderBy,
+            Sort.Direction direction,
+            NumberExpression<Long> commentCountExpr,
+            NumberExpression<Long> viewCountExpr
+    ) {
+        boolean ascending = direction.isAscending();
+
+        OrderSpecifier<?> primary =
+                primaryOrderSpecifier(orderBy, ascending, commentCountExpr, viewCountExpr);
+        OrderSpecifier<?> tiebreaker = ascending ? article.createdAt.asc() : article.createdAt.desc();
+        OrderSpecifier<?> idTiebreaker = ascending ? article.id.asc() : article.id.desc();
+
+        return new OrderSpecifier<?>[] {primary, tiebreaker, idTiebreaker};
+    }
+
+    private OrderSpecifier<?> primaryOrderSpecifier(
+            ArticleOrderBy orderBy,
+            boolean ascending,
+            NumberExpression<Long> commentCountExpr,
+            NumberExpression<Long> viewCountExpr
+    ) {
+        if (orderBy == ArticleOrderBy.COMMENT_COUNT) {
+            return ascending ? commentCountExpr.asc() : commentCountExpr.desc();
+        }
+        if (orderBy == ArticleOrderBy.VIEW_COUNT) {
+            return ascending ? viewCountExpr.asc() : viewCountExpr.desc();
+        }
+
+        return ascending ? article.date.asc() : article.date.desc();
     }
 
     private BooleanExpression keywordContains(String keyword) {

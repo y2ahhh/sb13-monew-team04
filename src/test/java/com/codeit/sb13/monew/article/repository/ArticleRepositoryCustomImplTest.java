@@ -86,6 +86,11 @@ class ArticleRepositoryCustomImplTest {
                 ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, null, 100, userId);
     }
 
+    private ArticleSearchCondition sortedBy(ArticleOrderBy orderBy, Sort.Direction direction) {
+        return new ArticleSearchCondition(null, null, null, null,
+                orderBy, direction, null, null, null, 100, null);
+    }
+
     private List<String> titlesOf(List<ArticleSearchRow> rows) {
         return rows.stream().map(row -> row.article().getTitle()).toList();
     }
@@ -269,5 +274,33 @@ class ArticleRepositoryCustomImplTest {
 
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).viewCount()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("publishDate 오름차순 정렬")
+    void searchOrderByPublishDateAsc() {
+        persistArticle("가장 오래된 기사", "요약", D1, ArticleSource.NAVER);
+        persistArticle("중간 기사", "요약", D2, ArticleSource.CHOSUN);
+        persistArticle("가장 최신 기사", "요약", D3, ArticleSource.HANKYUNG);
+
+        List<ArticleSearchRow> rows =
+                search(sortedBy(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.ASC));
+
+        assertThat(titlesOf(rows))
+                .containsExactly("가장 오래된 기사", "중간 기사", "가장 최신 기사");
+    }
+
+    @Test
+    @DisplayName("publishDate 내림차순 정렬")
+    void searchOrderByPublishDateDesc() {
+        persistArticle("가장 오래된 기사", "요약", D1, ArticleSource.NAVER);
+        persistArticle("중간 기사", "요약", D2, ArticleSource.CHOSUN);
+        persistArticle("가장 최신 기사", "요약", D3, ArticleSource.HANKYUNG);
+
+        List<ArticleSearchRow> rows =
+                search(sortedBy(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC));
+
+        assertThat(titlesOf(rows))
+                .containsExactly("가장 최신 기사", "중간 기사", "가장 오래된 기사");
     }
 }
