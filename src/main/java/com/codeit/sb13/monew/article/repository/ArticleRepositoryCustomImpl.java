@@ -2,11 +2,13 @@ package com.codeit.sb13.monew.article.repository;
 
 import static com.codeit.sb13.monew.article.domain.QArticle.article;
 import static com.codeit.sb13.monew.article.domain.QArticleView.articleView;
+import static com.codeit.sb13.monew.comment.domain.QComment.comment;
 import static com.codeit.sb13.monew.user.domain.QUser.user;
 
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.repository.dto.ArticleSearchCondition;
 import com.codeit.sb13.monew.article.repository.dto.ArticleSearchRow;
+import com.codeit.sb13.monew.user.domain.QUser;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
@@ -23,17 +25,21 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
 
+    private static final QUser commentUser = new QUser("commentUser");
+
     private final JPAQueryFactory queryFactory;
 
     @Override
     public List<ArticleSearchRow> search(ArticleSearchCondition condition) {
+        NumberExpression<Long> commentCountExpr = commentCountExpression();
         NumberExpression<Long> viewCountExpr = viewCountExpression();
         BooleanExpression viewedByMeExpr = viewedByMeExpression(condition.requestUserId());
 
         return queryFactory
                 .select(Projections.constructor(
-                        // viewCountExpr는 서브쿼리를 감싼 표현식이라 getType()이 Long이 아니라 Object로 소실된다.
-                        ArticleSearchRow.class, article, viewCountExpr.longValue(), viewedByMeExpr))
+                        // 두 카운트 표현식은 서브쿼리를 감싼 것이라 getType()이 Long이 아니라 Object로 소실된다.
+                        ArticleSearchRow.class, article,
+                        commentCountExpr.longValue(), viewCountExpr.longValue(), viewedByMeExpr))
                 .from(article)
                 .where(
                         article.deletedAt.isNull(),
@@ -44,6 +50,19 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
                 )
                 .orderBy(article.date.desc(), article.createdAt.desc(), article.id.desc())
                 .fetch();
+    }
+
+    private NumberExpression<Long> commentCountExpression() {
+        return Expressions.asNumber(
+                JPAExpressions.select(comment.count())
+                        .from(comment)
+                        .join(comment.user, commentUser)
+                        .where(
+                                comment.article.eq(article),
+                                comment.deletedAt.isNull(),
+                                commentUser.deletedAt.isNull()
+                        )
+        );
     }
 
     private NumberExpression<Long> viewCountExpression() {

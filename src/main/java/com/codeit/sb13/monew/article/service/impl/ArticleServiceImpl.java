@@ -77,12 +77,18 @@ public class ArticleServiceImpl implements ArticleService {
                 command.sourceIn(),
                 command.publishDateFrom(),
                 command.publishDateTo(),
+                command.orderBy(),
+                command.direction(),
+                command.cursor(),
+                command.after(),
+                command.idAfter(),
+                command.limit(),
                 command.requestUserId()
         );
 
-        // commentCount는 댓글 집계 방식 확정 전까지 0 (MID4-163 → MID4-147)
         return articleRepository.search(condition).stream()
-                .map(row -> articleMapper.toDto(row.article(), row.viewedByMe(), 0L, row.viewCount()))
+                .map(row -> articleMapper.toDto(
+                        row.article(), row.viewedByMe(), row.commentCount(), row.viewCount()))
                 .toList();
     }
 

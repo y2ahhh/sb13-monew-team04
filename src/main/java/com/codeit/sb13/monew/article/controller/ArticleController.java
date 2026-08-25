@@ -11,6 +11,7 @@ import com.codeit.sb13.monew.article.service.dto.ArticleDto;
 import com.codeit.sb13.monew.article.service.dto.ArticleSearchCommand;
 import com.codeit.sb13.monew.article.service.dto.ArticleViewDto;
 import com.codeit.sb13.monew.global.MonewHttpHeaders;
+import com.codeit.sb13.monew.global.exception.article.ArticleSearchConditionInvalidException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -42,11 +43,27 @@ public class ArticleController implements ArticleApi {
             @ModelAttribute ArticleSearchRequest request,
             @RequestHeader(MonewHttpHeaders.REQUEST_USER_ID) UUID requestUserId
     ) {
+        if (request.orderBy() == null) {
+            throw new ArticleSearchConditionInvalidException("orderBy는 필수입니다.");
+        }
+        if (request.direction() == null) {
+            throw new ArticleSearchConditionInvalidException("direction은 필수입니다.");
+        }
+        if (request.limit() < 1) {
+            throw new ArticleSearchConditionInvalidException("limit은 1 이상이어야 합니다: " + request.limit());
+        }
+
         ArticleSearchCommand command = new ArticleSearchCommand(
                 request.keyword(),
                 request.sourceIn(),
                 request.publishDateFrom(),
                 request.publishDateTo(),
+                request.orderBy(),
+                request.direction(),
+                request.cursor(),
+                request.after(),
+                request.idAfter(),
+                request.limit(),
                 requestUserId
         );
 

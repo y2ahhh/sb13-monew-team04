@@ -9,6 +9,7 @@ import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.mapper.ArticleMapper;
 import com.codeit.sb13.monew.article.repository.ArticleRepository;
 import com.codeit.sb13.monew.article.repository.ArticleViewRepository;
+import com.codeit.sb13.monew.article.service.dto.ArticleOrderBy;
 import com.codeit.sb13.monew.article.service.dto.ArticleRequest;
 import com.codeit.sb13.monew.article.service.dto.ArticleSearchCommand;
 import com.codeit.sb13.monew.article.service.impl.ArticleServiceImpl;
@@ -29,6 +30,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
@@ -345,11 +347,18 @@ class ArticleServiceTest {
     void testSearchArticlesPassesCondition() {
         // given
         UUID userId = UUID.randomUUID();
+        UUID idAfter = UUID.randomUUID();
         ArticleSearchCommand command = new ArticleSearchCommand(
                 "반도체",
                 List.of(ArticleSource.NAVER, ArticleSource.CHOSUN),
                 LocalDateTime.of(2026, 8, 1, 0, 0),
                 LocalDateTime.of(2026, 8, 31, 0, 0),
+                ArticleOrderBy.VIEW_COUNT,
+                Sort.Direction.ASC,
+                "10",
+                LocalDateTime.of(2026, 8, 20, 12, 0),
+                idAfter,
+                30,
                 userId
         );
         when(articleRepository.search(any(ArticleSearchCondition.class))).thenReturn(List.of());
@@ -369,31 +378,38 @@ class ArticleServiceTest {
         assertThat(condition.publishDateFrom()).isEqualTo(LocalDateTime.of(2026, 8, 1, 0, 0));
         assertThat(condition.publishDateTo()).isEqualTo(LocalDateTime.of(2026, 8, 31, 0, 0));
         assertThat(condition.requestUserId()).isEqualTo(userId);
+        assertThat(condition.orderBy()).isEqualTo(ArticleOrderBy.VIEW_COUNT);
+        assertThat(condition.direction()).isEqualTo(Sort.Direction.ASC);
+        assertThat(condition.cursor()).isEqualTo("10");
+        assertThat(condition.after()).isEqualTo(LocalDateTime.of(2026, 8, 20, 12, 0));
+        assertThat(condition.idAfter()).isEqualTo(idAfter);
+        assertThat(condition.limit()).isEqualTo(30);
     }
 
     @Test
-    @DisplayName("목록 조회 - 조회 결과를 ArticleDto로 변환하고 commentCount는 0으로 채운다")
+    @DisplayName("목록 조회 - 조회 결과의 집계값을 그대로 ArticleDto로 옮긴다")
     void testSearchArticlesMapsRows() {
         // given
         UUID userId = UUID.randomUUID();
-        ArticleSearchCommand command =
-                new ArticleSearchCommand(null, null, null, null, userId);
+        ArticleSearchCommand command = new ArticleSearchCommand(
+                null, null, null, null,
+                ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, null, 50, userId);
 
         Article article = Article.create("제목", "요약", "https://example.com/1",
                 LocalDateTime.now(), ArticleSource.NAVER);
-        ArticleSearchRow row = new ArticleSearchRow(article, 5L, true);
+        ArticleSearchRow row = new ArticleSearchRow(article, 3L, 5L, true);
         ArticleDto dto = new ArticleDto(UUID.randomUUID(), ArticleSource.NAVER,
-                "https://example.com/1", "제목", LocalDateTime.now(), "요약", 0L, 5L, true);
+                "https://example.com/1", "제목", LocalDateTime.now(), "요약", 3L, 5L, true);
 
         when(articleRepository.search(any(ArticleSearchCondition.class))).thenReturn(List.of(row));
-        when(articleMapper.toDto(article, true, 0L, 5L)).thenReturn(dto);
+        when(articleMapper.toDto(article, true, 3L, 5L)).thenReturn(dto);
 
         // when
         List<ArticleDto> result = articleService.searchArticles(command);
 
         // then
         assertThat(result).containsExactly(dto);
-        verify(articleMapper).toDto(article, true, 0L, 5L);
+        verify(articleMapper).toDto(article, true, 3L, 5L);
     }
 
     @Test
@@ -401,8 +417,9 @@ class ArticleServiceTest {
     void testSearchArticlesValidatesUserFirst() {
         // given
         UUID userId = UUID.randomUUID();
-        ArticleSearchCommand command =
-                new ArticleSearchCommand(null, null, null, null, userId);
+        ArticleSearchCommand command = new ArticleSearchCommand(
+                null, null, null, null,
+                ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, null, 50, userId);
         when(articleRepository.search(any(ArticleSearchCondition.class))).thenReturn(List.of());
 
         // when

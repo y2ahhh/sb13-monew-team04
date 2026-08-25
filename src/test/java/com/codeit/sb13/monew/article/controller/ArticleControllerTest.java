@@ -7,6 +7,7 @@ import com.codeit.sb13.monew.article.s3.service.ArticleRestoreService;
 import com.codeit.sb13.monew.article.s3.service.dto.ArticleRestoreCommand;
 import com.codeit.sb13.monew.article.s3.service.dto.ArticleRestoreResult;
 import com.codeit.sb13.monew.article.service.ArticleService;
+import com.codeit.sb13.monew.article.service.dto.ArticleOrderBy;
 import com.codeit.sb13.monew.article.service.dto.ArticleSearchCommand;
 import com.codeit.sb13.monew.article.service.dto.ArticleViewDto;
 import com.codeit.sb13.monew.global.exception.article.ArticleRestoreFailedException;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -268,7 +270,10 @@ class ArticleControllerTest {
 
         // when & then
         mockMvc.perform(get("/api/articles")
-                        .header(REQUEST_USER_ID, userId))
+                        .header(REQUEST_USER_ID, userId)
+                        .param("orderBy", "publishDate")
+                        .param("direction", "DESC")
+                        .param("limit", "50"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(articleId.toString()))
@@ -292,7 +297,13 @@ class ArticleControllerTest {
                         .param("keyword", "반도체")
                         .param("sourceIn", "NAVER", "CHOSUN")
                         .param("publishDateFrom", "2026-08-01T00:00:00")
-                        .param("publishDateTo", "2026-08-31T00:00:00"))
+                        .param("publishDateTo", "2026-08-31T00:00:00")
+                        .param("orderBy", "viewCount")
+                        .param("direction", "ASC")
+                        .param("cursor", "10")
+                        .param("after", "2026-08-20T12:00:00")
+                        .param("idAfter", "11111111-1111-1111-1111-111111111111")
+                        .param("limit", "30"))
                 .andExpect(status().isOk());
 
         // then
@@ -309,6 +320,16 @@ class ArticleControllerTest {
         org.assertj.core.api.Assertions.assertThat(command.publishDateTo())
                 .isEqualTo(LocalDateTime.of(2026, 8, 31, 0, 0));
         org.assertj.core.api.Assertions.assertThat(command.requestUserId()).isEqualTo(userId);
+        org.assertj.core.api.Assertions.assertThat(command.orderBy())
+                .isEqualTo(ArticleOrderBy.VIEW_COUNT);
+        org.assertj.core.api.Assertions.assertThat(command.direction())
+                .isEqualTo(Sort.Direction.ASC);
+        org.assertj.core.api.Assertions.assertThat(command.cursor()).isEqualTo("10");
+        org.assertj.core.api.Assertions.assertThat(command.after())
+                .isEqualTo(LocalDateTime.of(2026, 8, 20, 12, 0));
+        org.assertj.core.api.Assertions.assertThat(command.idAfter())
+                .isEqualTo(UUID.fromString("11111111-1111-1111-1111-111111111111"));
+        org.assertj.core.api.Assertions.assertThat(command.limit()).isEqualTo(30);
     }
 
     @Test

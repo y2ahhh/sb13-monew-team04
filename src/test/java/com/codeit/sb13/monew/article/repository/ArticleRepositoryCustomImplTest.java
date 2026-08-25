@@ -7,7 +7,9 @@ import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.domain.ArticleView;
 import com.codeit.sb13.monew.article.repository.dto.ArticleSearchCondition;
 import com.codeit.sb13.monew.article.repository.dto.ArticleSearchRow;
+import com.codeit.sb13.monew.article.service.dto.ArticleOrderBy;
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;
+import org.springframework.data.domain.Sort;
 import com.codeit.sb13.monew.global.config.QueryDslConfig;
 import com.codeit.sb13.monew.user.domain.User;
 import org.junit.jupiter.api.DisplayName;
@@ -78,7 +80,10 @@ class ArticleRepositoryCustomImplTest {
 
     private ArticleSearchCondition condition(String keyword, List<ArticleSource> sourceIn,
                                              LocalDateTime from, LocalDateTime to, UUID userId) {
-        return new ArticleSearchCondition(keyword, sourceIn, from, to, userId);
+        // 정렬·커서 파라미터는 Step 3에서 쿼리에 반영한다. 여기서는 기존 동작
+        // (발행일 내림차순 전체 조회)을 유지하는 기본값을 넣는다.
+        return new ArticleSearchCondition(keyword, sourceIn, from, to,
+                ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, null, 100, userId);
     }
 
     private List<String> titlesOf(List<ArticleSearchRow> rows) {
