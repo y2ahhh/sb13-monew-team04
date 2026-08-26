@@ -14,20 +14,47 @@ import org.springframework.data.repository.query.Param;
 
 public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> {
 
-  Long countByCommentId(UUID commentId);
+  @Query("""
+  SELECT COUNT(CL)
+      FROM CommentLike CL
+      JOIN CL.comment C
+      JOIN CL.likedBy LB
+      WHERE C.id = :commentId
+          AND LB.deletedAt IS NULL
+          AND C.deletedAt IS NULL
+  """) // 탈퇴 또는 논리 삭제된 유저의 좋아요는 카운트에서 제외
+  Long countActiveLikesByCommentId(@Param("commentId") UUID commentId);
 
   @Query("""
-      select cl
-      from CommentLike cl
-      join fetch cl.comment c
-      join fetch c.article
-      join fetch c.user
-      join fetch cl.likedBy
-      where c.id = :commentId
-        and cl.likedBy.id = :likedById
-  """)
-  Optional<CommentLike> findByCommentAndLikedBy(@Param("commentId") UUID commentId, @Param("likedById") UUID likedById);
+      SELECT CASE WHEN COUNT(CL) > 0 THEN TRUE ELSE FALSE END
+      FROM CommentLike CL
+      JOIN CL.comment C
+      JOIN CL.likedBy LB
+      WHERE C.id = :commentId
+          AND LB.id = :likedById
+          AND LB.deletedAt IS NULL
+          AND C.deletedAt IS NULL
+      """) // 조건에 맞는 데이터가 0개 이상이면 true, 없으면 false 반환
+  boolean existsActiveByCommentIdAndLikedById(
+      @Param("commentId") UUID commentId,
+      @Param("likedById") UUID likedById
+  );
 
+  // CommentLikeDto 생성에는 좋아요 자체와 댓글·기사·작성자 정보가 모두 필요하다
+  @Query("""
+      SELECT CL
+      FROM CommentLike CL
+      JOIN FETCH CL.comment C
+      JOIN FETCH C.article
+      JOIN FETCH C.user
+      JOIN FETCH CL.likedBy
+      WHERE C.id = :commentId
+          AND CL.likedBy.id = :likedById
+      """)
+  Optional<CommentLike> findWithCommentDetailsByCommentIdAndLikedById(
+      @Param("commentId") UUID commentId,
+      @Param("likedById") UUID likedById
+  );
 
   void deleteByComment_User_Id(UUID userId);
   void deleteByLikedBy_Id(UUID userId);
