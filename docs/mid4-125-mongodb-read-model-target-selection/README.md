@@ -114,6 +114,7 @@ MongoDB Read Model을 후속 적용하는 경우 삭제 상태 반영 기준은 
 - payload 내부 필드를 DB에서 직접 조회하는 요구가 없으면 JSON path/index는 만들지 않는다.
 - payload는 이벤트 재처리와 projection 갱신에 필요한 최소 정보만 담는 방향으로 검토한다.
 - MongoDB Read Model 적용 시 outbox 이벤트 후보에는 `eventId`, `eventSequence`, `eventType`, `aggregateType`, `aggregateId`, `occurredAt`, 삭제 여부, 영향 받는 사용자 식별 정보를 포함할 수 있다.
+- `payload.eventSequence`는 `outbox_events.event_sequence`를 payload에 담은 값이며, 별도 도메인 sequence나 aggregate version이 아니다. worker는 이 값을 MongoDB `activity_histories.lastAppliedEventSequence`에 저장하고, activity 상태 전이는 `eventSequence > lastAppliedEventSequence` 조건으로 보호한다.
 - 일반 projection 갱신 이벤트의 `activityType`, 활동 record ID, `sourceEntityType`, `sourceEntityId`, 활동 시각, 화면 응답용 대상 데이터 전달 방식은 후속 구현 티켓에서 확정한다.
 - 화면 응답용 대상 데이터를 payload에 직렬화할지, worker가 RDB에서 재조회할지는 이번 티켓에서 결정하지 않는다.
 - 기사/댓글 삭제처럼 여러 사용자 활동에 영향을 줄 수 있는 이벤트는 reverse index 조회 또는 사용자별 이벤트 fan-out 중 어떤 방식을 사용할지 후속 설계에서 결정한다.
