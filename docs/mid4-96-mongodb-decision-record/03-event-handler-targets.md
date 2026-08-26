@@ -10,9 +10,11 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 ## 공통 삭제 이벤트
 
-논리삭제 개념은 사용자, 기사, 댓글에 둔다.
+논리삭제 개념은 사용자, 기사, 댓글에 둔다. 관심사는 노출 상태 변경을 같은 대상 숨김 이벤트로 처리한다.
 
 논리삭제 이벤트는 기존에 `visible=true`인 activity만 숨김 처리한다. 이미 `CANCELED`, `UNSUBSCRIBED`, `TARGET_DELETED`, `USER_DELETED`로 숨겨진 activity의 `status`는 덮어쓰지 않는다.
+
+`TARGET_DELETED`로 숨길 때는 어떤 대상의 삭제 또는 비노출 전파로 숨겨졌는지 `hiddenByTargetType`, `hiddenByTargetId`를 함께 저장한다. 대상 복구 이벤트는 `status=TARGET_DELETED`와 `hiddenByTargetType`, `hiddenByTargetId`가 복구된 대상과 일치하는 activity만 복구 후보로 본다.
 
 ```text
 사용자 논리삭제 또는 탈퇴
@@ -23,6 +25,7 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 댓글 논리삭제
 -> targetType=COMMENT, targetId=commentId, visible=true인 activity visible=false, status=TARGET_DELETED 처리
+-> hiddenByTargetType=COMMENT, hiddenByTargetId=commentId 저장
 -> comment snapshot visible=false 처리
 
 댓글 물리삭제
@@ -31,7 +34,9 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 기사 논리삭제
 -> targetType=ARTICLE, targetId=articleId, visible=true인 activity visible=false, status=TARGET_DELETED 처리
+-> hiddenByTargetType=ARTICLE, hiddenByTargetId=articleId 저장
 -> targetType=COMMENT, parentTargetType=ARTICLE, parentTargetId=articleId, visible=true인 activity visible=false, status=TARGET_DELETED 처리
+-> hiddenByTargetType=ARTICLE, hiddenByTargetId=articleId 저장
 -> article snapshot visible=false 처리
 
 기사 물리삭제
@@ -40,12 +45,40 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 -> targetType=COMMENT, parentTargetType=ARTICLE, parentTargetId=articleId인 activity_histories 문서 제거
 ```
 
+## 공통 복구 이벤트
+
+대상 복구 이벤트는 activity만 재활성화하지 않는다. RDB 기준 대상과 필요한 부모 대상이 현재 노출 가능한 상태인지 확인하고, 대상 snapshot을 RDB 현재 값으로 갱신해 `visible=true`로 복구한 뒤 activity를 `visible=true`, `status=ACTIVE`로 복구한다. 대상이 아직 RDB에서 삭제 또는 비노출 상태이면 activity 재활성화를 하지 않는다. `CANCELED`, `UNSUBSCRIBED`, `USER_DELETED` 상태는 대상 복구 이벤트로 자동 복구하지 않는다.
+
+```text
+댓글 복구
+-> RDB 댓글과 부모 기사가 모두 노출 가능한 상태인지 확인
+-> comment snapshot을 RDB 현재 값으로 갱신하고 visible=true 처리
+-> status=TARGET_DELETED, hiddenByTargetType=COMMENT, hiddenByTargetId=commentId인 activity만 visible=true, status=ACTIVE 처리
+-> hiddenByTargetType, hiddenByTargetId 제거
+
+기사 복구
+-> RDB 기사가 노출 가능한 상태인지 확인
+-> article snapshot을 RDB 현재 값으로 갱신하고 visible=true 처리
+-> status=TARGET_DELETED, hiddenByTargetType=ARTICLE, hiddenByTargetId=articleId인 기사 activity visible=true, status=ACTIVE 처리
+-> 같은 조건의 댓글 activity는 댓글 snapshot도 노출 가능한 경우에만 visible=true, status=ACTIVE 처리
+-> hiddenByTargetType, hiddenByTargetId 제거
+
+관심사 재노출
+-> RDB 관심사가 노출 가능한 상태인지 확인
+-> interest snapshot을 RDB 현재 값으로 갱신하고 visible=true 처리
+-> status=TARGET_DELETED, hiddenByTargetType=INTEREST, hiddenByTargetId=interestId인 activity만 visible=true, status=ACTIVE 처리
+-> hiddenByTargetType, hiddenByTargetId 제거
+```
+
 ### 구독 중인 관심사
 
 ```text
 관심사 구독
+-> RDB 관심사가 노출 가능한 상태인지 확인
+-> interest snapshot을 RDB 현재 값으로 갱신하고 visible=true 보장
 -> 사용자별 구독 관심사 활동 생성 또는 재활성화
 -> visible=true, status=ACTIVE 처리
+-> hiddenByTargetType, hiddenByTargetId 제거
 
 구독 해제
 -> 해당 사용자의 구독 관심사 활동 visible=false, status=UNSUBSCRIBED 처리
@@ -55,6 +88,7 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 관심사 비노출 또는 제거
 -> 해당 interestId를 참조하는 visible=true 구독 관심사 활동 visible=false, status=TARGET_DELETED 처리
+-> hiddenByTargetType=INTEREST, hiddenByTargetId=interestId 저장
 -> interest snapshot visible=false 처리
 
 구독자 수 변경
@@ -74,12 +108,14 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 댓글 논리삭제
 -> 해당 commentId를 참조하는 visible=true 작성 댓글 활동 visible=false, status=TARGET_DELETED 처리
+-> hiddenByTargetType=COMMENT, hiddenByTargetId=commentId 저장
 
 댓글 물리삭제
 -> 해당 commentId를 참조하는 작성 댓글 activity 제거
 
 기사 논리삭제
 -> parentTargetType=ARTICLE, parentTargetId=articleId인 visible=true 작성 댓글 활동 visible=false, status=TARGET_DELETED 처리
+-> hiddenByTargetType=ARTICLE, hiddenByTargetId=articleId 저장
 
 기사 물리삭제
 -> parentTargetType=ARTICLE, parentTargetId=articleId인 작성 댓글 activity 제거
@@ -92,8 +128,11 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 ```text
 댓글 좋아요
+-> RDB 댓글과 부모 기사가 모두 노출 가능한 상태인지 확인
+-> comment snapshot을 RDB 현재 값으로 갱신하고 visible=true 보장
 -> 좋아요 댓글 활동 생성 또는 재활성화
 -> visible=true, status=ACTIVE 처리
+-> hiddenByTargetType, hiddenByTargetId 제거
 
 좋아요 취소
 -> 해당 사용자의 좋아요 댓글 활동 visible=false, status=CANCELED 처리
@@ -103,12 +142,14 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 댓글 논리삭제
 -> 해당 commentId를 참조하는 visible=true 좋아요 댓글 활동 visible=false, status=TARGET_DELETED 처리
+-> hiddenByTargetType=COMMENT, hiddenByTargetId=commentId 저장
 
 댓글 물리삭제
 -> 해당 commentId를 참조하는 좋아요 댓글 activity 제거
 
 기사 논리삭제
 -> parentTargetType=ARTICLE, parentTargetId=articleId인 visible=true 좋아요 댓글 활동 visible=false, status=TARGET_DELETED 처리
+-> hiddenByTargetType=ARTICLE, hiddenByTargetId=articleId 저장
 
 기사 물리삭제
 -> parentTargetType=ARTICLE, parentTargetId=articleId인 좋아요 댓글 activity 제거
@@ -121,8 +162,11 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 ```text
 기사 조회
+-> RDB 기사가 노출 가능한 상태인지 확인
+-> article snapshot을 RDB 현재 값으로 갱신하고 visible=true 보장
 -> 최근 본 뉴스 활동 생성 또는 재활성화
 -> visible=true, status=ACTIVE 처리
+-> hiddenByTargetType, hiddenByTargetId 제거
 -> 같은 사용자가 같은 기사를 다시 조회하면 occurredAt을 최신화
 
 기사 수정
@@ -130,6 +174,7 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 기사 논리삭제
 -> 해당 articleId를 참조하는 visible=true 최근 본 뉴스 활동 visible=false, status=TARGET_DELETED 처리
+-> hiddenByTargetType=ARTICLE, hiddenByTargetId=articleId 저장
 
 기사 물리삭제
 -> 해당 articleId를 참조하는 최근 본 뉴스 activity 제거
