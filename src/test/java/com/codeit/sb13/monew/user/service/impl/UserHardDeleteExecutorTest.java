@@ -140,6 +140,7 @@ public class UserHardDeleteExecutorTest {
         .password("PassWord123!")
         .build();
     LocalDateTime threshold = LocalDateTime.now().minusDays(1);
+    //softDelete를 호출하지 않아서 deletedAt은 null이다.
     when(userRepository.findById(uuid))
         .thenReturn(Optional.of(user));
 

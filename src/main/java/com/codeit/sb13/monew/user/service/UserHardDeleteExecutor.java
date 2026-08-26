@@ -29,6 +29,10 @@ public class UserHardDeleteExecutor {
   public void hardDeleteUser(UUID userId) {
     userRepository.findById(userId)
         .orElseThrow(() -> new UserNotFoundException(userId));
+    deleteAllRelateDataData(userId);
+  }
+
+  private void deleteAllRelateDataData(UUID userId) {
     // FK 제약 순서 고려
     // CommentLike→ Comment → ArticleView → Subscribe → Notification → User
     commentLikeRepository.deleteByComment_User_Id(userId);
@@ -38,14 +42,16 @@ public class UserHardDeleteExecutor {
     subscribeRepository.deleteByUserId(userId);
     notificationRepository.deleteByUser_Id(userId);
     userRepository.deleteById(userId);
+
   }
 
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void hardDeleteExpiredUser(UUID userId, LocalDateTime threshold) {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> new UserNotFoundException(userId));
     LocalDateTime deletedAt = user.getDeletedAt();
     if(deletedAt != null &&  deletedAt.isBefore(threshold)) {
-      hardDeleteUser(userId);
+      deleteAllRelateDataData(userId);
     }
   }
 
