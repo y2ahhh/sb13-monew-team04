@@ -14,7 +14,7 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 논리삭제 이벤트는 기존에 `visible=true`인 activity만 숨김 처리한다. 이미 `CANCELED`, `UNSUBSCRIBED`, `TARGET_DELETED`, `USER_DELETED`로 숨겨진 activity의 `status`는 덮어쓰지 않는다.
 
-`TARGET_DELETED`로 숨길 때는 어떤 대상의 삭제 또는 비노출 전파로 숨겨졌는지 `hiddenByTargetType`, `hiddenByTargetId`를 함께 저장한다. 대상 복구 이벤트는 `status=TARGET_DELETED`와 `hiddenByTargetType`, `hiddenByTargetId`가 복구된 대상과 일치하는 activity만 복구 후보로 본다.
+`TARGET_DELETED`로 숨길 때는 어떤 대상의 삭제 또는 비노출 전파로 visible=true activity가 숨겨졌는지 `hiddenByTargetType`, `hiddenByTargetId`를 함께 저장한다. 이미 숨겨진 activity는 다른 삭제 사유로 `hiddenByTargetType`, `hiddenByTargetId`가 갱신되지 않을 수 있으므로, 대상 복구 이벤트는 이 한 쌍만으로 복구 후보를 제한하지 않는다.
 
 아래 이벤트별 `visible`, `status`, `occurredAt` 갱신은 Outbox 설계의 `event_sequence` guard를 통과한 경우에만 반영한다. 오래된 이벤트 재처리가 최신 activity 상태를 덮어쓰면 안 된다.
 
@@ -49,27 +49,31 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 ## 공통 복구 이벤트
 
-대상 복구 이벤트는 activity만 재활성화하지 않는다. RDB 기준 대상과 필요한 부모 대상이 현재 노출 가능한 상태인지 확인하고, 대상 snapshot을 RDB 현재 값으로 갱신해 `visible=true`로 복구한 뒤 activity를 `visible=true`, `status=ACTIVE`로 복구한다. 대상이 아직 RDB에서 삭제 또는 비노출 상태이면 activity 재활성화를 하지 않는다. `CANCELED`, `UNSUBSCRIBED`, `USER_DELETED` 상태는 대상 복구 이벤트로 자동 복구하지 않는다.
+대상 복구 이벤트는 activity만 재활성화하지 않는다. 복구 대상과 관련될 수 있는 `status=TARGET_DELETED` activity 후보를 `targetType`, `targetId`, `parentTargetType`, `parentTargetId`로 찾고, RDB 기준 대상과 필요한 부모 대상이 현재 노출 가능한 상태인지 다시 계산한다. 남은 차단 원인이 없으면 대상 snapshot을 RDB 현재 값으로 갱신해 `visible=true`로 복구한 뒤 activity를 `visible=true`, `status=ACTIVE`로 복구한다. 대상이 아직 RDB에서 삭제 또는 비노출 상태이면 activity 재활성화를 하지 않는다. `CANCELED`, `UNSUBSCRIBED`, `USER_DELETED` 상태는 대상 복구 이벤트로 자동 복구하지 않는다.
 
 ```text
 댓글 복구
 -> RDB 댓글과 부모 기사가 모두 노출 가능한 상태인지 확인
 -> comment snapshot을 RDB 현재 값으로 갱신하고 visible=true 처리
--> status=TARGET_DELETED, hiddenByTargetType=COMMENT, hiddenByTargetId=commentId인 activity만 visible=true, status=ACTIVE 처리
--> hiddenByTargetType, hiddenByTargetId 제거
+-> targetType=COMMENT, targetId=commentId, status=TARGET_DELETED인 activity 후보를 확인
+-> 남은 차단 원인이 없는 activity만 visible=true, status=ACTIVE 처리
+-> 복구된 activity의 hiddenByTargetType, hiddenByTargetId 제거
 
 기사 복구
 -> RDB 기사가 노출 가능한 상태인지 확인
 -> article snapshot을 RDB 현재 값으로 갱신하고 visible=true 처리
--> status=TARGET_DELETED, hiddenByTargetType=ARTICLE, hiddenByTargetId=articleId인 기사 activity visible=true, status=ACTIVE 처리
--> 같은 조건의 댓글 activity는 댓글 snapshot도 노출 가능한 경우에만 visible=true, status=ACTIVE 처리
--> hiddenByTargetType, hiddenByTargetId 제거
+-> targetType=ARTICLE, targetId=articleId, status=TARGET_DELETED인 기사 activity 후보를 확인
+-> parentTargetType=ARTICLE, parentTargetId=articleId, status=TARGET_DELETED인 댓글 activity 후보를 확인
+-> 댓글 activity 후보는 각 댓글이 노출 가능한 경우 comment snapshot을 RDB 현재 값으로 갱신하고 visible=true 처리
+-> 각 activity의 대상과 부모 대상에 남은 차단 원인이 없는 경우에만 visible=true, status=ACTIVE 처리
+-> 복구된 activity의 hiddenByTargetType, hiddenByTargetId 제거
 
 관심사 재노출
 -> RDB 관심사가 노출 가능한 상태인지 확인
 -> interest snapshot을 RDB 현재 값으로 갱신하고 visible=true 처리
--> status=TARGET_DELETED, hiddenByTargetType=INTEREST, hiddenByTargetId=interestId인 activity만 visible=true, status=ACTIVE 처리
--> hiddenByTargetType, hiddenByTargetId 제거
+-> targetType=INTEREST, targetId=interestId, status=TARGET_DELETED인 activity 후보를 확인
+-> 남은 차단 원인이 없는 activity만 visible=true, status=ACTIVE 처리
+-> 복구된 activity의 hiddenByTargetType, hiddenByTargetId 제거
 ```
 
 ### 구독 중인 관심사

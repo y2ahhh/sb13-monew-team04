@@ -110,14 +110,17 @@ lastAppliedEventSequence
 -> 새 activity 생성 시 현재 이벤트의 event_sequence 저장
 
 hiddenByTargetType
--> status=TARGET_DELETED일 때 숨김을 유발한 대상 종류
+-> status=TARGET_DELETED일 때 visible=true였던 activity를 숨김 처리한 직접 대상 종류
 -> 예: COMMENT, ARTICLE, INTEREST
+-> 복구 판단을 위한 전체 원인 집합이 아니라 디버깅 및 보조 후보 조회용 정보
 -> ACTIVE, CANCELED, UNSUBSCRIBED, USER_DELETED 상태에서는 null 또는 필드 미저장
 
 hiddenByTargetId
--> status=TARGET_DELETED일 때 숨김을 유발한 대상 ID
+-> status=TARGET_DELETED일 때 visible=true였던 activity를 숨김 처리한 직접 대상 ID
 -> ACTIVE, CANCELED, UNSUBSCRIBED, USER_DELETED 상태에서는 null 또는 필드 미저장
 ```
+
+한 activity가 이미 `visible=false`이면 다른 논리삭제 또는 비노출 이벤트가 `hiddenByTargetType`, `hiddenByTargetId`를 덮어쓰지 않을 수 있다. 따라서 이 한 쌍만으로 복구 가능 여부를 판단하지 않고, 복구 시 `targetType`, `targetId`, `parentTargetType`, `parentTargetId`로 후보를 찾은 뒤 RDB 현재 상태를 다시 계산한다.
 
 필수 및 권장 인덱스는 다음과 같다.
 
@@ -198,7 +201,7 @@ parentTargetId = A1
 { hiddenByTargetType: 1, hiddenByTargetId: 1, status: 1 }
 ```
 
-대상 복구 이벤트에서 해당 삭제 또는 비노출 전파로 숨겨진 activity를 찾는 데 사용한다.
+직접 숨김 원인을 기준으로 상태를 확인하거나 단순 후보를 좁힐 때 사용한다. 복구 최종 판단은 이 인덱스만으로 하지 않고, activity의 대상 및 부모 식별자로 RDB 현재 상태를 다시 계산해 결정한다.
 
 ```text
 hiddenByTargetType = ARTICLE
@@ -254,7 +257,7 @@ U1 + INTEREST_SUBSCRIBED + INTEREST + I1
 
 이미 같은 activity가 있으면 새로 만들지 않고 기존 문서를 갱신한다.
 
-기존 activity를 다시 노출할 때는 activity만 `ACTIVE`로 바꾸지 않는다. 먼저 RDB 기준 대상과 필요한 부모 대상이 현재 노출 가능한 상태인지 확인하고, 대상 snapshot을 RDB 현재 값으로 갱신해 `visible=true`를 보장한 뒤 activity를 복구한다. 대상이 아직 RDB에서 삭제 또는 비노출 상태이면 activity를 재활성화하지 않는다.
+기존 activity를 다시 노출하거나 대상 복구 이벤트를 처리할 때는 activity만 `ACTIVE`로 바꾸지 않는다. 먼저 RDB 기준 대상과 필요한 부모 대상이 현재 노출 가능한 상태인지 확인하고, 대상 snapshot을 RDB 현재 값으로 갱신해 `visible=true`를 보장한 뒤 activity를 복구한다. 대상이 아직 RDB에서 삭제 또는 비노출 상태이면 activity를 재활성화하지 않는다. `hiddenByTargetType`, `hiddenByTargetId`는 복구 성공 시에만 제거한다.
 
 ```text
 댓글 C1 좋아요 취소
@@ -316,7 +319,7 @@ U1 + INTEREST_SUBSCRIBED + INTEREST + I1
 
 논리삭제와 비노출 처리는 기존 activity를 숨긴다.
 
-사용자, 기사, 댓글 논리삭제 이벤트는 기존에 `visible=true`인 activity만 상태 변경 대상으로 본다. 이미 좋아요 취소, 구독 해제, 다른 삭제 사유로 숨겨진 activity의 `status`는 덮어쓰지 않는다.
+사용자, 기사, 댓글 논리삭제 이벤트는 기존에 `visible=true`인 activity만 상태 변경 대상으로 본다. 이미 좋아요 취소, 구독 해제, 다른 삭제 사유로 숨겨진 activity의 `status`는 덮어쓰지 않는다. 따라서 `hiddenByTargetType`, `hiddenByTargetId`는 activity를 숨길 수 있는 모든 원인의 집합이 아니다.
 
 ```text
 사용자 U1 논리삭제
@@ -342,27 +345,31 @@ U1 + INTEREST_SUBSCRIBED + INTEREST + I1
 -> interest_activity_snapshots visible=false
 ```
 
-대상 복구 이벤트는 `TARGET_DELETED` 상태만으로 판단하지 않는다. `hiddenByTargetType`, `hiddenByTargetId`가 복구된 대상과 일치하고, RDB 기준 대상과 필요한 부모 대상이 모두 노출 가능한 경우에만 snapshot과 activity를 함께 복구한다.
+대상 복구 이벤트는 `hiddenByTargetType`, `hiddenByTargetId` 일치만으로 판단하지 않는다. 복구 대상과 관련될 수 있는 `status=TARGET_DELETED` activity 후보를 `targetType`, `targetId`, `parentTargetType`, `parentTargetId`로 찾고, 각 activity의 대상과 부모 대상이 RDB 기준으로 모두 노출 가능한지 다시 계산한다. 남은 차단 원인이 없을 때만 snapshot과 activity를 함께 복구한다.
 
 ```text
 댓글 C1 복구
 -> RDB 댓글 C1과 부모 기사 A1이 모두 노출 가능한 상태인지 확인
 -> comment_activity_snapshots를 RDB 현재 값으로 갱신하고 visible=true 처리
--> status=TARGET_DELETED, hiddenByTargetType=COMMENT, hiddenByTargetId=C1인 activity만 visible=true, status=ACTIVE 처리
--> hiddenByTargetType, hiddenByTargetId 제거
+-> targetType=COMMENT, targetId=C1, status=TARGET_DELETED인 activity 후보를 확인
+-> 남은 차단 원인이 없는 activity만 visible=true, status=ACTIVE 처리
+-> 복구된 activity의 hiddenByTargetType, hiddenByTargetId 제거
 
 기사 A1 복구
 -> RDB 기사 A1이 노출 가능한 상태인지 확인
 -> article_activity_snapshots를 RDB 현재 값으로 갱신하고 visible=true 처리
--> status=TARGET_DELETED, hiddenByTargetType=ARTICLE, hiddenByTargetId=A1인 기사 activity visible=true, status=ACTIVE 처리
--> 같은 조건의 댓글 activity는 댓글 snapshot도 노출 가능한 경우에만 visible=true, status=ACTIVE 처리
--> hiddenByTargetType, hiddenByTargetId 제거
+-> targetType=ARTICLE, targetId=A1, status=TARGET_DELETED인 기사 activity 후보를 확인
+-> parentTargetType=ARTICLE, parentTargetId=A1, status=TARGET_DELETED인 댓글 activity 후보를 확인
+-> 댓글 activity 후보는 각 댓글이 노출 가능한 경우 comment_activity_snapshots를 RDB 현재 값으로 갱신하고 visible=true 처리
+-> 각 activity의 대상과 부모 대상에 남은 차단 원인이 없는 경우에만 visible=true, status=ACTIVE 처리
+-> 복구된 activity의 hiddenByTargetType, hiddenByTargetId 제거
 
 관심사 I1 재노출
 -> RDB 관심사 I1이 노출 가능한 상태인지 확인
 -> interest_activity_snapshots를 RDB 현재 값으로 갱신하고 visible=true 처리
--> status=TARGET_DELETED, hiddenByTargetType=INTEREST, hiddenByTargetId=I1인 activity만 visible=true, status=ACTIVE 처리
--> hiddenByTargetType, hiddenByTargetId 제거
+-> targetType=INTEREST, targetId=I1, status=TARGET_DELETED인 activity 후보를 확인
+-> 남은 차단 원인이 없는 activity만 visible=true, status=ACTIVE 처리
+-> 복구된 activity의 hiddenByTargetType, hiddenByTargetId 제거
 ```
 
 핵심 규칙은 다음과 같다.
@@ -372,8 +379,8 @@ U1 + INTEREST_SUBSCRIBED + INTEREST + I1
 새 대상에 대한 활동은 insert
 댓글 activity는 부모 기사 식별자 저장
 취소/논리삭제/비노출은 기존 activity 숨김
-TARGET_DELETED는 hiddenByTargetType, hiddenByTargetId로 숨김 원인 저장
-복구는 snapshot visible=true 복구와 activity ACTIVE 복구를 함께 처리
+TARGET_DELETED는 hiddenByTargetType, hiddenByTargetId로 직접 숨김 원인을 보조 저장
+복구는 RDB 대상/부모 상태 재계산 후 snapshot visible=true 복구와 activity ACTIVE 복구를 함께 처리
 activity 상태 전이는 lastAppliedEventSequence 조건으로 오래된 이벤트 재처리 방지
 occurredAt은 $max 또는 동등한 단조 조건으로 갱신
 물리삭제는 MongoDB Read Model에서도 제거
@@ -552,14 +559,14 @@ RDB는 원본 상태의 기준이고, MongoDB는 조회 최적화용 사본이�
 활동 대상 삭제, 비공개 또는 비노출
 -> visible=false
 -> status=TARGET_DELETED
--> hiddenByTargetType, hiddenByTargetId 저장
+-> hiddenByTargetType, hiddenByTargetId에 직접 숨김 원인 저장
 
 사용자 삭제 또는 탈퇴
 -> visible=false
 -> status=USER_DELETED
 ```
 
-논리삭제 이벤트는 기존에 `visible=true`인 activity만 변경한다. 이미 `visible=false`인 activity는 기존 `status`를 유지한다.
+논리삭제 이벤트는 기존에 `visible=true`인 activity만 변경한다. 이미 `visible=false`인 activity는 기존 `status`를 유지한다. 따라서 `hiddenByTargetType`, `hiddenByTargetId`는 복구 가능 여부를 단독으로 결정하는 전체 차단 원인 목록이 아니다.
 
 구체적인 예시는 다음과 같다.
 
@@ -592,7 +599,7 @@ INTEREST_SUBSCRIBED + 관심사 비노출
 -> status=USER_DELETED
 ```
 
-대상 복구 이벤트는 `status=TARGET_DELETED`와 `hiddenByTargetType`, `hiddenByTargetId`가 모두 일치하는 activity만 복구 후보로 본다. `CANCELED`, `UNSUBSCRIBED`, `USER_DELETED` 상태는 대상 복구 이벤트로 자동 복구하지 않는다.
+대상 복구 이벤트는 `hiddenByTargetType`, `hiddenByTargetId` 일치만으로 복구 후보를 제한하지 않는다. 복구 대상과 관련될 수 있는 `status=TARGET_DELETED` activity를 `targetType`, `targetId`, `parentTargetType`, `parentTargetId`로 찾고, RDB 기준 대상과 필요한 부모 대상에 남은 삭제, 비공개, 비노출 차단 원인이 없는 경우에만 복구한다. `CANCELED`, `UNSUBSCRIBED`, `USER_DELETED` 상태는 대상 복구 이벤트로 자동 복구하지 않는다.
 
 ## 물리삭제 처리
 
@@ -624,4 +631,4 @@ INTEREST_SUBSCRIBED + 관심사 비노출
 { hiddenByTargetType: 1, hiddenByTargetId: 1, status: 1 }
 ```
 
-첫 번째 인덱스는 사용자별 최신 활동 조회와 커서 페이지네이션에 사용한다. 두 번째 인덱스는 사용자 논리삭제 또는 사용자 물리삭제 시 해당 사용자의 activity를 찾는 데 사용한다. 세 번째 인덱스는 특정 대상의 삭제 또는 상태 변경 반영에 사용한다. 네 번째 인덱스는 기사 삭제 또는 비공개 처리 시 해당 기사에 속한 댓글 activity를 숨김 처리하거나 제거하는 데 사용한다. 다섯 번째 인덱스는 대상 복구 이벤트에서 해당 삭제 또는 비노출 전파로 숨겨진 activity를 찾는 데 사용한다.
+첫 번째 인덱스는 사용자별 최신 활동 조회와 커서 페이지네이션에 사용한다. 두 번째 인덱스는 사용자 논리삭제 또는 사용자 물리삭제 시 해당 사용자의 activity를 찾는 데 사용한다. 세 번째 인덱스는 특정 대상의 삭제 또는 상태 변경 반영에 사용한다. 네 번째 인덱스는 기사 삭제 또는 비공개 처리 시 해당 기사에 속한 댓글 activity를 숨김 처리하거나 제거하는 데 사용한다. 다섯 번째 인덱스는 직접 숨김 원인을 기준으로 상태를 확인하거나 단순 후보를 좁힐 때 사용한다. 복구 최종 판단은 대상 및 부모 식별자와 RDB 현재 상태 재계산으로 수행한다.
