@@ -118,9 +118,9 @@ public class CommentLikeServiceTest {
 
     given(userRepository.findById(likedBy.getId())).willReturn(Optional.of(likedBy));
     given(commentRepository.findByIdAndDeletedAtIsNull(comment.getId())).willReturn(Optional.of(comment));
-    given(commentLikeRepository.findByCommentAndLikedBy(comment.getId(), likedBy.getId()))
+    given(commentLikeRepository.findWithCommentDetailsByCommentIdAndLikedById(comment.getId(), likedBy.getId()))
         .willReturn(Optional.empty(), Optional.of(newCommentLike));
-    given(commentLikeRepository.countByCommentId(comment.getId())).willReturn(1L);
+    given(commentLikeRepository.countActiveLikesByCommentId(comment.getId())).willReturn(1L);
 
     // when
     CommentLikeDto result = commentLikeService.likeComment(command);
@@ -141,9 +141,10 @@ public class CommentLikeServiceTest {
 
     then(commentRepository).should(times(1)).findByIdAndDeletedAtIsNull(comment.getId());
     then(userRepository).should(times(1)).findById(likedBy.getId());
-    then(commentLikeRepository).should(times(2)).findByCommentAndLikedBy(comment.getId(), likedBy.getId());
+    then(commentLikeRepository).should(times(2))
+        .findWithCommentDetailsByCommentIdAndLikedById(comment.getId(), likedBy.getId());
     then(commentLikeSaveService).should(times(1)).create(comment.getId(), likedBy.getId());
-    then(commentLikeRepository).should(times(1)).countByCommentId(comment.getId());
+    then(commentLikeRepository).should(times(1)).countActiveLikesByCommentId(comment.getId());
     then(notificationService).should(times(1))
             .notifyCommentLiked(new CommentLikedDto(likedBy, commentUser, comment.getId()));
   }
@@ -167,13 +168,13 @@ public class CommentLikeServiceTest {
     given(commentRepository.findByIdAndDeletedAtIsNull(comment.getId())).willReturn(Optional.of(comment));
     given(userRepository.findById(likedBy.getId())).willReturn(Optional.of(likedBy));
 
-    given(commentLikeRepository.findByCommentAndLikedBy(comment.getId(), likedBy.getId()))
+    given(commentLikeRepository.findWithCommentDetailsByCommentIdAndLikedById(comment.getId(), likedBy.getId()))
         .willReturn(Optional.empty(), Optional.of(existingLike));
 
     doThrow(duplicateException)
         .when(commentLikeSaveService)
         .create(comment.getId(), likedBy.getId());
-    given(commentLikeRepository.countByCommentId(comment.getId())).willReturn(1L);
+    given(commentLikeRepository.countActiveLikesByCommentId(comment.getId())).willReturn(1L);
 
     // when
     CommentLikeDto result = commentLikeService.likeComment(command);
@@ -194,8 +195,9 @@ public class CommentLikeServiceTest {
 
     then(commentRepository).should(times(1)).findByIdAndDeletedAtIsNull(comment.getId());
     then(userRepository).should(times(1)).findById(likedBy.getId());
-    then(commentLikeRepository).should(times(2)).findByCommentAndLikedBy(comment.getId(), likedBy.getId());
-    then(commentLikeRepository).should(times(1)).countByCommentId(comment.getId());
+    then(commentLikeRepository).should(times(2))
+        .findWithCommentDetailsByCommentIdAndLikedById(comment.getId(), likedBy.getId());
+    then(commentLikeRepository).should(times(1)).countActiveLikesByCommentId(comment.getId());
     then(commentLikeSaveService).should(times(1)).create(comment.getId(), likedBy.getId());
     then(notificationService).should(never()).notifyCommentLiked(any(CommentLikedDto.class));
   }
@@ -214,9 +216,10 @@ public class CommentLikeServiceTest {
     CommentLikeRegisterCommand command = new CommentLikeRegisterCommand(comment.getId(), likedBy.getId());
 
     given(commentRepository.findByIdAndDeletedAtIsNull(comment.getId())).willReturn(Optional.of(comment));
-    given(commentLikeRepository.findByCommentAndLikedBy(comment.getId(), likedBy.getId())).willReturn(Optional.of(existingLike));
+    given(commentLikeRepository.findWithCommentDetailsByCommentIdAndLikedById(comment.getId(), likedBy.getId()))
+        .willReturn(Optional.of(existingLike));
     given(userRepository.findById(likedBy.getId())).willReturn(Optional.of(likedBy));
-    given(commentLikeRepository.countByCommentId(comment.getId())).willReturn(1L);
+    given(commentLikeRepository.countActiveLikesByCommentId(comment.getId())).willReturn(1L);
 
     // when
     CommentLikeDto result = commentLikeService.likeComment(command);
@@ -236,9 +239,10 @@ public class CommentLikeServiceTest {
     );
     then(commentRepository).should(times(1)).findByIdAndDeletedAtIsNull(comment.getId());
     then(userRepository).should(times(1)).findById(likedBy.getId());
-    then(commentLikeRepository).should(times(1)).findByCommentAndLikedBy(comment.getId(), likedBy.getId());
+    then(commentLikeRepository).should(times(1))
+        .findWithCommentDetailsByCommentIdAndLikedById(comment.getId(), likedBy.getId());
     then(commentLikeSaveService).should(never()).create(any(UUID.class), any(UUID.class));
-    then(commentLikeRepository).should(times(1)).countByCommentId(comment.getId());
+    then(commentLikeRepository).should(times(1)).countActiveLikesByCommentId(comment.getId());
     then(notificationService).shouldHaveNoInteractions();
   }
 
@@ -329,9 +333,9 @@ public class CommentLikeServiceTest {
 
     given(userRepository.findById(likedBy.getId())).willReturn(Optional.of(likedBy));
     given(commentRepository.findByIdAndDeletedAtIsNull(comment.getId())).willReturn(Optional.of(comment));
-    given(commentLikeRepository.findByCommentAndLikedBy(comment.getId(), likedBy.getId()))
+    given(commentLikeRepository.findWithCommentDetailsByCommentIdAndLikedById(comment.getId(), likedBy.getId()))
             .willReturn(Optional.empty(), Optional.of(newCommentLike));
-    given(commentLikeRepository.countByCommentId(comment.getId())).willReturn(1L);
+    given(commentLikeRepository.countActiveLikesByCommentId(comment.getId())).willReturn(1L);
 
     doThrow(new DataIntegrityViolationException("알림 저장 실패 - content 길이 초과 등"))
             .when(notificationService)
