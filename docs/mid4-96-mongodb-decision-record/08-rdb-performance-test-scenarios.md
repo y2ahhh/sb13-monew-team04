@@ -4,7 +4,7 @@
 
 ## 목적
 
-이 문서는 활동내역 4개 조회 기능을 RDB 기준으로 동일 조건에서 측정하기 위한 성능 테스트 시나리오를 정리한다.
+이 문서는 단일 활동내역 API와 요청 내부 SQL/query를 RDB 기준으로 측정하기 위한 성능 테스트 시나리오를 정리한다.
 
 MongoDB Read Model 적용 여부는 이 문서에서 결정하지 않는다. 이 문서의 결과 표와 병목 판단 기준을 바탕으로 `MID4-125`에서 MongoDB 적용 대상을 선정한다.
 
@@ -17,8 +17,8 @@ MongoDB Read Model 적용 여부는 이 문서에서 결정하지 않는다. 이
 4. 실행 계획, SQL 개수, full scan, 정렬 및 join 비용 확인
 5. 병목이 확인된 조회에 한해 인덱스 후보 또는 쿼리 최적화 반영
 6. 같은 데이터와 같은 k6 시나리오로 재측정
-7. p95/p99, error rate, SQL 개수, join 비용, DB 부하 비교
-8. MongoDB 적용 후보 기능 선정 자료로 사용
+7. composite API p95/p99, error rate, SQL 개수, join 비용, DB 부하 비교
+8. SQL/query별 측정값을 MongoDB 적용 후보 기능 선정 자료로 사용
 ```
 
 새 인덱스는 측정 전에 선반영하지 않는다. PK/FK나 기존에 이미 존재하는 인덱스는 현재 RDB 기준에 포함하고, 추가 인덱스는 baseline 측정과 실행 계획 확인 이후 필요성이 확인될 때만 후보로 둔다.
@@ -34,7 +34,7 @@ MongoDB Read Model 적용 여부는 이 문서에서 결정하지 않는다. 이
 | 최근 좋아요한 댓글 조회 | 사용자 ID 기준 좋아요한 댓글 | 최신 10건 | 좋아요 취소 제외, 댓글/기사 제외 조건, join |
 | 최근 조회 기사 | 사용자 ID 기준 기사 조회 이력 | 최신 10건 | 삭제/비공개 기사 제외, 같은 기사 중복 제거, 정렬 |
 
-아래 기능별 path 변수는 초기 설계 당시의 후보다. 실제 MID4-132, MID4-134, MID4-179 측정은 단일 활동내역 API인 `GET /api/user-activities/{userId}`와 단일 target user 기준으로 수행했다.
+아래 기능별 path 변수는 초기 설계 당시의 후보다. 실제 MID4-132, MID4-134, MID4-179 측정은 단일 활동내역 API인 `GET /api/user-activities/{userId}`와 단일 target user 기준으로 수행했다. 현재 제공된 API는 이 composite API 하나이므로, k6 RPS와 p95/p99는 활동 유형별로 분리해 산출하지 않는다.
 
 ```text
 SUBSCRIBED_INTERESTS_PATH
@@ -43,7 +43,7 @@ LIKED_COMMENTS_PATH
 VIEWED_ARTICLES_PATH
 ```
 
-실제 endpoint는 API 구현 완료 후 환경 변수 또는 설정 파일에서 채운다.
+후속에 활동 유형별 endpoint가 추가되거나 query-level runtime 계측이 도입되기 전까지, 활동 유형별 후보 판단은 API RPS가 아니라 SQL/query별 실행 계획과 측정값을 사용한다.
 
 ## 데이터 규모별 측정 기준
 
@@ -91,7 +91,7 @@ VIEWED_ARTICLES_PATH
 
 ## k6 시나리오
 
-후속 보강 시나리오에서는 모든 조회 기능을 같은 부하 단계로 측정한다.
+후속 보강 시나리오에서는 단일 활동내역 API인 `GET /api/user-activities/{userId}`를 같은 부하 단계로 측정한다.
 
 | 시나리오 | 부하 | 시간 | 목적 |
 | --- | --- | --- | --- |
@@ -111,11 +111,11 @@ RPS 기준 측정은 요청 스케줄을 따라가는지 확인하기 위한 시
 200 req/s
 ```
 
-RPS 기준 측정은 endpoint별로 동일하게 적용하고, 특정 endpoint만 요청 비율을 높이지 않는다.
+RPS 기준 측정은 `GET /api/user-activities/{userId}` composite API에만 적용한다. 별도 endpoint 또는 query-level 계측이 없으면 구독 관심사, 최근 댓글, 좋아요 댓글, 조회 기사별 RPS와 p95/p99를 결과로 기록하지 않는다.
 
 ## 요청 구성
 
-기능별 대표 사용자 ID 순환은 후속 보강 k6 시나리오에서 검토한다. 현재 측정 근거는 `00000001-0000-4000-8000-000000000001` 단일 target user 기준이다.
+대표 사용자 ID 순환은 후속 보강 k6 시나리오에서 검토한다. 현재 측정 근거는 `00000001-0000-4000-8000-000000000001` 단일 target user 기준이다.
 
 ```text
 user-empty
@@ -127,7 +127,7 @@ user-mixed
 user-deleted
 ```
 
-기능별 요청은 다음 기준으로 구성한다.
+composite API 응답에 포함되는 활동 유형별 검증은 다음 기준으로 구성한다.
 
 | 기능 | 필수 검증 |
 | --- | --- |
@@ -145,9 +145,9 @@ k6와 애플리케이션, DB에서 아래 지표를 함께 수집한다.
 | 구분 | 지표 |
 | --- | --- |
 | k6 | `http_req_duration p95`, `http_req_duration p99`, `http_req_failed`, RPS, `dropped_iterations` |
-| 애플리케이션 | 요청 1건당 SQL 개수, endpoint별 response time, 커넥션 풀 대기 |
+| 애플리케이션 | composite API response time, 요청 1건당 SQL 개수, 커넥션 풀 대기 |
 | RDB | 쿼리 실행 시간, 실행 계획, 인덱스 사용 여부, DB CPU, slow query |
-| 비교 판단 | 데이터 규모 증가에 따른 p95/p99 증가율, join 비용, error rate |
+| 비교 판단 | composite API p95/p99 증가율, SQL/query별 join 비용, error rate |
 
 임시 성공 기준은 다음과 같이 둔다.
 
@@ -162,7 +162,7 @@ DB CPU 지속 70% 미만
 커넥션 풀 대기 거의 없음
 ```
 
-프로젝트 환경에서 위 기준을 그대로 만족하기 어렵다면 절대값보다 기능 간 상대 비교와 데이터 증가에 따른 악화 폭을 우선한다.
+프로젝트 환경에서 위 기준을 그대로 만족하기 어렵다면 composite API의 데이터 증가에 따른 악화 폭과 SQL/query별 상대 비용을 함께 본다.
 
 ## 현재 k6 측정 한계
 
@@ -207,7 +207,7 @@ MID4-179에서 수행한 k6 측정은 MongoDB Read Model을 바로 적용하지 
 
 ## SQL 및 join 확인 기준
 
-요청 1건당 SQL 개수는 endpoint별로 기록한다.
+요청 1건당 SQL 개수는 composite API 기준으로 기록하고, 병목 후보는 SQL/query별로 분리해 확인한다.
 
 ```text
 API 요청 1건
@@ -224,42 +224,40 @@ MongoDB 적용 검토는 RDB 쿼리와 인덱스 최적화를 반영한 뒤에�
 
 ## 결과 기록 표
 
-성능 측정 결과는 측정 단계, 데이터 규모, 시나리오별로 분리해 기록한다.
+성능 측정 결과는 측정 단계, 데이터 규모, 시나리오별로 분리해 기록한다. API p95/p99와 RPS는 `GET /api/user-activities/{userId}` composite API 기준으로만 기록한다.
 
 | 측정 단계 | 데이터 규모 | 시나리오 | API | p95 | p99 | error rate | RPS | dropped iterations | 요청당 SQL | 주요 join | DB CPU | 커넥션 대기 | 판단 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 현재 RDB baseline | 100k seed scale | Smoke | 구독 중인 관심사 조회 |  |  |  |  |  |  |  |  |  |  |
-| 현재 RDB baseline | 100k seed scale | Smoke | 최근 작성 댓글 조회 |  |  |  |  |  |  |  |  |  |  |
-| 현재 RDB baseline | 100k seed scale | Smoke | 최근 좋아요한 댓글 조회 |  |  |  |  |  |  |  |  |  |  |
-| 현재 RDB baseline | 100k seed scale | Smoke | 최근 조회 기사 |  |  |  |  |  |  |  |  |  |  |
+| 현재 RDB baseline | 100k seed scale | Smoke | GET /api/user-activities/{userId} |  |  |  |  |  |  |  |  |  |  |
 
-인덱스 또는 쿼리 최적화를 반영한 경우에는 아래 표로 개선 폭을 따로 기록한다.
+인덱스 또는 쿼리 최적화를 반영한 경우에는 SQL/query별 개선 폭을 따로 기록한다.
 
-| API | 데이터 규모 | baseline p95/p99 | 최적화 후 p95/p99 | 개선 폭 | 반영 내용 | 판단 |
+| SQL/query | 데이터 규모 | baseline median | 최적화 후 median | 개선 폭 | 반영 내용 | 판단 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 구독 관심사 main |  |  |  |  |  |  |
+| 구독 관심사 keywords |  |  |  |  |  |  |
+| 최근 작성 댓글 |  |  |  |  |  |  |
+| 최근 좋아요한 댓글 |  |  |  |  |  |  |
+| 최근 조회 기사 |  |  |  |  |  |  |
+
+전체 측정 완료 후 MongoDB 적용 대상 선정용 비교표를 별도로 작성한다.
+
+| 활동 유형 | 10m optimized SQL/query median | 요청 내 SQL 비용 | join/subquery 비용 | 제외 조건 영향 | API 병목 영향 | MongoDB 후보 판단 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 구독 중인 관심사 조회 |  |  |  |  |  |  |
 | 최근 작성 댓글 조회 |  |  |  |  |  |  |
 | 최근 좋아요한 댓글 조회 |  |  |  |  |  |  |
 | 최근 조회 기사 |  |  |  |  |  |  |
 
-전체 측정 완료 후 MongoDB 적용 대상 선정용 비교표를 별도로 작성한다.
-
-| API | 100k seed p95/p99 | 1m seed p95/p99 | 10m seed p95/p99 | 요청당 SQL | join 비용 | DB 부하 | 제외 조건 영향 | MongoDB 후보 판단 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 구독 중인 관심사 조회 |  |  |  |  |  |  |  |  |
-| 최근 작성 댓글 조회 |  |  |  |  |  |  |  |  |
-| 최근 좋아요한 댓글 조회 |  |  |  |  |  |  |  |  |
-| 최근 조회 기사 |  |  |  |  |  |  |  |  |
-
 ## 완료 기준
 
 ```text
 - 100k / 1m / 10m seed scale 데이터 규모별 측정 기준이 정리되어 있다.
-- 4개 조회 기능별 k6 시나리오가 정의되어 있다.
+- 단일 composite API 기준 k6 시나리오가 정의되어 있다.
 - 논리삭제 사용자/기사/댓글 제외 조건이 많은 데이터에서 필터 비용 측정 기준이 정리되어 있다.
-- p95/p99와 error rate 판단 기준이 정리되어 있다.
+- composite API p95/p99와 error rate 판단 기준이 정리되어 있다.
 - RPS 기준 측정과 dropped iterations 성공 기준이 정리되어 있다.
-- 요청 1건당 SQL 개수와 join 비용 확인 기준이 정리되어 있다.
+- 요청 1건당 SQL 개수와 SQL/query별 join 비용 확인 기준이 정리되어 있다.
 - 현재 RDB 기준 baseline 측정 후 인덱스 후보를 반영하고 재측정하는 기준이 정리되어 있다.
 - MongoDB 적용 대상 선정을 위한 비교표 형식이 정리되어 있다.
 - 실제 성능 측정 결과를 MID4-125와 MID4-179의 MongoDB 후순위 판단에 연결할 수 있다.

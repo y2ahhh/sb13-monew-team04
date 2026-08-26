@@ -4,7 +4,7 @@
 
 MID4-132 RDB baseline, MID4-133 인덱스 최적화, MID4-134 최적화 후 재측정 결과를 기준으로 활동내역 조회의 MongoDB Read Model 적용 대상을 판단한다.
 
-결론은 `후순위`다. 현재 측정 조건에서는 RDB 인덱스 최적화 후 4개 활동내역 조회가 병목이라고 보기 어렵고, MongoDB 환경구성 또는 Read Model 구현을 바로 진행할 근거가 부족하다. 이번 단계에서는 RDB를 유지하고, 목표 처리량 또는 p95/p99 SLO가 정해진 뒤 해당 기준을 넘는 조회가 생길 때 MongoDB 적용을 다시 판단한다.
+결론은 `후순위`다. 현재 측정 조건에서는 RDB 인덱스 최적화 후 composite 활동내역 API와 요청 내부 SQL/query가 병목이라고 보기 어렵고, MongoDB 환경구성 또는 Read Model 구현을 바로 진행할 근거가 부족하다. 이번 단계에서는 RDB를 유지하고, 목표 처리량 또는 p95/p99 SLO가 정해진 뒤 composite API 기준을 넘고 특정 SQL/query 병목이 확인될 때 MongoDB 적용을 다시 판단한다.
 
 ## 근거 문서
 
@@ -23,8 +23,11 @@ MID4-132 RDB baseline, MID4-133 인덱스 최적화, MID4-134 최적화 후 재�
 - k6 조건: 20 rps, 1m, `preAllocatedVUs=20`, `maxVUs=100`
 - SQL 측정: 3회 warm-up 후 `EXPLAIN (ANALYZE, BUFFERS)`, 5회 반복 실행 median
 - seed scale: `100k`, `1m`, `10m`은 테이블별 row 수가 아니라 `seed_activity_history(scale_count)` 입력값
+- API p95/p99/RPS는 `GET /api/user-activities/{userId}` composite API 기준이다. 활동 유형별 MongoDB 후보 판단에는 SQL/query별 측정값을 사용한다.
 
 ## API 비교
+
+아래 API 비교는 한 요청에서 네 가지 활동내역을 조합하는 `GET /api/user-activities/{userId}` 기준이다. 현재 API 요청만으로는 구독 관심사, 최근 댓글, 좋아요 댓글, 조회 기사별 RPS와 p95/p99를 분리 산출하지 않는다.
 
 | seed scale | baseline p95 | optimized p95 | baseline p99 | optimized p99 | baseline RPS | optimized RPS | baseline dropped | optimized dropped | error rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -36,7 +39,7 @@ MID4-132 baseline에서는 10m scale에서 20 rps를 따라가지 못했지만, 
 
 ## SQL 및 Join 비용 비교
 
-요청 1건은 현재 구현 기준으로 6개 SQL로 구성된다.
+요청 1건은 현재 구현 기준으로 6개 SQL로 구성된다. 활동 유형별 후보 판단은 이 SQL/query 측정값과 join/subquery 비용을 기준으로 한다.
 
 | 순서 | SQL | 주요 비용 |
 | ---: | --- | --- |
@@ -127,8 +130,8 @@ MID4-96의 MongoDB/Redis 적용 여부 판단에는 이 문서, [MID4-179 RDB �
 
 | 완료 조건 | 대응 |
 | --- | --- |
-| 4개 조회 기능의 RDB 성능 측정 결과 비교 | API 비교, SQL 및 Join 비용 비교 |
-| p95/p99, SQL 개수, DB 부하, join 비용 기준 병목 선정 | API 비교, SQL 및 Join 비용 비교, DB 부하 판단 |
+| 단일 활동내역 API와 요청 내부 SQL/query의 RDB 성능 측정 결과 비교 | composite API 비교, SQL 및 Join 비용 비교 |
+| p95/p99, SQL 개수, DB 부하, join 비용 기준 병목 선정 | composite API 비교, SQL 및 Join 비용 비교, DB 부하 판단 |
 | MongoDB 적용 여부 결론 | `후순위` |
 | activity_histories와 snapshot 저장 범위 | MongoDB 적용 시 범위 기준 |
 | 사용자/기사/댓글 논리삭제와 물리삭제 cleanup | 삭제 및 Cleanup 기준 |
@@ -141,5 +144,5 @@ MID4-96의 MongoDB/Redis 적용 여부 판단에는 이 문서, [MID4-179 RDB �
 MongoDB 환경구성 또는 Read Model 구현은 다음 조건 중 하나가 충족될 때 별도 티켓으로 진행한다.
 
 - 목표 RPS, p95/p99 SLO, 허용 error rate, dropped iteration 기준이 확정된다.
-- 확정된 기준으로 재측정했을 때 RDB 최적화 후에도 특정 조회가 기준을 넘는다.
+- 확정된 기준으로 재측정했을 때 RDB 최적화 후에도 composite API가 목표 기준을 넘고 특정 SQL/query 병목이 확인된다.
 - 구독 관심사 fan-out worst-case 측정에서 MongoDB snapshot 내부 `subscriberCount` 또는 keywords 조립 비용이 병목으로 확인된다. 현재 API DTO가 `interestSubscriberCount`를 사용하는 경우에는 조회 모델의 `subscriberCount`를 응답 DTO에서 `interestSubscriberCount`로 매핑한다.

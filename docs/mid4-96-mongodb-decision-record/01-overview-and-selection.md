@@ -49,10 +49,10 @@ MongoDB를 적용하게 될 경우, 적용 대상은 아래 4개 활동내역 �
 선정 기준은 단순 평균 응답 시간이 아니라 다음 항목을 함께 본다.
 
 ```text
-- API p95 응답 시간
-- API p99 응답 시간
+- composite API p95 응답 시간
+- composite API p99 응답 시간
 - 요청 1건당 SQL 개수
-- RDB 쿼리 실행 시간
+- SQL/query별 RDB 실행 시간
 - join 대상 테이블 수
 - DB CPU 사용률
 - 커넥션 풀 대기 시간
@@ -61,15 +61,17 @@ MongoDB를 적용하게 될 경우, 적용 대상은 아래 4개 활동내역 �
 - dropped iterations
 ```
 
-아래는 판단 방식 설명을 위한 가상 예시이며, 이번 측정의 실제 결론은 아니다.
+현재 제공된 API는 `GET /api/user-activities/{userId}` 하나이며, 이 API는 한 요청에서 네 가지 활동내역을 조합한다. 따라서 별도 endpoint 또는 query-level runtime 계측이 없으면 활동 유형별 API RPS와 p95/p99를 산출하지 않는다. API p95/p99와 RPS는 composite API 기준으로 보고, 활동 유형별 MongoDB 후보 선정에는 SQL/query별 측정값을 사용한다.
+
+아래는 판단 방식 설명을 위한 SQL/query 기준 가상 예시이며, 이번 측정의 실제 결론은 아니다.
 
 예를 들어 성능 측정 결과가 다음과 같다면:
 
 ```text
-구독 중인 관심사 조회: p95 80ms
-최근 작성 댓글 조회: p95 130ms
-최근 좋아요한 댓글 조회: p95 210ms
-최근 조회 기사: p95 160ms
+구독 중인 관심사 SQL/query median: 80ms
+최근 작성 댓글 SQL/query median: 130ms
+최근 좋아요한 댓글 SQL/query median: 210ms
+최근 조회 기사 SQL/query median: 160ms
 ```
 
 이 가상 예시에서는 `최근 좋아요한 댓글 조회`를 MongoDB Read Model 후속 적용 후보로 우선 검토한다.
@@ -125,7 +127,7 @@ Stress Test
 
 VU 기준 측정과 별도로 RPS 기준 측정을 필수 보강 시나리오로 수행한다.
 
-RPS 기준은 요청 스케줄을 따라가는지 확인하기 위한 시나리오이며, 목표 RPS와 `dropped_iterations=0`을 함께 성공 조건으로 본다.
+RPS 기준은 composite API 요청 스케줄을 따라가는지 확인하기 위한 시나리오이며, 목표 RPS와 `dropped_iterations=0`을 함께 성공 조건으로 본다.
 
 ```text
 50 req/s
@@ -168,4 +170,4 @@ DB CPU 지속 70% 미만
 커넥션 풀 대기 거의 없음
 ```
 
-위 기준을 만족하지 못하거나, RDB 최적화 이후에도 특정 조회 기능의 p95/p99가 유의미하게 높다면 MongoDB Read Model 적용을 검토한다.
+위 기준을 만족하지 못하거나, RDB 최적화 이후에도 composite API가 목표 p95/p99를 넘고 특정 SQL/query 비용이 병목으로 확인되면 해당 활동 유형을 MongoDB Read Model 적용 후보로 검토한다.
