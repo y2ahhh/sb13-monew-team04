@@ -21,6 +21,7 @@ import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.repository.UserRepository;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -130,5 +131,15 @@ public class CommentServiceImpl implements CommentService {
         comment.getId(), command.requestUserId());// 좋아요 여부를 업데이트하기 위해 조회
 
     return CommentDto.from(comment, likeCount, likedBy);
+  }
+
+
+  @Transactional
+  @Override
+  public void softDelete(UUID commentId) {
+    Comment comment = commentRepository.findActiveById(commentId)
+        .orElseThrow(() -> new CommentNotFoundException(commentId));
+
+    comment.softDelete();
   }
 }
