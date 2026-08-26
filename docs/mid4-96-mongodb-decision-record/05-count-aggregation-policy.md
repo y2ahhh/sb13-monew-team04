@@ -64,7 +64,7 @@ INTEREST_SUBSCRIBER_COUNT_CHANGED
 - worker가 추가 RDB 조회를 수행한다.
 
 판단
-- 초기 MongoDB Read Model 설계의 기본안으로 사용한다.
+- 후속 MongoDB Read Model 적용 시 기본안 후보로 둔다.
 ```
 
 ```text

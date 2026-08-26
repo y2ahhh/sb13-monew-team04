@@ -113,7 +113,7 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 -> 댓글 snapshot의 likeCount 갱신 필요 신호로 처리
 ```
 
-### 최근 본 뉴스 기사
+### 최근 조회 기사
 
 ```text
 기사 조회

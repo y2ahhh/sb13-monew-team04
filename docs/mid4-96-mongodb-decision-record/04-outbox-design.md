@@ -18,7 +18,7 @@ MongoDB 저장 성공
 -> 원본에는 없는 데이터가 MongoDB 활동내역에 남을 수 있다.
 ```
 
-따라서 기본 설계는 Transactional Outbox Pattern을 사용한다.
+따라서 MongoDB Read Model을 후속 적용하게 된다면 Transactional Outbox Pattern을 기본 설계 후보로 둔다.
 
 ```text
 RDB 트랜잭션 안
@@ -199,7 +199,7 @@ worker 조회 조건은 상태와 처리 가능 시각을 기준으로 둔다. p
 - 사용자 응답 전에 outbox insert 1회가 추가된다.
 
 판단
-- 정합성 근거가 필요하므로 기본안으로 사용한다.
+- 후속 적용 시 정합성 근거가 필요하므로 기본안 후보로 둔다.
 ```
 
 ```text
