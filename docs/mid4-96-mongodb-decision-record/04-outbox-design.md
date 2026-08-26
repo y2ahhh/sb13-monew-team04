@@ -160,11 +160,11 @@ PENDING 이벤트 또는 next_retry_at이 지난 FAILED 이벤트 조회
 -> occurredAt은 $max 또는 동등한 단조성 조건으로 갱신
 -> *_activity_snapshots는 대상 ID 기준 upsert
 -> 수정 가능한 snapshot 값은 오래된 payload로 덮어쓰지 않고 worker 처리 시점의 RDB 현재값을 조회해 반영
--> count 집계 이벤트 병합 처리 시 선택된 그룹 row 전체를 같은 상태로 전이
+-> count 집계 이벤트 병합 처리 시 성공은 그룹 전체 PROCESSED, 실패 retry와 DEAD_LETTER 판정은 row별 처리
 -> 오래된 event_sequence 재처리로 MongoDB update가 no-op이면 stale event로 보고 PROCESSED 처리
 -> MongoDB Read Model 반영 성공 시 PROCESSED
--> 실패 시 FAILED, retry_count 증가, next_retry_at 설정, last_error 기록
--> 최대 재시도 횟수 초과 시 DEAD_LETTER로 전환
+-> 개별 이벤트 실패 시 FAILED, retry_count 증가, next_retry_at 설정, last_error 기록
+-> 개별 이벤트가 최대 재시도 횟수를 초과하면 DEAD_LETTER로 전환
 ```
 
 UUID는 순서 기준으로 사용하지 않는다. worker 조회와 처리 시도 순서는 `created_at` 기준으로 두되, activity 상태 반영 가능 여부는 직렬화된 `event_sequence` 기준으로 판단한다. `created_at`은 worker polling 편의를 위한 정렬 기준이지 transaction commit 순서 보장 기준이 아니다. `occurred_at`은 활동 발생 시각과 조회 정렬 기준이지 stale event 방지 기준으로 단독 사용하지 않는다.
@@ -181,11 +181,13 @@ count 집계 이벤트 그룹 처리
 -> 그룹별로 RDB 현재 집계값 조회
 -> MongoDB snapshot을 대상 ID 기준 upsert 후 현재 집계값으로 $set
 -> MongoDB 반영 성공 후 선택된 그룹 row 전체를 PROCESSED, 동일 processed_at으로 bulk update
--> MongoDB 반영 실패를 감지하면 선택된 그룹 row 전체를 FAILED 처리
--> retry_count, next_retry_at, last_error도 그룹 row 전체에 동일 기준으로 갱신
+-> MongoDB 반영 실패를 감지하면 선택된 그룹 row 각각의 retry_count를 1 증가
+-> 증가 후 retry_count >= max_retry_count인 row는 DEAD_LETTER 처리
+-> 아직 한도 미만인 row는 FAILED 처리하고 row별 retry_count 기준으로 next_retry_at 설정
+-> last_error는 실패한 그룹 row 전체에 같은 원인을 기록
 ```
 
-병합 그룹에서는 대표 row만 `PROCESSED`로 변경하지 않는다. 나머지 row가 `PENDING` 또는 재시도 가능한 `FAILED`로 남으면 같은 신호가 다시 선택될 수 있기 때문이다. 반대로 MongoDB 반영 전에 그룹 row를 먼저 `PROCESSED`로 변경하지 않는다. 반영 실패 시 count 변경 신호가 유실될 수 있기 때문이다.
+병합 그룹에서는 대표 row만 `PROCESSED`로 변경하지 않는다. 나머지 row가 `PENDING` 또는 재시도 가능한 `FAILED`로 남으면 같은 신호가 다시 선택될 수 있기 때문이다. 반대로 MongoDB 반영 전에 그룹 row를 먼저 `PROCESSED`로 변경하지 않는다. 반영 실패 시 count 변경 신호가 유실될 수 있기 때문이다. 성공 상태 전이는 그룹 전체에 동일하게 적용하지만, 실패 시 `retry_count`, `next_retry_at`, `DEAD_LETTER` 판정은 row별 기존 retry 이력을 보존해 계산한다.
 
 MongoDB 반영 성공 후 outbox 상태 저장 전에 worker가 중단되면 그룹 row가 다시 선택될 수 있다. 이 경우 snapshot 대상 ID 기준 upsert와 RDB 현재 집계값 `$set`으로 재처리가 멱등하게 수렴해야 한다. MongoDB 반영 실패 후 `FAILED` 저장 전 중단된 경우에도 기존 `PENDING` 또는 `FAILED` 상태가 남아 그룹 전체가 다시 재시도된다.
 

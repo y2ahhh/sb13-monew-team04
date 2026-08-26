@@ -67,8 +67,10 @@ count 이벤트 병합 그룹
 
 처리 실패
 -> RDB 현재 count 조회 또는 MongoDB snapshot $set 실패
--> 선택된 그룹 row 전체를 FAILED로 변경
--> retry_count, next_retry_at, last_error를 그룹 row 전체에 동일 기준으로 갱신
+-> 선택된 그룹 row 각각의 retry_count를 1 증가
+-> 증가 후 retry_count >= max_retry_count인 row는 DEAD_LETTER로 변경
+-> 아직 한도 미만인 row는 FAILED로 변경하고 row별 retry_count 기준으로 next_retry_at 설정
+-> last_error는 실패한 그룹 row 전체에 같은 원인을 기록
 
 worker 중단
 -> MongoDB 반영 성공 후 outbox 상태 저장 전에 중단되면 그룹 row가 다시 선택될 수 있음
@@ -77,6 +79,8 @@ worker 중단
 ```
 
 병합 그룹의 대표 row만 `PROCESSED`로 바꾸지 않는다. 선택된 그룹 row 전체가 완료 처리되어야 같은 batch에서 이미 반영한 신호가 반복 선택되지 않는다. 또한 MongoDB 반영 전에 그룹 row를 먼저 완료 처리하지 않는다. 반영 실패 시 count 변경 신호가 유실될 수 있기 때문이다.
+
+성공 상태 전이는 그룹 전체에 동일하게 적용하지만, 실패 시 retry 이력은 row별로 보존한다. 같은 그룹 안에 `retry_count=4`인 row와 `retry_count=1`인 row가 있고 `max_retry_count=5`에서 다시 실패하면, 첫 번째 row는 `DEAD_LETTER`로 전환하고 두 번째 row는 `retry_count=2`, `FAILED`, 2회차 기준 `next_retry_at`으로 전환한다.
 
 조회수 이벤트가 worker 처리량을 지속적으로 초과하면 기사 조회 이벤트와 count 갱신 이벤트를 분리하거나, 일정 주기 batch/coalescing publisher로 전환한다. 이 경우 viewCount snapshot은 실시간 정확값이 아니라 짧은 지연을 허용하는 표시값으로 취급한다.
 
