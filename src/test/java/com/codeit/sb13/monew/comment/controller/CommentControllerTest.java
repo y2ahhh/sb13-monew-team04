@@ -252,4 +252,28 @@ public class CommentControllerTest {
     then(commentService).shouldHaveNoInteractions();
   }
 
+
+  @Test
+  @DisplayName("댓글 정보 수정 성공 - RED")
+  void 댓글_수정_성공() throws Exception {
+    UUID commentId = UUID.randomUUID();
+    UUID requestUserId = UUID.randomUUID();
+    LocalDateTime createdAt = LocalDateTime.of(2026, 8, 25, 10, 30);
+    CommentDto response = new CommentDto(commentId, UUID.randomUUID(), requestUserId,
+        "작성자", "수정된 댓글", 2L, true, createdAt);
+    given(commentService.update(argThat(command -> command != null
+        && commentId.equals(command.commentId())
+        && requestUserId.equals(command.requestUserId())
+        && "수정된 댓글".equals(command.content())))).willReturn(response);
+
+    mockMvc.perform(patch("/api/comments/{commentId}", commentId)
+            .header("Monew-Request-User-ID", requestUserId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"content\":\"수정된 댓글\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(commentId.toString()))
+        .andExpect(jsonPath("$.content").value("수정된 댓글"))
+        .andExpect(jsonPath("$.likeCount").value(2))
+        .andExpect(jsonPath("$.likedByMe").value(true));
+  }
 }
