@@ -6,6 +6,8 @@
 
 MID4-125와 MID4-179 측정 결과 기준으로 RDB 인덱스 최적화 후 `GET /api/user-activities/{userId}`는 10m seed에서 `200 rps`까지 안정적으로 처리됐다. 현재 근거만으로는 MongoDB 환경 구성, Outbox, projection 동기화, 삭제 전파, 장애 재처리 정책을 배포 전에 추가할 만큼의 성능 병목이 확인되지 않았다.
 
+따라서 현재 판단은 MongoDB Read Model을 배포 범위에 포함하지 않고, RDB를 활동내역 조회의 기준 구현이자 Source of Truth로 유지하는 것이다. Redis도 활동내역 Read Model 저장소나 캐시로 적용하지 않는다.
+
 이 디렉터리의 `01`~`08` 문서는 MongoDB 적용 가능성을 검토하기 위해 작성한 사전 설계 기록이다. 최종 적용 여부는 이 README, MID4-125, MID4-179 측정 결과를 기준으로 판단한다.
 
 따라서 이번 단계의 의사결정은 다음과 같다.
@@ -16,6 +18,14 @@ MID4-125와 MID4-179 측정 결과 기준으로 RDB 인덱스 최적화 후 `GET
 | Redis | 미적용 |
 | RDB | Source of Truth로 유지 |
 | 배포 전 작업 | RDB 최적화 상태 유지 |
+
+## k6 측정 해석 범위
+
+MID4-179의 k6 결과는 이번 의사결정의 참고 근거로 사용하되, 운영 환경의 보장값으로 보지 않는다.
+
+현재 결과는 로컬 dev 환경, 단일 target user, 10m seed, 각 요청량 단계 1분 측정 기준이다. multi-user 분포, 구독 관심사 fan-out worst-case, 장시간 soak, 반복 측정에 따른 편차, read/write 혼합 부하, MongoDB 구현 전후 비교는 아직 검증하지 않았다.
+
+따라서 `200 rps`는 현재 조건에서 확인한 RDB 최적화 상태의 참고 상한이며, k6 보강 측정은 별도 Jira 티켓에서 준비한다.
 
 ## 재검토 조건
 
