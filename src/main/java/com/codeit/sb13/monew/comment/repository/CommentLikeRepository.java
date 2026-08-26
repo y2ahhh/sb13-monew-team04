@@ -19,9 +19,13 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> 
       FROM CommentLike CL
       JOIN CL.comment C
       JOIN CL.likedBy LB
+      JOIN C.article A
+      JOIN C.user U
       WHERE C.id = :commentId
           AND LB.deletedAt IS NULL
           AND C.deletedAt IS NULL
+          AND A.deletedAt IS NULL
+          AND U.deletedAt IS NULL
   """) // 탈퇴 또는 논리 삭제된 유저의 좋아요는 카운트에서 제외
   Long countActiveLikesByCommentId(@Param("commentId") UUID commentId);
 
@@ -30,10 +34,14 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> 
       FROM CommentLike CL
       JOIN CL.comment C
       JOIN CL.likedBy LB
+      JOIN C.article A
+      JOIN C.user U
       WHERE C.id = :commentId
           AND LB.id = :likedById
           AND LB.deletedAt IS NULL
           AND C.deletedAt IS NULL
+          AND A.deletedAt IS NULL
+          AND U.deletedAt IS NULL
       """) // 조건에 맞는 데이터가 0개 이상이면 true, 없으면 false 반환
   boolean existsActiveByCommentIdAndLikedById(
       @Param("commentId") UUID commentId,
