@@ -213,7 +213,12 @@ public class CommentLikeServiceTest {
   void UNIQUE_외_저장_오류는_그대로_전파한다() {
     CommentLikeRegisterCommand command = new CommentLikeRegisterCommand(comment.getId(), likedBy.getId());
     DataIntegrityViolationException foreignKeyException =
-        new DataIntegrityViolationException("FK 제약 위반 발생");
+        new DataIntegrityViolationException("FK 제약 위반 발생",
+            new ConstraintViolationException(
+                "FK 제약 위반 발생",
+                new SQLException(),
+                "fk_comment_likes_comment_id"));
+    // ConstraintViolationException 추가, isDuplicateCommentLike 제약 조건 위반 이름 비교식의 false 경로까지 확인
 
     given(commentRepository.findActiveById(comment.getId())).willReturn(Optional.of(comment));
     given(userRepository.findByIdAndDeletedAtIsNull(likedBy.getId())).willReturn(Optional.of(likedBy));
