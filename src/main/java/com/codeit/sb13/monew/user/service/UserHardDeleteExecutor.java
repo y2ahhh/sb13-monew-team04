@@ -6,7 +6,9 @@ import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
 import com.codeit.sb13.monew.interest.repository.SubscribeRepository;
 import com.codeit.sb13.monew.notification.repository.NotificationRepository;
+import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.repository.UserRepository;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -36,6 +38,15 @@ public class UserHardDeleteExecutor {
     subscribeRepository.deleteByUserId(userId);
     notificationRepository.deleteByUser_Id(userId);
     userRepository.deleteById(userId);
+  }
+
+  public void hardDeleteExpiredUser(UUID userId, LocalDateTime threshold) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new UserNotFoundException(userId));
+    LocalDateTime deletedAt = user.getDeletedAt();
+    if(deletedAt != null &&  deletedAt.isBefore(threshold)) {
+      hardDeleteUser(userId);
+    }
   }
 
 }
