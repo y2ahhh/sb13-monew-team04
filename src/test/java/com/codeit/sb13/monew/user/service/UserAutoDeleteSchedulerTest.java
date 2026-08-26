@@ -4,6 +4,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,13 +32,17 @@ class UserAutoDeleteSchedulerTest {
   void 락_획득에_성공하면_배치가_실행된다() {
     // given
     when(advisoryLockService.executeWithLock(eq("user-auto-delete"), any(Runnable.class)))
-        .thenReturn(true);
-
+        .thenAnswer(invocation -> {
+          Runnable task = invocation.getArgument(1);
+          task.run();
+          return true;
+        });
     // when
     userAutoDeleteScheduler.userAutoDeleteScheduler();
 
     // then
     verify(advisoryLockService).executeWithLock(eq("user-auto-delete"), any(Runnable.class));
+    verify(userService).autoDeleteExpiredUsers();
   }
 
   @Test
@@ -51,6 +56,7 @@ class UserAutoDeleteSchedulerTest {
     assertThatCode(() -> userAutoDeleteScheduler.userAutoDeleteScheduler())
         .doesNotThrowAnyException();
     verify(advisoryLockService).executeWithLock(eq("user-auto-delete"), any(Runnable.class));
+    verify(userService, never()).autoDeleteExpiredUsers();
 
   }
 }
