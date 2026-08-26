@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -133,7 +134,7 @@ public class ArticleServiceImpl implements ArticleService {
         // Article 생성
         Article article = Article.create(
                 request.getTitle(),
-                request.getSummary(),
+                resolveSummary(request),
                 request.getLink(),
                 request.getDate(),
                 request.getSource()
@@ -148,6 +149,12 @@ public class ArticleServiceImpl implements ArticleService {
             }
             throw e;
         }
+    }
+
+    private String resolveSummary(ArticleRequest request) {
+        return StringUtils.hasText(request.getSummary())
+                ? request.getSummary()
+                : request.getTitle();
     }
 
     @Override
