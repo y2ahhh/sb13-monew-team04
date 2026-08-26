@@ -15,9 +15,10 @@ MID4-134는 10m seed scale에서 `20 rps`, `1m` 조건을 통과했지만 최대
 - k6 executor: `constant-arrival-rate`
 - 측정 시간: 각 단계 `1m`
 - VU 설정: `preAllocatedVUs=500`, `maxVUs=500`
+- measured RPS: k6 `handleSummary`가 저장한 `http_reqs.rate` 기준
 - 성공 판단: `error rate < 1%`, `dropped iterations = 0`, p95/p99 급증 없음
 
-10m seed는 다음 분포로 생성했다.
+10m seed의 실제 측정 시점 row count는 다음과 같다.
 
 | table | rows |
 | --- | ---: |
@@ -25,10 +26,10 @@ MID4-134는 10m seed scale에서 `20 rps`, `1m` 조건을 통과했지만 최대
 | interests | 50,000 |
 | keywords | 150,000 |
 | subscriptions | 500,045 |
-| articles | 2,000,000 |
-| comments | 4,000,000 |
+| articles | 1,999,802 |
+| comments | 4,000,296 |
 | comment_likes | 3,000,000 |
-| article_views | 3,000,000 |
+| article_views | 2,999,999 |
 
 ## RPS 해석 기준
 
@@ -40,6 +41,8 @@ MID4-134는 10m seed scale에서 `20 rps`, `1m` 조건을 통과했지만 최대
 ```
 
 따라서 최대 요청량은 평균 응답 시간만으로 확정하지 않고, k6의 실제 도착률, VU 사용량, dropped iterations, p95/p99, DB 부하를 함께 확인한다.
+
+결과 표의 `measured RPS`는 k6 summary의 `http_reqs.rate` 값을 그대로 기록한 것이다. k6가 집계한 전체 실행 구간 기준 Counter rate이므로 `requests / 60초`로 계산한 값과 다를 수 있다. 요청량 판단은 `target rate`와 `dropped iterations`를 함께 본다.
 
 ## 결과
 
@@ -54,7 +57,7 @@ MID4-134는 10m seed scale에서 `20 rps`, `1m` 조건을 통과했지만 최대
 
 ## DB 부하
 
-30초 지점 `docker stats --no-stream` 기준이다.
+30초 지점 `docker stats --no-stream` 단일 시점 샘플 기준이다. 실행 전체 평균이나 최대값이 아니다.
 
 | target rate | PostgreSQL CPU | PostgreSQL memory | note |
 | ---: | ---: | ---: | --- |

@@ -63,7 +63,11 @@ function Invoke-DockerStats {
 
     $outputPath = Join-Path $rawRoot "docker-stats-$Phase-$runLabel.txt"
     $output = docker stats --no-stream $PgContainer 2>&1
+    $exitCode = $LASTEXITCODE
     Write-TextOutput $outputPath $output
+    if ($exitCode -ne 0) {
+        throw "docker stats failed. phase=$Phase exitCode=$exitCode output=$outputPath"
+    }
 }
 
 function Invoke-PgActivitySnapshot {
@@ -84,7 +88,11 @@ ORDER BY state, wait_event_type, wait_event;
 "@
 
     $output = docker exec $PgContainer psql -U monew -d monew -v ON_ERROR_STOP=1 -c $sql 2>&1
+    $exitCode = $LASTEXITCODE
     Write-TextOutput $outputPath $output
+    if ($exitCode -ne 0) {
+        throw "docker exec psql failed. phase=$Phase exitCode=$exitCode output=$outputPath"
+    }
 }
 
 $k6Environment = @{

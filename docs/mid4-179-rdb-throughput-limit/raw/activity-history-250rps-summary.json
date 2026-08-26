@@ -3,6 +3,10 @@
   "url": "http://host.docker.internal:8080/api/user-activities/00000001-0000-4000-8000-000000000001",
   "targetUserId": "00000001-0000-4000-8000-000000000001",
   "expectedStatus": 200,
+  "requestedRate": 250,
+  "duration": "1m",
+  "preAllocatedVUs": 500,
+  "maxVUs": 500,
   "metrics": {
     "requests": 13563,
     "rps": 233.6628742214486,
