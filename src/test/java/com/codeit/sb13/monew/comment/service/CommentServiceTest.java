@@ -74,8 +74,8 @@ public class CommentServiceTest {
     UUID commentId = UUID.randomUUID();
 
     CommentRegisterCommand command=new CommentRegisterCommand(article.getId(), user.getId(), "테스트 댓글");
-    given(userRepository.findById(user.getId())).willReturn(java.util.Optional.of(user));
-    given(articleRepository.findById(article.getId())).willReturn(java.util.Optional.of(article));
+    given(userRepository.findByIdAndDeletedAtIsNull(user.getId())).willReturn(java.util.Optional.of(user));
+    given(articleRepository.findByIdAndDeletedAtIsNull(article.getId())).willReturn(java.util.Optional.of(article));
     given(commentRepository.save(any(Comment.class))).willAnswer(invocation -> {
       Comment comment = invocation.getArgument(0);
       ReflectionTestUtils.setField(comment, "id", commentId);
@@ -286,7 +286,7 @@ public class CommentServiceTest {
     ReflectionTestUtils.setField(comment, "createdAt", createdAt);
 
     CommentUpdateCommand command=new CommentUpdateCommand(comment.getId(), user.getId(), "수정된 테스트 댓글");
-    given(commentRepository.findByIdAndDeletedAtIsNull(comment.getId())).willReturn(java.util.Optional.of(comment));
+    given(commentRepository.findActiveById(comment.getId())).willReturn(java.util.Optional.of(comment));
     given(commentLikeRepository.countActiveLikesByCommentId(comment.getId())).willReturn(0L);
     given(commentLikeRepository.existsActiveByCommentIdAndLikedById(comment.getId(), user.getId())).willReturn(false);
 
@@ -305,7 +305,7 @@ public class CommentServiceTest {
         () -> assertThat(result.likedByMe()).isFalse(),
         () -> assertThat(result.createdAt()).isEqualTo(createdAt)
     );
-    then(commentRepository).should(times(1)).findByIdAndDeletedAtIsNull(comment.getId());
+    then(commentRepository).should(times(1)).findActiveById(comment.getId());
     then(commentLikeRepository).should(times(1)).countActiveLikesByCommentId(comment.getId());
     then(commentLikeRepository).should(times(1))
         .existsActiveByCommentIdAndLikedById(comment.getId(), user.getId());
@@ -317,7 +317,7 @@ public class CommentServiceTest {
   void 존재하지_않는_댓글_수정_실패() {
     CommentUpdateCommand command = new CommentUpdateCommand(
         UUID.randomUUID(), UUID.randomUUID(), "수정된 댓글");
-    given(commentRepository.findByIdAndDeletedAtIsNull(command.commentId()))
+    given(commentRepository.findActiveById(command.commentId()))
         .willReturn(java.util.Optional.empty());
 
     assertThatThrownBy(() -> commentService.update(command))
@@ -346,7 +346,7 @@ public class CommentServiceTest {
     CommentUpdateCommand command = new CommentUpdateCommand(
         comment.getId(), UUID.randomUUID(), "수정된 댓글");
 
-    given(commentRepository.findByIdAndDeletedAtIsNull(comment.getId()))
+    given(commentRepository.findActiveById(comment.getId()))
         .willReturn(java.util.Optional.of(comment));
 
     assertThatThrownBy(() -> commentService.update(command))
