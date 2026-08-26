@@ -301,7 +301,10 @@ class ArticleServiceTest {
                 .thenReturn(true);
         when(articleViewRepository.countByArticle_IdAndUser_DeletedAtIsNull(testArticleId))
                 .thenReturn(7L);
-        when(articleMapper.toDto(testArticle, true, 0L, 7L))
+        when(commentRepository
+                .countByArticle_IdAndDeletedAtIsNullAndUser_DeletedAtIsNull(testArticleId))
+                .thenReturn(6L);
+        when(articleMapper.toDto(testArticle, true, 6L, 7L))
                 .thenReturn(expectedDto);
 
         // when
@@ -309,7 +312,7 @@ class ArticleServiceTest {
 
         // then
         assertThat(result).isEqualTo(expectedDto);
-        verify(articleMapper).toDto(testArticle, true, 0L, 7L);
+        verify(articleMapper).toDto(testArticle, true, 6L, 7L);
     }
 
     @Test

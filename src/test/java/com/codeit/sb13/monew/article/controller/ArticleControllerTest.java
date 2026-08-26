@@ -519,4 +519,19 @@ class ArticleControllerTest {
 
         verify(articleService, never()).searchArticles(any());
     }
+
+
+    @Test
+    @DisplayName("목록 조회 시 limit이 상한을 넘으면 400과 ART_016을 반환한다")
+    void getArticlesWithLimitAboveMax() throws Exception {
+        mockMvc.perform(get("/api/articles")
+                        .header(REQUEST_USER_ID, userId)
+                        .param("orderBy", "publishDate")
+                        .param("direction", "DESC")
+                        .param("limit", "101"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ART_016"));
+
+        verify(articleService, never()).searchArticles(any());
+    }
 }

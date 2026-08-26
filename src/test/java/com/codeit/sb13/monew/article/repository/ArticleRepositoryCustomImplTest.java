@@ -1,6 +1,7 @@
 package com.codeit.sb13.monew.article.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
@@ -11,6 +12,7 @@ import com.codeit.sb13.monew.article.repository.dto.ArticleSearchRow;
 import com.codeit.sb13.monew.article.service.dto.ArticleOrderBy;
 import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;
+import com.codeit.sb13.monew.global.exception.article.ArticleSearchConditionInvalidException;
 import org.springframework.data.domain.Sort;
 import com.codeit.sb13.monew.global.config.QueryDslConfig;
 import com.codeit.sb13.monew.user.domain.User;
@@ -130,8 +132,7 @@ class ArticleRepositoryCustomImplTest {
 
     private ArticleSearchCondition condition(String keyword, List<ArticleSource> sourceIn,
                                              LocalDateTime from, LocalDateTime to, UUID userId) {
-        // 정렬·커서 파라미터는 Step 3에서 쿼리에 반영한다. 여기서는 기존 동작
-        // (발행일 내림차순 전체 조회)을 유지하는 기본값을 넣는다.
+        // 이 헬퍼의 기본값: 발행일 내림차순, 커서 없음.
         return new ArticleSearchCondition(keyword, sourceIn, from, to,
                 ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, null, 100, userId);
     }
@@ -467,5 +468,79 @@ class ArticleRepositoryCustomImplTest {
         assertThat(page.rows()).hasSize(2);
         assertThat(page.hasNext()).isFalse();
         assertThat(page.totalElements()).isEqualTo(2L);
+    }
+
+
+    @Test
+    @DisplayName("커서 세 값 중 일부만 오면 예외를 던진다")
+    void partialCursorIsRejected() {
+        persistArticle("기사", "요약", D1, ArticleSource.NAVER);
+
+        // cursor만 있고 after, idAfter가 없다.
+        assertThatThrownBy(() -> articleRepository.search(
+                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
+                        D1.toString(), null, null, 10)))
+                .isInstanceOf(ArticleSearchConditionInvalidException.class);
+    }
+
+    @Test
+    @DisplayName("viewCount 정렬에서도 커서로 페이지를 끝까지 넘길 수 있다")
+    void cursorPagingWorksForViewCountOrdering() {
+        User u1 = persistUser();
+        User u2 = persistUser();
+        User u3 = persistUser();
+
+        Article three = persistArticle("조회3", "요약", D1, ArticleSource.NAVER);
+        Article two = persistArticle("조회2", "요약", D2, ArticleSource.CHOSUN);
+        Article one = persistArticle("조회1", "요약", D3, ArticleSource.HANKYUNG);
+        Article zero = persistArticle("조회0", "요약", D1, ArticleSource.NAVER);
+
+        view(three, u1);
+        view(three, u2);
+        view(three, u3);
+        view(two, u1);
+        view(two, u2);
+        view(one, u1);
+
+        List<String> collected = new ArrayList<>();
+        ArticleSearchPage p = firstPage(ArticleOrderBy.VIEW_COUNT, Sort.Direction.DESC, 2);
+        collected.addAll(titlesOf(p.rows()));
+
+        while (p.hasNext()) {
+            p = nextPage(p, ArticleOrderBy.VIEW_COUNT, Sort.Direction.DESC, 2);
+            collected.addAll(titlesOf(p.rows()));
+        }
+
+        assertThat(collected).containsExactly("조회3", "조회2", "조회1", "조회0");
+        assertThat(zero).isNotNull();
+    }
+
+    @Test
+    @DisplayName("commentCount 정렬에서도 커서로 페이지를 끝까지 넘길 수 있다")
+    void cursorPagingWorksForCommentCountOrdering() {
+        User user = persistUser();
+
+        Article three = persistArticle("댓글3", "요약", D1, ArticleSource.NAVER);
+        Article two = persistArticle("댓글2", "요약", D2, ArticleSource.CHOSUN);
+        Article one = persistArticle("댓글1", "요약", D3, ArticleSource.HANKYUNG);
+        persistArticle("댓글0", "요약", D1, ArticleSource.NAVER);
+
+        comment(three, user);
+        comment(three, user);
+        comment(three, user);
+        comment(two, user);
+        comment(two, user);
+        comment(one, user);
+
+        List<String> collected = new ArrayList<>();
+        ArticleSearchPage p = firstPage(ArticleOrderBy.COMMENT_COUNT, Sort.Direction.ASC, 2);
+        collected.addAll(titlesOf(p.rows()));
+
+        while (p.hasNext()) {
+            p = nextPage(p, ArticleOrderBy.COMMENT_COUNT, Sort.Direction.ASC, 2);
+            collected.addAll(titlesOf(p.rows()));
+        }
+
+        assertThat(collected).containsExactly("댓글0", "댓글1", "댓글2", "댓글3");
     }
 }

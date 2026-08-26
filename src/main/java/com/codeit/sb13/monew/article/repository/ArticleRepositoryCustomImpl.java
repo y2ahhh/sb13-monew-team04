@@ -134,8 +134,15 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
         LocalDateTime after = condition.after();
         UUID idAfter = condition.idAfter();
 
-        if (!StringUtils.hasText(cursor) || after == null || idAfter == null) {
+        // 세 값은 하나의 단위다. 일부만 오면 첫 페이지를 다시 돌려주게 되어
+        // 클라이언트가 같은 항목을 두 번 받는다. 조용히 넘기지 않고 거부한다.
+        boolean noneProvided = !StringUtils.hasText(cursor) && after == null && idAfter == null;
+        if (noneProvided) {
             return null;
+        }
+        if (!StringUtils.hasText(cursor) || after == null || idAfter == null) {
+            throw new ArticleSearchConditionInvalidException(
+                    "cursor, after, idAfter는 함께 전달해야 합니다.");
         }
 
         boolean ascending = condition.direction().isAscending();

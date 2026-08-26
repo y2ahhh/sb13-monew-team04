@@ -34,6 +34,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ArticleController implements ArticleApi {
 
+    /**
+     * 집계값 정렬은 기사 한 건마다 상관 서브쿼리를 평가한다. 상한이 없으면
+     * limit=1000000 같은 요청이 그대로 리포지토리에 도달해 DB에 과부하를 준다.
+     */
+    private static final int MAX_LIMIT = 100;
+
     private final ArticleService articleService;
     private final ArticleViewService articleViewService;
     private final ArticleRestoreService articleRestoreService;
@@ -52,6 +58,10 @@ public class ArticleController implements ArticleApi {
         }
         if (request.limit() < 1) {
             throw new ArticleSearchConditionInvalidException("limit은 1 이상이어야 합니다: " + request.limit());
+        }
+        if (request.limit() > MAX_LIMIT) {
+            throw new ArticleSearchConditionInvalidException(
+                    "limit은 " + MAX_LIMIT + " 이하여야 합니다: " + request.limit());
         }
 
         ArticleSearchCommand command = new ArticleSearchCommand(

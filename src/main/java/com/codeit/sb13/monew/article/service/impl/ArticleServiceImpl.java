@@ -63,8 +63,10 @@ public class ArticleServiceImpl implements ArticleService {
                 .existsByArticle_IdAndUser_Id(articleId, requestUserId);
         long viewCount = articleViewRepository.countByArticle_IdAndUser_DeletedAtIsNull(articleId);
 
-        // commentCount는 댓글 파트 집계 방식 확정 전까지 0 (MID4-147)
-        return articleMapper.toDto(article, viewedByMe, 0L, viewCount);
+        long commentCount = commentRepository
+                .countByArticle_IdAndDeletedAtIsNullAndUser_DeletedAtIsNull(articleId);
+
+        return articleMapper.toDto(article, viewedByMe, commentCount, viewCount);
     }
 
     @Override
