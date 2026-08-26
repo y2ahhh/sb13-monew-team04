@@ -48,10 +48,35 @@ INTEREST_SUBSCRIBER_COUNT_CHANGED
 ```text
 ARTICLE_VIEW_COUNT_CHANGED
 -> producer는 articleId 기준 조회수 변경 신호를 저장한다.
--> worker는 한 번의 polling batch 안에서 같은 articleId 이벤트를 하나로 합친다.
+-> worker는 한 번의 polling batch 안에서 같은 event_type + articleId 이벤트를 하나로 합친다.
 -> 같은 batch에서 articleId별 RDB 현재 viewCount 재조회는 최대 1회만 수행한다.
 -> MongoDB article snapshot에는 누적 증감값이 아니라 RDB 현재 viewCount를 $set한다.
 ```
+
+병합 처리된 outbox row의 상태 전이는 그룹 전체를 기준으로 한다.
+
+```text
+count 이벤트 병합 그룹
+-> 기준: 같은 polling batch에서 선택된 row 중 event_type + snapshot 대상 ID가 같은 row
+-> 대상 ID 예: commentId, articleId, interestId
+
+처리 성공
+-> RDB 현재 count 조회 성공
+-> MongoDB snapshot 대상 ID 기준 upsert 및 현재 count $set 성공
+-> 선택된 그룹 row 전체를 PROCESSED, 동일 processed_at으로 변경
+
+처리 실패
+-> RDB 현재 count 조회 또는 MongoDB snapshot $set 실패
+-> 선택된 그룹 row 전체를 FAILED로 변경
+-> retry_count, next_retry_at, last_error를 그룹 row 전체에 동일 기준으로 갱신
+
+worker 중단
+-> MongoDB 반영 성공 후 outbox 상태 저장 전에 중단되면 그룹 row가 다시 선택될 수 있음
+-> 재처리 시 snapshot 대상 ID 기준 upsert와 현재 count $set으로 멱등 처리
+-> MongoDB 반영 전 또는 실패 상태 저장 전 중단되면 기존 상태가 남아 그룹 전체가 다시 재시도됨
+```
+
+병합 그룹의 대표 row만 `PROCESSED`로 바꾸지 않는다. 선택된 그룹 row 전체가 완료 처리되어야 같은 batch에서 이미 반영한 신호가 반복 선택되지 않는다. 또한 MongoDB 반영 전에 그룹 row를 먼저 완료 처리하지 않는다. 반영 실패 시 count 변경 신호가 유실될 수 있기 때문이다.
 
 조회수 이벤트가 worker 처리량을 지속적으로 초과하면 기사 조회 이벤트와 count 갱신 이벤트를 분리하거나, 일정 주기 batch/coalescing publisher로 전환한다. 이 경우 viewCount snapshot은 실시간 정확값이 아니라 짧은 지연을 허용하는 표시값으로 취급한다.
 

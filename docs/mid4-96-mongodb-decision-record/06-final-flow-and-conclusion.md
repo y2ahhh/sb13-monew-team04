@@ -134,6 +134,8 @@ MongoDB 반영은 response 반환 이후 worker가 비동기로 수행하므로,
 
 카운트 집계값은 MongoDB 반영만을 위해 RDB counter를 바로 만들지 않고, 기본적으로 worker가 RDB에서 현재 집계값을 다시 조회해 MongoDB snapshot에 반영한다.
 
+같은 polling batch 안에서 count 집계 이벤트를 병합하면 `event_type + snapshot 대상 ID` 기준으로 그룹화한다. MongoDB snapshot 대상 ID 기준 upsert와 현재 집계값 `$set`이 성공한 뒤에만 선택된 그룹 row 전체를 `PROCESSED`로 변경한다. 반영 실패 시에는 그룹 row 전체를 `FAILED`로 전환하고, 상태 저장 전 중단되면 기존 상태가 남아 그룹 전체가 재시도된다. 재시도는 대상 ID 기준 upsert와 `$set`으로 멱등하게 처리한다.
+
 사용자가 같은 대상에 대해 같은 종류의 활동을 반복하면 activity를 계속 추가하지 않고 `userId + type + targetType + targetId` 기준으로 기존 activity를 upsert한다.
 
 이 upsert 기준은 후속 구현 시 unique index와 atomic upsert로 보장한다. 같은 outbox 이벤트가 재처리되거나 동일 활동 이벤트가 중복 발행되어도 activity는 중복 생성하지 않는다.
