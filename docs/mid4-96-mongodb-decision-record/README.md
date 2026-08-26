@@ -33,8 +33,10 @@ MID4-179의 k6 결과는 이번 의사결정의 참고 근거로 사용하되, �
 
 - 활동내역 API 목표 처리량이 `250 rps` 이상으로 확정된다.
 - 현재보다 엄격한 p95/p99 SLO가 정해지고 RDB 최적화 상태에서 기준을 넘는다.
-- 구독 관심사 fan-out worst-case에서 `interestSubscriberCount` 또는 keywords 조립 비용이 병목으로 확인된다.
+- 구독 관심사 fan-out worst-case에서 MongoDB snapshot 내부 `subscriberCount` 또는 keywords 조립 비용이 병목으로 확인된다.
 - RDB 인덱스와 SQL 구조를 재검증한 뒤에도 특정 활동내역 조회가 병목으로 남는다.
+
+현재 RDB 활동내역 DTO는 구독 관심사 응답 필드로 `interestSubscriberCount`를 사용한다. MongoDB Read Model을 후속 적용할 경우 snapshot 내부 필드는 `subscriberCount`로 유지하고, API 응답 DTO 변환 시 `subscriberCount -> interestSubscriberCount`로 매핑한다.
 
 ## 근거 문서
 

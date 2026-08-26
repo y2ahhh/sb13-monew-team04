@@ -29,10 +29,29 @@ ARTICLE_COMMENT_COUNT_CHANGED
 -> worker가 RDB에서 현재 commentCount를 다시 집계한다.
 -> MongoDB article snapshot에 commentCount를 $set으로 반영한다.
 
+ARTICLE_VIEW_COUNT_CHANGED
+-> payload에는 articleId, eventId, occurredAt 같은 최소 식별 정보만 담는다.
+-> worker가 이벤트 처리 시점에 RDB에서 현재 viewCount를 다시 조회한다.
+-> MongoDB article snapshot에 viewCount를 $set으로 반영한다.
+
 INTEREST_SUBSCRIBER_COUNT_CHANGED
 -> worker가 RDB에서 현재 subscriberCount를 다시 집계한다.
 -> MongoDB interest snapshot에 subscriberCount를 $set으로 반영한다.
 ```
+
+기사 조회는 발생 빈도가 높을 수 있으므로 조회수 변경 이벤트는 worker가 outbox row마다 RDB를 1회씩 재조회하지 않는다.
+
+초기 기준은 다음과 같다.
+
+```text
+ARTICLE_VIEW_COUNT_CHANGED
+-> producer는 articleId 기준 조회수 변경 신호를 저장한다.
+-> worker는 한 번의 polling batch 안에서 같은 articleId 이벤트를 하나로 합친다.
+-> 같은 batch에서 articleId별 RDB 현재 viewCount 재조회는 최대 1회만 수행한다.
+-> MongoDB article snapshot에는 누적 증감값이 아니라 RDB 현재 viewCount를 $set한다.
+```
+
+조회수 이벤트가 worker 처리량을 지속적으로 초과하면 기사 조회 이벤트와 count 갱신 이벤트를 분리하거나, 일정 주기 batch/coalescing publisher로 전환한다. 이 경우 viewCount snapshot은 실시간 정확값이 아니라 짧은 지연을 허용하는 표시값으로 취급한다.
 
 이 방식은 worker가 추가 RDB 조회를 수행한다는 단점이 있지만, RDB 원본 모델을 불필요하게 역정규화하지 않고 이벤트 순서가 일부 바뀌어도 최신 집계값으로 수렴하기 쉽다.
 

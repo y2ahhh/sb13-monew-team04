@@ -141,4 +141,4 @@ MongoDB 환경구성 또는 Read Model 구현은 다음 조건 중 하나가 충
 
 - 목표 RPS, p95/p99 SLO, 허용 error rate, dropped iteration 기준이 확정된다.
 - 확정된 기준으로 재측정했을 때 RDB 최적화 후에도 특정 조회가 기준을 넘는다.
-- 구독 관심사 fan-out worst-case 측정에서 `interestSubscriberCount` 또는 keywords 조립 비용이 병목으로 확인된다.
+- 구독 관심사 fan-out worst-case 측정에서 MongoDB snapshot 내부 `subscriberCount` 또는 keywords 조립 비용이 병목으로 확인된다. 현재 API DTO가 `interestSubscriberCount`를 사용하는 경우에는 조회 모델의 `subscriberCount`를 응답 DTO에서 `interestSubscriberCount`로 매핑한다.

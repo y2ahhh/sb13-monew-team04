@@ -104,10 +104,10 @@ status
 -> 예: ACTIVE, CANCELED, UNSUBSCRIBED, TARGET_DELETED, USER_DELETED
 ```
 
-권장 인덱스는 다음과 같다.
+필수 및 권장 인덱스는 다음과 같다.
 
 ```js
-{ userId: 1, type: 1, targetType: 1, targetId: 1 }
+{ userId: 1, type: 1, targetType: 1, targetId: 1 } // unique
 { userId: 1, type: 1, visible: 1, occurredAt: -1, _id: -1 }
 { userId: 1, visible: 1 }
 { targetType: 1, targetId: 1 }
@@ -133,7 +133,7 @@ MongoDB 인덱스에서 숫자는 저장값이 아니라 인덱스 정렬 방향
 예: U1 + COMMENT_LIKED + COMMENT + C1
 ```
 
-가능하면 unique index 후보로 본다.
+후속 구현 시 필수 unique index로 만든다. worker가 같은 outbox 이벤트를 재처리하거나 동일 활동 이벤트가 중복 발행되어도 이 natural key를 기준으로 하나의 activity만 유지한다.
 
 ```js
 { userId: 1, type: 1, visible: 1, occurredAt: -1, _id: -1 }
@@ -186,7 +186,7 @@ parentTargetId = A1
 userId + type + targetType + targetId
 ```
 
-이 조합이 없으면 새로 생성하고, 이미 있으면 기존 activity를 수정 또는 upsert한다.
+이 조합이 없으면 새로 생성하고, 이미 있으면 기존 activity를 수정한다. MongoDB 쓰기는 find 후 insert/update를 나누지 않고 이 natural key 기준의 atomic upsert로 처리한다.
 
 예시는 다음과 같다.
 

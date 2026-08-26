@@ -44,19 +44,22 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 ```text
 관심사 구독
--> 사용자별 구독 관심사 활동 생성 또는 visible=true 처리
+-> 사용자별 구독 관심사 활동 생성 또는 재활성화
+-> visible=true, status=ACTIVE 처리
 
 구독 해제
--> 해당 사용자의 구독 관심사 활동 visible=false 또는 status=UNSUBSCRIBED 처리
+-> 해당 사용자의 구독 관심사 활동 visible=false, status=UNSUBSCRIBED 처리
 
 관심사 키워드 추가 또는 삭제
 -> 관심사 snapshot의 keywords 갱신
 
 관심사 비노출 또는 제거
--> 해당 interestId를 참조하는 구독 관심사 활동 visible=false 처리
+-> 해당 interestId를 참조하는 visible=true 구독 관심사 활동 visible=false, status=TARGET_DELETED 처리
+-> interest snapshot visible=false 처리
 
 구독자 수 변경
--> 관심사 snapshot의 subscriberCount 갱신 필요 신호로 처리
+-> INTEREST_SUBSCRIBER_COUNT_CHANGED 이벤트로 처리
+-> worker가 RDB 현재 subscriberCount를 재집계해 interest snapshot의 subscriberCount를 $set
 ```
 
 ### 최근 작성 댓글
@@ -89,10 +92,11 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 ```text
 댓글 좋아요
--> 좋아요 댓글 활동 생성 또는 visible=true 처리
+-> 좋아요 댓글 활동 생성 또는 재활성화
+-> visible=true, status=ACTIVE 처리
 
 좋아요 취소
--> 해당 사용자의 좋아요 댓글 활동 visible=false 또는 status=CANCELED 처리
+-> 해당 사용자의 좋아요 댓글 활동 visible=false, status=CANCELED 처리
 
 댓글 수정
 -> 댓글 snapshot의 content, updatedAt 등 표시 데이터 갱신
@@ -117,11 +121,12 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 ```text
 기사 조회
--> 최근 본 뉴스 활동 생성 또는 upsert
+-> 최근 본 뉴스 활동 생성 또는 재활성화
+-> visible=true, status=ACTIVE 처리
 -> 같은 사용자가 같은 기사를 다시 조회하면 occurredAt을 최신화
 
 기사 수정
--> 기사 snapshot의 title, summary, source, date 등 표시 데이터 갱신
+-> 기사 snapshot의 title, summary, source, publishedAt 등 표시 데이터 갱신
 
 기사 논리삭제
 -> 해당 articleId를 참조하는 visible=true 최근 본 뉴스 활동 visible=false, status=TARGET_DELETED 처리
@@ -130,8 +135,10 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 -> 해당 articleId를 참조하는 최근 본 뉴스 activity 제거
 
 조회수 변경
--> 기사 snapshot의 viewCount 갱신 필요 신호로 처리
+-> ARTICLE_VIEW_COUNT_CHANGED 이벤트로 처리
+-> worker가 RDB 현재 viewCount를 재조회해 article snapshot의 viewCount를 $set
 
 댓글 작성 또는 삭제
--> 기사 snapshot의 commentCount 갱신 필요 신호로 처리
+-> ARTICLE_COMMENT_COUNT_CHANGED 이벤트로 처리
+-> worker가 RDB 현재 commentCount를 재집계해 article snapshot의 commentCount를 $set
 ```

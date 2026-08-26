@@ -85,7 +85,10 @@ source_version  BIGINT NULL
 ```text
 id
 -> Outbox 이벤트 식별자
--> 별도 event_id 컬럼을 두지 않고 이 값을 멱등성 기준으로 사용한다.
+-> activity_histories 중복 방지를 위한 natural key는 아니다.
+-> activity_histories 쓰기 멱등성은 `userId + type + targetType + targetId` unique index와 atomic upsert로 보장한다.
+-> snapshot 쓰기 멱등성은 commentId, articleId, interestId 같은 대상 ID 기준 upsert로 보장한다.
+-> Outbox id 기준 처리 중복 확인이 필요하면 MongoDB 반영 이력 컬렉션 또는 RDB 처리 로그에 outbox id를 unique하게 기록하는 방식을 별도로 둔다.
 
 event_type
 -> 이벤트 종류
@@ -138,6 +141,9 @@ created_at, updated_at
 ```text
 PENDING 이벤트 또는 next_retry_at이 지난 FAILED 이벤트 조회
 -> created_at ASC 순서로 처리
+-> activity_histories는 natural key 기준 atomic upsert
+-> *_activity_snapshots는 대상 ID 기준 upsert
+-> 수정 가능한 snapshot 값은 오래된 payload로 덮어쓰지 않고 worker 처리 시점의 RDB 현재값을 조회해 반영
 -> MongoDB Read Model 반영 성공 시 PROCESSED
 -> 실패 시 FAILED, retry_count 증가, next_retry_at 설정, last_error 기록
 -> 최대 재시도 횟수 초과 시 DEAD_LETTER로 전환
@@ -184,6 +190,18 @@ worker 조회 조건은 상태와 처리 가능 시각을 기준으로 둔다. p
 ```
 
 초기 구현에서는 `source_version` 없이 Outbox 이벤트를 저장하고, 단일 worker가 `created_at ASC` 기준으로 처리한다.
+
+다만 `source_version`이 없는 동안에도 재시도 중인 이전 이벤트가 최신 snapshot을 덮어쓰면 안 된다. 따라서 댓글 내용, 기사 제목/요약/게시일, 관심사 키워드, count 집계값처럼 나중 이벤트로 변경될 수 있는 snapshot 필드는 event payload의 표시값을 그대로 최종값으로 쓰지 않는다.
+
+```text
+E1 처리 실패
+-> E2 처리 성공
+-> E1 재시도
+```
+
+위 순서가 발생해도 worker는 E1 payload의 오래된 표시값을 덮어쓰지 않고, 처리 시점의 RDB 현재값을 다시 조회해 snapshot에 `$set`한다. 같은 aggregate의 후속 이벤트 보류나 `source_version` guard는 후속 구현에서 엔티티 version 도입이 확정될 때 선택할 수 있는 대안으로 둔다.
+
+`DEAD_LETTER`로 전환된 이벤트를 수동 재처리할 때도 같은 기준을 적용한다. 즉, 재처리 이벤트는 payload에 있던 과거 표시값을 복원하지 않고, RDB 현재값 기준으로 MongoDB Read Model을 수렴시킨다.
 
 ### 대안과 트레이드오프
 

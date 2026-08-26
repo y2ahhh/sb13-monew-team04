@@ -101,7 +101,9 @@ VIEWED_ARTICLES_PATH
 | High Load | 100 VU | 10분 | 병목 발생 여부 확인 |
 | Stress | 50 -> 100 -> 200 -> 400 VU | 각 단계 3~5분 | 성능이 무너지는 지점 확인 |
 
-가능하면 VU 기준 외에 RPS 기준도 함께 측정한다.
+VU 기준 측정과 별도로 RPS 기준 측정을 필수 보강 시나리오로 수행한다.
+
+RPS 기준 측정은 요청 스케줄을 따라가는지 확인하기 위한 시나리오이며, 목표 RPS와 `dropped_iterations=0`을 함께 성공 조건으로 본다.
 
 ```text
 50 req/s
@@ -142,7 +144,7 @@ k6와 애플리케이션, DB에서 아래 지표를 함께 수집한다.
 
 | 구분 | 지표 |
 | --- | --- |
-| k6 | `http_req_duration p95`, `http_req_duration p99`, `http_req_failed`, RPS |
+| k6 | `http_req_duration p95`, `http_req_duration p99`, `http_req_failed`, RPS, `dropped_iterations` |
 | 애플리케이션 | 요청 1건당 SQL 개수, endpoint별 response time, 커넥션 풀 대기 |
 | RDB | 쿼리 실행 시간, 실행 계획, 인덱스 사용 여부, DB CPU, slow query |
 | 비교 판단 | 데이터 규모 증가에 따른 p95/p99 증가율, join 비용, error rate |
@@ -153,6 +155,7 @@ k6와 애플리케이션, DB에서 아래 지표를 함께 수집한다.
 
 ```text
 http_req_failed < 1%
+dropped_iterations = 0
 p95 < 200ms
 p99 < 500ms
 DB CPU 지속 70% 미만
@@ -223,12 +226,12 @@ MongoDB 적용 검토는 RDB 쿼리와 인덱스 최적화를 반영한 뒤에�
 
 성능 측정 결과는 측정 단계, 데이터 규모, 시나리오별로 분리해 기록한다.
 
-| 측정 단계 | 데이터 규모 | 시나리오 | API | p95 | p99 | error rate | RPS | 요청당 SQL | 주요 join | DB CPU | 커넥션 대기 | 판단 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 현재 RDB baseline | 100k seed scale | Smoke | 구독 중인 관심사 조회 |  |  |  |  |  |  |  |  |  |
-| 현재 RDB baseline | 100k seed scale | Smoke | 최근 작성 댓글 조회 |  |  |  |  |  |  |  |  |  |
-| 현재 RDB baseline | 100k seed scale | Smoke | 최근 좋아요한 댓글 조회 |  |  |  |  |  |  |  |  |  |
-| 현재 RDB baseline | 100k seed scale | Smoke | 최근 조회 기사 |  |  |  |  |  |  |  |  |  |
+| 측정 단계 | 데이터 규모 | 시나리오 | API | p95 | p99 | error rate | RPS | dropped iterations | 요청당 SQL | 주요 join | DB CPU | 커넥션 대기 | 판단 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 현재 RDB baseline | 100k seed scale | Smoke | 구독 중인 관심사 조회 |  |  |  |  |  |  |  |  |  |  |
+| 현재 RDB baseline | 100k seed scale | Smoke | 최근 작성 댓글 조회 |  |  |  |  |  |  |  |  |  |  |
+| 현재 RDB baseline | 100k seed scale | Smoke | 최근 좋아요한 댓글 조회 |  |  |  |  |  |  |  |  |  |  |
+| 현재 RDB baseline | 100k seed scale | Smoke | 최근 조회 기사 |  |  |  |  |  |  |  |  |  |  |
 
 인덱스 또는 쿼리 최적화를 반영한 경우에는 아래 표로 개선 폭을 따로 기록한다.
 
@@ -255,6 +258,7 @@ MongoDB 적용 검토는 RDB 쿼리와 인덱스 최적화를 반영한 뒤에�
 - 4개 조회 기능별 k6 시나리오가 정의되어 있다.
 - 논리삭제 사용자/기사/댓글 제외 조건이 많은 데이터에서 필터 비용 측정 기준이 정리되어 있다.
 - p95/p99와 error rate 판단 기준이 정리되어 있다.
+- RPS 기준 측정과 dropped iterations 성공 기준이 정리되어 있다.
 - 요청 1건당 SQL 개수와 join 비용 확인 기준이 정리되어 있다.
 - 현재 RDB 기준 baseline 측정 후 인덱스 후보를 반영하고 재측정하는 기준이 정리되어 있다.
 - MongoDB 적용 대상 선정을 위한 비교표 형식이 정리되어 있다.

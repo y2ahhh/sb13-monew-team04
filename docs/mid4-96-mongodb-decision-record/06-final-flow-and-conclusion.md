@@ -136,6 +136,10 @@ MongoDB 반영은 response 반환 이후 worker가 비동기로 수행하므로,
 
 사용자가 같은 대상에 대해 같은 종류의 활동을 반복하면 activity를 계속 추가하지 않고 `userId + type + targetType + targetId` 기준으로 기존 activity를 upsert한다.
 
+이 upsert 기준은 후속 구현 시 unique index와 atomic upsert로 보장한다. 같은 outbox 이벤트가 재처리되거나 동일 활동 이벤트가 중복 발행되어도 activity는 중복 생성하지 않는다.
+
+댓글 내용, 기사 제목/요약/게시일, 관심사 키워드, count 집계값처럼 나중 이벤트로 바뀔 수 있는 snapshot 필드는 오래된 payload로 덮어쓰지 않고, worker 처리 시점의 RDB 현재값을 조회해 반영한다.
+
 댓글 작성 또는 댓글 좋아요처럼 기사에 종속된 activity는 `parentTargetType=ARTICLE`, `parentTargetId=articleId`를 함께 저장한다. 기사 삭제 또는 비공개 처리 시 이 부모 식별자로 해당 기사에 속한 댓글 activity를 숨김 처리한다.
 
 좋아요 취소, 구독 해제, 사용자/기사/댓글 논리삭제처럼 기존 활동내역에서 더 이상 노출되면 안 되는 이벤트가 발생하면 기존 activity를 삭제하지 않고 `visible=false`로 변경한다.
