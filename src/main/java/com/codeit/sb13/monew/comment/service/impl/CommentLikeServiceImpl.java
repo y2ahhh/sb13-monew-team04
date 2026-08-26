@@ -42,9 +42,9 @@ public class CommentLikeServiceImpl implements CommentLikeService {
 
     log.debug("댓글 좋아요 등록 시작 - 댓글 아이디: {}", commentId);
 
-    Comment comment = commentRepository.findByIdAndDeletedAtIsNull(commentId)
+    Comment comment = commentRepository.findActiveById(commentId)
             .orElseThrow(() -> new CommentNotFoundException(commentId));
-    User likedByUser = userRepository.findById(likedById)
+    User likedByUser = userRepository.findByIdAndDeletedAtIsNull(likedById)
             .orElseThrow(() -> new UserNotFoundException(likedById));
 
     return commentLikeRepository.findWithCommentDetailsByCommentIdAndLikedById(commentId, likedById)
@@ -89,8 +89,9 @@ public class CommentLikeServiceImpl implements CommentLikeService {
 
     log.debug("댓글 좋아요 취소 시작 - 댓글 아이디: {}", commentId);
 
-    commentRepository.findByIdAndDeletedAtIsNull(commentId).orElseThrow(()-> new CommentNotFoundException(commentId));
-    userRepository.findById(requestUserId).orElseThrow(()->new UserNotFoundException(requestUserId));
+    commentRepository.findActiveById(commentId).orElseThrow(()-> new CommentNotFoundException(commentId));
+    userRepository.findByIdAndDeletedAtIsNull(requestUserId)
+        .orElseThrow(()->new UserNotFoundException(requestUserId));
 
     Long deletedCount = commentLikeRepository.deleteByCommentIdAndLikedById(commentId, requestUserId);
     if (deletedCount == 0L) {

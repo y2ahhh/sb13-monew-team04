@@ -44,8 +44,10 @@ public class CommentServiceImpl implements CommentService {
   @Override
   public CommentDto create(CommentRegisterCommand command) { // 서비스 전용객체를 사용
     log.debug("댓글 생성 시작 - 기사 아이디: {}", command.articleId()); // 개인 정보 또는 민감한 정보는 로그에 남기지 않음
-    User user = userRepository.findById(command.userId()).orElseThrow(()->new UserNotFoundException(command.userId()));
-    Article article = articleRepository.findById(command.articleId()).orElseThrow(()->new ArticleNotFoundException(command.articleId()));
+    User user = userRepository.findByIdAndDeletedAtIsNull(command.userId())
+        .orElseThrow(()->new UserNotFoundException(command.userId()));
+    Article article = articleRepository.findByIdAndDeletedAtIsNull(command.articleId())
+        .orElseThrow(()->new ArticleNotFoundException(command.articleId()));
     Comment comment= Comment.builder()
         .article(article).user(user).content(command.content())
         .build();
@@ -114,7 +116,7 @@ public class CommentServiceImpl implements CommentService {
   @Transactional
   @Override
   public CommentDto update(CommentUpdateCommand command) {
-    Comment comment = commentRepository.findByIdAndDeletedAtIsNull(command.commentId())
+    Comment comment = commentRepository.findActiveById(command.commentId())
         .orElseThrow(() -> new CommentNotFoundException(command.commentId()));
 
     if (!comment.getUser().getId().equals(command.requestUserId())) {
