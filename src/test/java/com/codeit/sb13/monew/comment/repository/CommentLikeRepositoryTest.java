@@ -348,11 +348,18 @@ class CommentLikeRepositoryTest {
 
     Comment targetComment = persistComment(article, writer, "target comment");
     Comment otherComment = persistComment(article, writer, "other comment");
-    CommentLike like1 = persistCommentLike(targetComment, liker1);
-    CommentLike like2 = persistCommentLike(targetComment, liker2);
-    CommentLike otherLike = persistCommentLike(otherComment, liker1);
+    persistCommentLike(targetComment, liker1);
+    persistCommentLike(targetComment, liker2);
+    persistCommentLike(otherComment, liker1);
 
+    em.flush(); // 테스트 데이터는 실제 데이터베이스에 반영하고 1차 캐시 제거한다
     em.clear();
+
+    // 삭제 실행 전 fixture 확인
+    Assertions.assertAll(
+        ()->assertThat(commentLikeRepository.countActiveLikesByCommentId(targetComment.getId())).isEqualTo(2L),
+        ()->assertThat(commentLikeRepository.countActiveLikesByCommentId(otherComment.getId())).isEqualTo(1L)
+    );
 
     // when
     Long deletedCount=commentLikeRepository.deleteByCommentId(targetComment.getId());
