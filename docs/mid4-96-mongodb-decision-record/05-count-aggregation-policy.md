@@ -61,9 +61,15 @@ count 이벤트 병합 그룹
 -> 대상 ID 예: commentId, articleId, interestId
 
 처리 성공
+-> snapshot 대상 RDB source row 존재 확인 성공
 -> RDB 현재 count 조회 성공
 -> MongoDB snapshot 대상 ID 기준 upsert 및 현재 count $set 성공
 -> 선택된 그룹 row 전체를 PROCESSED, 동일 processed_at으로 변경
+
+cleanup 이후 stale event
+-> snapshot 대상 RDB source row가 물리삭제되어 없음
+-> MongoDB snapshot upsert를 수행하지 않음
+-> 선택된 그룹 row 전체를 stale event로 보고 PROCESSED 처리
 
 처리 실패
 -> RDB 현재 count 조회 또는 MongoDB snapshot $set 실패
@@ -79,6 +85,8 @@ worker 중단
 ```
 
 병합 그룹의 대표 row만 `PROCESSED`로 바꾸지 않는다. 선택된 그룹 row 전체가 완료 처리되어야 같은 batch에서 이미 반영한 신호가 반복 선택되지 않는다. 또한 MongoDB 반영 전에 그룹 row를 먼저 완료 처리하지 않는다. 반영 실패 시 count 변경 신호가 유실될 수 있기 때문이다.
+
+물리삭제 cleanup 이후 삭제 전 count 이벤트가 재처리될 수 있으므로, count snapshot upsert도 activity와 동일하게 RDB source row 존재 확인을 먼저 수행한다. source row가 없으면 payload만으로 snapshot을 재생성하지 않고, 선택된 병합 그룹 row 전체를 no-op 및 `PROCESSED`로 정리한다.
 
 성공 상태 전이는 그룹 전체에 동일하게 적용하지만, 실패 시 retry 이력은 row별로 보존한다. 같은 그룹 안에 `retry_count=4`인 row와 `retry_count=1`인 row가 있고 `max_retry_count=5`에서 다시 실패하면, 첫 번째 row는 `DEAD_LETTER`로 전환하고 두 번째 row는 `retry_count=2`, `FAILED`, 2회차 기준 `next_retry_at`으로 전환한다.
 
