@@ -17,4 +17,6 @@ public interface CommentService {
   CommentDto update(@Valid CommentUpdateCommand command);
 
   void softDelete(UUID commentId);
+
+  void hardDelete(UUID commentId);
 }
