@@ -45,12 +45,16 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> 
       SELECT CL
       FROM CommentLike CL
       JOIN FETCH CL.comment C
-      JOIN FETCH C.article
-      JOIN FETCH C.user
-      JOIN FETCH CL.likedBy
+      JOIN FETCH C.article A
+      JOIN FETCH C.user U
+      JOIN FETCH CL.likedBy LB
       WHERE C.id = :commentId
           AND CL.likedBy.id = :likedById
-      """)
+          AND C.deletedAt IS NULL
+          AND U.deletedAt IS NULL
+          AND A.deletedAt IS NULL
+          AND LB.deletedAt IS NULL
+      """) // 활성 조건 추가, 논리 삭제된 데이터는 제외
   Optional<CommentLike> findWithCommentDetailsByCommentIdAndLikedById(
       @Param("commentId") UUID commentId,
       @Param("likedById") UUID likedById
