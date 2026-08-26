@@ -153,6 +153,8 @@ created_at, updated_at
 ```text
 PENDING 이벤트 또는 next_retry_at이 지난 FAILED 이벤트 조회
 -> created_at ASC 순서로 처리
+-> activity 또는 snapshot upsert 전에 이벤트가 참조하는 RDB source row 존재 여부 확인
+-> source row가 물리삭제되어 없으면 MongoDB 문서를 생성하지 않고 stale cleanup event로 보고 PROCESSED 처리
 -> activity_histories는 natural key 기준 atomic upsert로 중복 문서 생성 방지
 -> activity 상태 전이는 직렬화된 event_sequence > lastAppliedEventSequence 조건을 만족할 때만 반영
 -> occurredAt은 $max 또는 동등한 단조성 조건으로 갱신
@@ -166,6 +168,10 @@ PENDING 이벤트 또는 next_retry_at이 지난 FAILED 이벤트 조회
 ```
 
 UUID는 순서 기준으로 사용하지 않는다. worker 조회와 처리 시도 순서는 `created_at` 기준으로 두되, activity 상태 반영 가능 여부는 직렬화된 `event_sequence` 기준으로 판단한다. `created_at`은 worker polling 편의를 위한 정렬 기준이지 transaction commit 순서 보장 기준이 아니다. `occurred_at`은 활동 발생 시각과 조회 정렬 기준이지 stale event 방지 기준으로 단독 사용하지 않는다.
+
+물리삭제 cleanup 이후에는 기존 MongoDB activity 또는 snapshot 문서가 제거되어 `lastAppliedEventSequence`도 함께 사라질 수 있다. 이 경우 sequence guard만으로는 삭제 전 `PENDING` 또는 `FAILED` 이벤트의 재처리 upsert를 막을 수 없다. 따라서 worker는 natural key atomic upsert 또는 snapshot upsert 전에 RDB source row 존재 여부를 확인하고, source row가 없으면 payload만으로 activity나 snapshot을 복원하지 않는다. 이 이벤트는 이미 cleanup 이후 도착한 stale event로 보고 `PROCESSED` 처리한다.
+
+후속 구현 검증에는 cleanup 이후 삭제 전 `PENDING` 또는 `FAILED` 이벤트를 재처리해도 해당 activity와 snapshot 문서가 다시 생성되지 않는 시나리오를 포함한다.
 
 count 집계 이벤트를 batch 안에서 병합 처리하는 경우 상태 전이는 outbox row 단위가 아니라 선택된 그룹 row 전체에 적용한다. 그룹 기준은 현재 polling batch에서 선택된 row 중 같은 `event_type`과 같은 snapshot 대상 ID를 가진 row다.
 

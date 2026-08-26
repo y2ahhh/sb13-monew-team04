@@ -621,6 +621,8 @@ INTEREST_SUBSCRIBED + 관심사 비노출
 
 물리삭제 이후에는 복구를 고려하지 않는다. 복구 가능성은 논리삭제 상태에서만 유지한다.
 
+물리삭제 cleanup으로 activity 또는 snapshot 문서가 제거되면 `lastAppliedEventSequence`도 함께 사라질 수 있다. 따라서 물리삭제 이후 지연 이벤트나 재처리 이벤트가 도착했을 때의 재생성 차단 기준은 sequence guard가 아니라 RDB source row 존재 여부다. worker는 upsert 전에 원본 사용자, 기사, 댓글, 관심사 등 필요한 source row가 존재하고 노출 가능한지 확인하며, source row가 없으면 MongoDB 문서를 다시 만들지 않고 no-op 처리한다.
+
 추천 인덱스 예시는 다음과 같다.
 
 ```js

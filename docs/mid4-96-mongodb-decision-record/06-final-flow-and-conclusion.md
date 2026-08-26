@@ -162,6 +162,8 @@ worker는 activity update 시 `lastAppliedEventSequence`가 없거나 현재 이
 
 사용자, 기사, 댓글이 RDB에서 최종 물리삭제되면 MongoDB Read Model에서도 관련 `activity_histories`와 snapshot 문서를 제거한다. 물리삭제 이후에는 복구를 고려하지 않고, 복구 가능성은 논리삭제 상태에서만 유지한다.
 
+물리삭제 cleanup 후에는 제거된 MongoDB 문서의 `lastAppliedEventSequence`도 사라질 수 있으므로, 삭제 전 지연 이벤트 재처리 차단을 sequence guard에만 의존하지 않는다. worker는 activity 또는 snapshot upsert 전에 RDB source row 존재 여부를 확인하고, source row가 없으면 payload만으로 문서를 재생성하지 않는다. cleanup 후 도착한 stale event는 no-op으로 처리하고 outbox row는 `PROCESSED`로 전환할 수 있다.
+
 최종 구조는 다음과 같다.
 
 ```text

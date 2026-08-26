@@ -47,6 +47,8 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 -> targetType=COMMENT, parentTargetType=ARTICLE, parentTargetId=articleId인 activity_histories 문서 제거
 ```
 
+물리삭제 이후에는 복구를 고려하지 않는다. 삭제 전 `PENDING` 또는 재시도 가능한 `FAILED` 이벤트가 나중에 처리되더라도, worker는 activity 또는 snapshot upsert 전에 RDB 현재 상태를 확인한다. source row가 없으면 payload만으로 MongoDB 문서를 재생성하지 않고 no-op 처리한다.
+
 ## 공통 복구 이벤트
 
 대상 복구 이벤트는 activity만 재활성화하지 않는다. 복구 대상과 관련될 수 있는 `status=TARGET_DELETED` activity 후보를 `targetType`, `targetId`, `parentTargetType`, `parentTargetId`로 찾고, RDB 기준 대상과 필요한 부모 대상이 현재 노출 가능한 상태인지 다시 계산한다. 남은 차단 원인이 없으면 대상 snapshot을 RDB 현재 값으로 갱신해 `visible=true`로 복구한 뒤 activity를 `visible=true`, `status=ACTIVE`로 복구한다. 대상이 아직 RDB에서 삭제 또는 비노출 상태이면 activity 재활성화를 하지 않는다. `CANCELED`, `UNSUBSCRIBED`, `USER_DELETED` 상태는 대상 복구 이벤트로 자동 복구하지 않는다.
