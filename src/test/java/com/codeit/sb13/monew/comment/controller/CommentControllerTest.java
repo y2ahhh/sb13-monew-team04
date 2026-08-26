@@ -2,6 +2,7 @@ package com.codeit.sb13.monew.comment.controller;
 
 import static org.mockito.BDDMockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -300,5 +301,18 @@ public class CommentControllerTest {
 
     // then
     then(commentService).should(times(1)).softDelete(commentId);
+  }
+
+  @Test
+  @DisplayName("댓글 물리 삭제 성공 - RED")
+  void 댓글_물리_삭제_성공() throws Exception {
+    // given
+    UUID commentId = UUID.randomUUID();
+    mockMvc.perform(delete("/api/comments/{commentId}/hard", commentId))
+        .andExpect(status().isNoContent())
+        .andExpect(content().string("")); // 응답 비어 있는지 확인
+
+    // then
+    then(commentService).should(times(1)).hardDelete(commentId);
   }
 }
