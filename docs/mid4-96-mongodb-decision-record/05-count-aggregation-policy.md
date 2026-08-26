@@ -15,6 +15,8 @@ MongoDB = 활동내역 조회를 위한 역정규화 Read Model
 
 예를 들어 댓글 내용 수정은 댓글 엔티티의 version으로 순서를 판단할 수 있지만, 댓글 좋아요 수는 좋아요 테이블의 집계 결과이므로 댓글 version만으로 순서를 판단하기 어렵다.
 
+activity 상태 전이는 outbox `event_sequence`와 activity의 `lastAppliedEventSequence` 비교로 보호하지만, 이 기준을 count snapshot 전체에 전역 적용하지는 않는다. count snapshot은 이벤트 payload의 과거 count를 신뢰하지 않고 RDB 현재 집계값을 다시 조회해 수렴시키는 정책을 기본으로 둔다.
+
 따라서 집계값 변경 이벤트는 다음 기준으로 처리한다.
 
 집계 이벤트의 핵심은 이벤트 payload에 들어온 과거 값을 그대로 반영하는 것이 아니라, worker가 처리하는 시점의 RDB 현재값으로 MongoDB snapshot을 수렴시키는 것이다. 따라서 중복 이벤트나 일부 순서 역전이 발생해도 마지막으로 처리된 집계 이벤트는 처리 시점의 현재 집계값을 다시 반영한다.
@@ -104,3 +106,5 @@ ARTICLE_VIEW_COUNT_CHANGED
 다만 현재는 엔티티 version 필드 추가가 먼저 필요하므로 별도 검토 대상으로 둔다.
 
 `likeCount`처럼 다른 테이블을 기준으로 집계하는 값에는 엔티티 `source_version`을 억지로 붙이지 않는다.
+
+`event_sequence`는 activity 상태 전이를 오래된 이벤트 재처리로부터 보호하기 위한 기준이다. 집계값처럼 RDB 현재값을 재조회해 `$set`하는 snapshot 필드의 순서 판단을 `event_sequence` 하나로 대체하지 않는다.

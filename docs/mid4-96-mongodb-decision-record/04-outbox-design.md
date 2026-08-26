@@ -57,6 +57,7 @@ Outbox 저장은 원본 엔티티 변경과 같은 RDB 트랜잭션에 참여해
 outbox_events
 
 id              UUID PK
+event_sequence  BIGINT NOT NULL
 event_type      VARCHAR(80)
 aggregate_type  VARCHAR(50)
 aggregate_id    UUID
@@ -72,13 +73,15 @@ created_at      TIMESTAMP
 updated_at      TIMESTAMP
 ```
 
+`event_sequence`는 outbox 이벤트 간 비교 가능한 단조 증가 값으로 둔다. DB sequence 또는 동등한 단조 증가 전략으로 생성하고, activity 상태 전이의 순서 보호 기준으로 사용한다.
+
 `source_version`은 바로 확정하지 않고 보류 컬럼으로 둔다.
 
 ```text
 source_version  BIGINT NULL
 ```
 
-이 컬럼은 이벤트 순서 역전 방지에는 유용하지만, 사용하려면 댓글, 기사, 관심사 같은 원본 엔티티에 version 필드를 먼저 추가해야 한다. 엔티티 변경 범위와 낙관적 락 예외 처리까지 함께 검토해야 하므로 초기 Outbox 기본 구조에는 포함하지 않는다.
+이 컬럼은 원본 엔티티 snapshot 필드의 순서 역전 방지에는 유용하지만, 사용하려면 댓글, 기사, 관심사 같은 원본 엔티티에 version 필드를 먼저 추가해야 한다. 엔티티 변경 범위와 낙관적 락 예외 처리까지 함께 검토해야 하므로 초기 Outbox 기본 구조에는 포함하지 않는다.
 
 각 컬럼의 의미는 다음과 같다.
 
@@ -86,9 +89,15 @@ source_version  BIGINT NULL
 id
 -> Outbox 이벤트 식별자
 -> activity_histories 중복 방지를 위한 natural key는 아니다.
--> activity_histories 쓰기 멱등성은 `userId + type + targetType + targetId` unique index와 atomic upsert로 보장한다.
+-> activity_histories 중복 문서 방지는 `userId + type + targetType + targetId` unique index와 atomic upsert로 보장한다.
 -> snapshot 쓰기 멱등성은 commentId, articleId, interestId 같은 대상 ID 기준 upsert로 보장한다.
 -> Outbox id 기준 처리 중복 확인이 필요하면 MongoDB 반영 이력 컬렉션 또는 RDB 처리 로그에 outbox id를 unique하게 기록하는 방식을 별도로 둔다.
+
+event_sequence
+-> Outbox 이벤트 간 비교 가능한 단조 증가 값
+-> activity_histories의 visible, status, occurredAt 같은 상태 전이 순서 보호에 사용한다.
+-> MongoDB activity에는 lastAppliedEventSequence로 마지막 반영 값을 저장한다.
+-> source_version처럼 특정 원본 엔티티의 version이 아니라 projection 이벤트 전체의 적용 순서 기준이다.
 
 event_type
 -> 이벤트 종류
@@ -141,15 +150,18 @@ created_at, updated_at
 ```text
 PENDING 이벤트 또는 next_retry_at이 지난 FAILED 이벤트 조회
 -> created_at ASC 순서로 처리
--> activity_histories는 natural key 기준 atomic upsert
+-> activity_histories는 natural key 기준 atomic upsert로 중복 문서 생성 방지
+-> activity 상태 전이는 event_sequence > lastAppliedEventSequence 조건을 만족할 때만 반영
+-> occurredAt은 $max 또는 동등한 단조성 조건으로 갱신
 -> *_activity_snapshots는 대상 ID 기준 upsert
 -> 수정 가능한 snapshot 값은 오래된 payload로 덮어쓰지 않고 worker 처리 시점의 RDB 현재값을 조회해 반영
+-> 오래된 event_sequence 재처리로 MongoDB update가 no-op이면 stale event로 보고 PROCESSED 처리
 -> MongoDB Read Model 반영 성공 시 PROCESSED
 -> 실패 시 FAILED, retry_count 증가, next_retry_at 설정, last_error 기록
 -> 최대 재시도 횟수 초과 시 DEAD_LETTER로 전환
 ```
 
-UUID는 순서 기준으로 사용하지 않는다. 처리 순서는 `created_at` 또는 `occurred_at` 기준으로 둔다.
+UUID는 순서 기준으로 사용하지 않는다. worker 조회와 처리 시도 순서는 `created_at` 기준으로 두되, activity 상태 반영 가능 여부는 `event_sequence` 기준으로 판단한다. `occurred_at`은 활동 발생 시각과 조회 정렬 기준이지 stale event 방지 기준으로 단독 사용하지 않는다.
 
 초기 재시도 정책은 다음과 같이 둔다.
 
@@ -175,6 +187,36 @@ worker 조회 조건은 상태와 처리 가능 시각을 기준으로 둔다. p
 
 여러 worker를 동시에 운영해야 하는 경우에는 같은 이벤트를 여러 worker가 동시에 처리하지 않도록 JPQL/native query 또는 DB lock 전략을 별도로 검토한다.
 
+### Activity 상태 순서 보호 기준
+
+`userId + type + targetType + targetId` natural key와 atomic upsert는 같은 activity 문서가 중복 생성되지 않도록 막는다. 하지만 이전 이벤트가 실패했다가 나중에 재처리되는 경우, natural key만으로는 최신 activity 상태를 오래된 상태로 되돌리는 문제를 막을 수 없다.
+
+```text
+E1: 댓글 좋아요
+E2: 좋아요 취소
+
+E1 처리 실패
+-> E2 처리 성공, activity visible=false, status=CANCELED
+-> E1 재시도
+```
+
+위 순서에서 E1이 단순 upsert로 재처리되면 activity가 다시 `ACTIVE`가 될 수 있다. 따라서 activity 상태 전이는 다음 조건부 update로 보호한다.
+
+```text
+update 조건
+-> natural key 일치
+-> lastAppliedEventSequence가 없거나 lastAppliedEventSequence < 현재 event_sequence
+
+update 내용
+-> visible, status, hiddenByTargetType, hiddenByTargetId 등 상태 필드 갱신
+-> occurredAt은 $max 또는 동등한 단조 조건으로만 갱신
+-> lastAppliedEventSequence = 현재 event_sequence
+```
+
+조건을 만족하지 않는 이벤트는 이미 더 최신 이벤트가 반영된 stale event로 본다. 이 경우 MongoDB update는 no-op이며, outbox row는 재시도 대상이 아니라 처리 완료로 볼 수 있다.
+
+이 기준은 JPA `@Version` 낙관적 락과 유사한 목적을 갖지만, RDB 원본 엔티티의 동시 수정 충돌 제어가 아니라 MongoDB Read Model projection의 오래된 이벤트 재처리 방지 조건이다.
+
 ### Source Version 검토 기준
 
 `source_version`은 원본 엔티티 변경 이벤트가 순서 역전으로 MongoDB snapshot을 잘못 덮어쓰는 문제를 줄이기 위한 값이다.
@@ -189,7 +231,7 @@ worker 조회 조건은 상태와 처리 가능 시각을 기준으로 둔다. p
 - 낙관적 락 예외 처리를 프로젝트 범위에서 감당할 수 있는지
 ```
 
-초기 구현에서는 `source_version` 없이 Outbox 이벤트를 저장하고, 단일 worker가 `created_at ASC` 기준으로 처리한다.
+초기 구현에서는 `source_version` 없이 Outbox 이벤트를 저장하고, 단일 worker가 `created_at ASC` 기준으로 처리한다. 다만 activity 상태 전이는 `source_version`이 아니라 `event_sequence`와 `lastAppliedEventSequence` 비교로 보호한다.
 
 다만 `source_version`이 없는 동안에도 재시도 중인 이전 이벤트가 최신 snapshot을 덮어쓰면 안 된다. 따라서 댓글 내용, 기사 제목/요약/게시일, 관심사 키워드, count 집계값처럼 나중 이벤트로 변경될 수 있는 snapshot 필드는 event payload의 표시값을 그대로 최종값으로 쓰지 않는다.
 
@@ -199,7 +241,7 @@ E1 처리 실패
 -> E1 재시도
 ```
 
-위 순서가 발생해도 worker는 E1 payload의 오래된 표시값을 덮어쓰지 않고, 처리 시점의 RDB 현재값을 다시 조회해 snapshot에 `$set`한다. 같은 aggregate의 후속 이벤트 보류나 `source_version` guard는 후속 구현에서 엔티티 version 도입이 확정될 때 선택할 수 있는 대안으로 둔다.
+위 순서가 발생해도 worker는 E1 payload의 오래된 표시값을 덮어쓰지 않고, 처리 시점의 RDB 현재값을 다시 조회해 snapshot에 `$set`한다. 같은 aggregate의 후속 이벤트 보류나 `source_version` guard는 원본 엔티티 snapshot 필드 보호가 필요하고 엔티티 version 도입이 확정될 때 선택할 수 있는 대안으로 둔다.
 
 `DEAD_LETTER`로 전환된 이벤트를 수동 재처리할 때도 같은 기준을 적용한다. 즉, 재처리 이벤트는 payload에 있던 과거 표시값을 복원하지 않고, RDB 현재값 기준으로 MongoDB Read Model을 수렴시킨다.
 

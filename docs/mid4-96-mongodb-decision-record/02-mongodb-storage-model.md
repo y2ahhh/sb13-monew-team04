@@ -57,6 +57,7 @@ comment_activity_snapshots = 1개
   "occurredAt": "2026-08-15T10:30:00",
   "visible": true,
   "status": "ACTIVE",
+  "lastAppliedEventSequence": 1024,
   "createdAt": "2026-08-15T10:30:00",
   "updatedAt": "2026-08-15T10:30:00"
 }
@@ -103,6 +104,11 @@ status
 -> 기본값 ACTIVE
 -> 예: ACTIVE, CANCELED, UNSUBSCRIBED, TARGET_DELETED, USER_DELETED
 
+lastAppliedEventSequence
+-> 이 activity에 마지막으로 반영된 outbox event_sequence
+-> 오래된 이벤트 재처리가 최신 visible, status, occurredAt를 덮어쓰지 않도록 조건부 update에 사용
+-> 새 activity 생성 시 현재 이벤트의 event_sequence 저장
+
 hiddenByTargetType
 -> status=TARGET_DELETED일 때 숨김을 유발한 대상 종류
 -> 예: COMMENT, ARTICLE, INTEREST
@@ -144,6 +150,8 @@ MongoDB 인덱스에서 숫자는 저장값이 아니라 인덱스 정렬 방향
 ```
 
 후속 구현 시 필수 unique index로 만든다. worker가 같은 outbox 이벤트를 재처리하거나 동일 활동 이벤트가 중복 발행되어도 이 natural key를 기준으로 하나의 activity만 유지한다.
+
+이 인덱스와 atomic upsert는 중복 문서 생성을 막기 위한 장치다. 이벤트 처리 순서 역전까지 보장하지는 않으므로, activity 상태 전이는 `lastAppliedEventSequence` 조건으로 별도 보호한다.
 
 ```js
 { userId: 1, type: 1, visible: 1, occurredAt: -1, _id: -1 }
@@ -210,6 +218,10 @@ userId + type + targetType + targetId
 
 이 조합이 없으면 새로 생성하고, 이미 있으면 기존 activity를 수정한다. MongoDB 쓰기는 find 후 insert/update를 나누지 않고 이 natural key 기준의 atomic upsert로 처리한다.
 
+activity 상태 변경은 natural key만으로 update하지 않는다. worker는 현재 outbox 이벤트의 `event_sequence`가 기존 activity의 `lastAppliedEventSequence`보다 큰 경우에만 `visible`, `status`, `hiddenByTargetType`, `hiddenByTargetId` 같은 상태 필드를 갱신한다. 기존 값이 없거나 더 작은 경우에는 갱신하고, 기존 값이 같거나 더 크면 오래된 재처리 이벤트로 보고 no-op 처리한다.
+
+`occurredAt`은 최신 활동 정렬 기준이므로 역행하지 않게 처리한다. 좋아요, 구독, 기사 조회처럼 활동 시각을 갱신하는 이벤트는 `$max` 또는 동등한 단조성 조건으로만 `occurredAt`을 갱신한다. 취소, 삭제, 비노출, 복구 이벤트도 과거 이벤트가 최신 `occurredAt`을 낮추지 못하게 한다.
+
 예시는 다음과 같다.
 
 ```text
@@ -257,7 +269,8 @@ U1 + INTEREST_SUBSCRIBED + INTEREST + I1
 -> visible=true
 -> status=ACTIVE
 -> hiddenByTargetType, hiddenByTargetId 제거
--> occurredAt 최신화
+-> occurredAt은 기존 값과 이벤트 occurredAt 중 큰 값으로 갱신
+-> lastAppliedEventSequence 갱신
 
 관심사 I1 구독 취소
 -> 기존 INTEREST_SUBSCRIBED + INTEREST + I1
@@ -271,7 +284,8 @@ U1 + INTEREST_SUBSCRIBED + INTEREST + I1
 -> visible=true
 -> status=ACTIVE
 -> hiddenByTargetType, hiddenByTargetId 제거
--> occurredAt 최신화
+-> occurredAt은 기존 값과 이벤트 occurredAt 중 큰 값으로 갱신
+-> lastAppliedEventSequence 갱신
 
 기사 A1 다시 조회
 -> 기존 ARTICLE_VIEWED + ARTICLE + A1
@@ -280,7 +294,8 @@ U1 + INTEREST_SUBSCRIBED + INTEREST + I1
 -> visible=true
 -> status=ACTIVE
 -> hiddenByTargetType, hiddenByTargetId 제거
--> occurredAt 최신화
+-> occurredAt은 기존 값과 이벤트 occurredAt 중 큰 값으로 갱신
+-> lastAppliedEventSequence 갱신
 ```
 
 댓글 수정처럼 활동 자체가 다시 발생한 것이 아니라 대상 표시 정보만 바뀐 경우에는 activity를 새로 만들지 않는다.
@@ -359,6 +374,8 @@ U1 + INTEREST_SUBSCRIBED + INTEREST + I1
 취소/논리삭제/비노출은 기존 activity 숨김
 TARGET_DELETED는 hiddenByTargetType, hiddenByTargetId로 숨김 원인 저장
 복구는 snapshot visible=true 복구와 activity ACTIVE 복구를 함께 처리
+activity 상태 전이는 lastAppliedEventSequence 조건으로 오래된 이벤트 재처리 방지
+occurredAt은 $max 또는 동등한 단조 조건으로 갱신
 물리삭제는 MongoDB Read Model에서도 제거
 수정은 activity가 아니라 snapshot 갱신
 ```

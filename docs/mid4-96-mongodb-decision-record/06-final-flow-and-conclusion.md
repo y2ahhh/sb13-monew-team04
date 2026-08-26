@@ -138,7 +138,13 @@ MongoDB 반영은 response 반환 이후 worker가 비동기로 수행하므로,
 
 이 upsert 기준은 후속 구현 시 unique index와 atomic upsert로 보장한다. 같은 outbox 이벤트가 재처리되거나 동일 활동 이벤트가 중복 발행되어도 activity는 중복 생성하지 않는다.
 
+다만 natural key와 atomic upsert는 중복 문서 방지 계약이지 이벤트 순서 보호 계약은 아니다. activity의 `visible`, `status`, `occurredAt` 같은 상태 전이는 outbox `event_sequence`와 activity의 `lastAppliedEventSequence`를 비교하는 조건부 update로 보호한다.
+
+worker는 activity update 시 `lastAppliedEventSequence`가 없거나 현재 이벤트의 `event_sequence`보다 작은 경우에만 상태 필드를 갱신한다. 더 오래된 이벤트가 재처리되면 MongoDB update는 no-op 처리하고 outbox row는 처리 완료로 볼 수 있다. `occurredAt`은 `$max` 또는 동등한 단조성 조건으로 갱신해 과거 이벤트가 최신 활동 시각을 낮추지 못하게 한다.
+
 댓글 내용, 기사 제목/요약/게시일, 관심사 키워드, count 집계값처럼 나중 이벤트로 바뀔 수 있는 snapshot 필드는 오래된 payload로 덮어쓰지 않고, worker 처리 시점의 RDB 현재값을 조회해 반영한다.
+
+`source_version`은 원본 엔티티 snapshot 필드의 순서 보호 후보로 남긴다. activity 상태 전이 보호는 여러 aggregate 이벤트가 같은 activity key를 갱신할 수 있으므로 `source_version`이 아니라 `event_sequence` 기준을 기본으로 둔다.
 
 댓글 작성 또는 댓글 좋아요처럼 기사에 종속된 activity는 `parentTargetType=ARTICLE`, `parentTargetId=articleId`를 함께 저장한다. 기사 삭제 또는 비공개 처리 시 이 부모 식별자로 해당 기사에 속한 댓글 activity를 숨김 처리한다.
 
@@ -159,8 +165,9 @@ MongoDB 반영은 response 반환 이후 worker가 비동기로 수행하므로,
 ```text
 RDB 원본 데이터
 -> 활동 이벤트 발생
--> outbox_events 저장
--> outbox worker가 activity_histories 및 snapshot 갱신
+-> event_sequence가 포함된 outbox_events 저장
+-> outbox worker가 event_sequence guard로 activity_histories 갱신
+-> snapshot은 대상 ID 기준으로 갱신
 -> 활동내역 API 조회
 -> activity_histories 조회
 -> 대상 snapshot 조회 및 매핑

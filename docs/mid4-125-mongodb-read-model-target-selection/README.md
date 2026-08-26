@@ -100,7 +100,8 @@ MongoDB Read Model을 후속 적용하는 경우 삭제 상태 반영 기준은 
 - 물리삭제: RDB source row 삭제 시 연결된 MongoDB projection과 snapshot도 cleanup 대상에 포함한다.
 - cleanup은 RDB 삭제 정책과 같은 이벤트 또는 배치 기준으로 맞추며, MongoDB 문서만 독립적으로 정리하지 않는다.
 - 지연 이벤트나 재처리 이벤트가 삭제된 projection 또는 snapshot을 재생성하지 않도록 순서 판정과 멱등성 정책을 후속 구현 티켓에서 확정한다.
-- 후속 검토 항목은 `eventId` 중복 처리, aggregate별 `version` 또는 `occurredAt` 비교, 삭제 이벤트 우선순위, tombstone 또는 삭제 처리 기록 보존 기간, retry/dead-letter 정책이다.
+- MID4-96 설계에서는 activity 상태 전이 순서 보호 후보를 outbox `event_sequence`와 activity `lastAppliedEventSequence` 비교로 구체화했다.
+- 후속 검토 항목은 `eventId` 중복 처리, aggregate별 `version`, activity별 `event_sequence` 비교, 삭제 이벤트 우선순위, tombstone 또는 삭제 처리 기록 보존 기간, retry/dead-letter 정책이다.
 
 ## Outbox Payload 기준
 
@@ -109,7 +110,7 @@ MongoDB Read Model을 후속 적용하는 경우 삭제 상태 반영 기준은 
 - 테스트 DB: `TEXT fallback`
 - payload 내부 필드를 DB에서 직접 조회하는 요구가 없으면 JSON path/index는 만들지 않는다.
 - payload는 이벤트 재처리와 projection 갱신에 필요한 최소 정보만 담는 방향으로 검토한다.
-- MongoDB Read Model 적용 시 payload 후보에는 `eventId`, `eventType`, `aggregateType`, `aggregateId`, `occurredAt`, 삭제 여부, 영향 받는 사용자 식별 정보를 포함할 수 있다.
+- MongoDB Read Model 적용 시 outbox 이벤트 후보에는 `eventId`, `eventSequence`, `eventType`, `aggregateType`, `aggregateId`, `occurredAt`, 삭제 여부, 영향 받는 사용자 식별 정보를 포함할 수 있다.
 - 일반 projection 갱신 이벤트의 `activityType`, 활동 record ID, `sourceEntityType`, `sourceEntityId`, 활동 시각, 화면 응답용 대상 데이터 전달 방식은 후속 구현 티켓에서 확정한다.
 - 화면 응답용 대상 데이터를 payload에 직렬화할지, worker가 RDB에서 재조회할지는 이번 티켓에서 결정하지 않는다.
 - 기사/댓글 삭제처럼 여러 사용자 활동에 영향을 줄 수 있는 이벤트는 reverse index 조회 또는 사용자별 이벤트 fan-out 중 어떤 방식을 사용할지 후속 설계에서 결정한다.

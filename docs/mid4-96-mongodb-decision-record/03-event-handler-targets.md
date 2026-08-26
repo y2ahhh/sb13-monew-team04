@@ -16,6 +16,8 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 
 `TARGET_DELETED`로 숨길 때는 어떤 대상의 삭제 또는 비노출 전파로 숨겨졌는지 `hiddenByTargetType`, `hiddenByTargetId`를 함께 저장한다. 대상 복구 이벤트는 `status=TARGET_DELETED`와 `hiddenByTargetType`, `hiddenByTargetId`가 복구된 대상과 일치하는 activity만 복구 후보로 본다.
 
+아래 이벤트별 `visible`, `status`, `occurredAt` 갱신은 Outbox 설계의 `event_sequence` guard를 통과한 경우에만 반영한다. 오래된 이벤트 재처리가 최신 activity 상태를 덮어쓰면 안 된다.
+
 ```text
 사용자 논리삭제 또는 탈퇴
 -> userId=deletedUserId, visible=true인 activity visible=false, status=USER_DELETED 처리
@@ -167,7 +169,7 @@ MongoDB Read Model을 적용하면 RDB 원본 데이터의 변경을 MongoDB 조
 -> 최근 본 뉴스 활동 생성 또는 재활성화
 -> visible=true, status=ACTIVE 처리
 -> hiddenByTargetType, hiddenByTargetId 제거
--> 같은 사용자가 같은 기사를 다시 조회하면 occurredAt을 최신화
+-> 같은 사용자가 같은 기사를 다시 조회하면 occurredAt을 단조 조건으로 최신화
 
 기사 수정
 -> 기사 snapshot의 title, summary, source, publishedAt 등 표시 데이터 갱신
