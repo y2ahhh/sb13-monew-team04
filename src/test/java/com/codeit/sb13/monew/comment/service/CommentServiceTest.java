@@ -374,47 +374,38 @@ public class CommentServiceTest {
   @DisplayName("댓글은 논리 삭제할 수 있다 - GREEN")
   void 댓글_논리_삭제() {
     // given
-    articleUserSetUp();
-
-    Comment comment=Comment.builder()
-        .article(article)
-        .user(user)
-        .content("테스트 댓글")
-        .build();
-    ReflectionTestUtils.setField(comment, "id", UUID.randomUUID());
-    ReflectionTestUtils.setField(comment, "createdAt", createdAt);
-
-    given(commentRepository.findActiveById(comment.getId())).willReturn(Optional.of(comment));
+    UUID commentId = UUID.randomUUID();
+    given(commentRepository.softDeleteIfNotDeleted(eq(commentId), any(LocalDateTime.class)))
+        .willReturn(1);
 
     // when
-    commentService.softDelete(comment.getId());
+    commentService.softDelete(commentId);
 
     // then
-    Assertions.assertAll(
-        () -> assertThat(comment.getDeletedAt()).isNotNull(),
-        ()->then(commentRepository).should(times(1)).findActiveById(comment.getId())
-    );
-    verify(commentRepository, times(1)).findActiveById(comment.getId());
+    then(commentRepository).should(times(1))
+        .softDeleteIfNotDeleted(eq(commentId), any(LocalDateTime.class));
   }
 
   @Test
-  @DisplayName("존재하지 않는 댓글은 논리 삭제 시 예외가 발생한다")
+  @DisplayName("존재하지 않는 댓글은 논리 삭제 시 404 예외가 발생한다")
   void 존재하지_않는_댓글_논리_삭제_실패() {
     // given
     UUID commentId = UUID.randomUUID();
-    given(commentRepository.findActiveById(commentId)).willReturn(Optional.empty());
+    given(commentRepository.softDeleteIfNotDeleted(eq(commentId), any(LocalDateTime.class)))
+        .willReturn(0);
 
     // when
     assertThatThrownBy(() -> commentService.softDelete(commentId)).isInstanceOf(CommentNotFoundException.class);
 
     // then
-    then(commentRepository).should(times(1)).findActiveById(commentId);
+    then(commentRepository).should(times(1))
+        .softDeleteIfNotDeleted(eq(commentId), any(LocalDateTime.class));
         
   }
 
 
   @Test
-  @DisplayName("댓글 물리 삭제 성공 - RED")
+  @DisplayName("댓글은 물리 삭제할 수 있다 - GREEN")
   void 댓글_물리_삭제() {
     articleUserSetUp();
 
@@ -426,7 +417,7 @@ public class CommentServiceTest {
     ReflectionTestUtils.setField(comment, "id", UUID.randomUUID());
     ReflectionTestUtils.setField(comment, "createdAt", createdAt);
 
-    given(commentRepository.existsById(comment.getId())).willReturn(true);
+    given(commentRepository.findForHardDeleteById(comment.getId())).willReturn(Optional.of(comment));
 
     // when
     commentService.hardDelete(comment.getId());
@@ -434,6 +425,6 @@ public class CommentServiceTest {
     // then
     InOrder inOrder = inOrder(commentRepository, commentLikeRepository);
     inOrder.verify(commentLikeRepository).deleteByCommentId(comment.getId());
-    inOrder.verify(commentRepository).deleteById(comment.getId());
+    inOrder.verify(commentRepository).delete(comment);
   }
 }
