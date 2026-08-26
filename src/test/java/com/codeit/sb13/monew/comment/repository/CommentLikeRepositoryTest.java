@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,9 @@ class CommentLikeRepositoryTest {
 
   @Autowired
   private CommentLikeRepository commentLikeRepository;
+
+  @Autowired
+  private CommentRepository commentRepository;
 
   @Autowired
   private TestEntityManager em;
@@ -308,6 +312,8 @@ class CommentLikeRepositoryTest {
   }
 
 
+
+
   @Test
   @DisplayName("활성되어 있는 사용자의 좋아요만 집계하고 likedByMe 여부를 확인한다")
   void countActiveLikesAndExistsActiveLike_excludeSoftDeletedLiker() {
@@ -327,5 +333,37 @@ class CommentLikeRepositoryTest {
         comment.getId(), activeLiker.getId())).isTrue();
     assertThat(commentLikeRepository.existsActiveByCommentIdAndLikedById(
         comment.getId(), deletedLiker.getId())).isFalse();
+  }
+
+
+
+  @Test
+  @DisplayName("댓글 물리 삭제 시 해당 ID에 해당하는 모든 좋아요 삭제한다 - RED")
+  void deleteByCommentId_deletesOnlyTargetCommentLikes() {
+    // given
+    User writer = persistUser("writer");
+    User liker1 = persistUser("liker1");
+    User liker2 = persistUser("liker2");
+    Article article = persistArticle("article");
+
+    Comment targetComment = persistComment(article, writer, "target comment");
+    Comment otherComment = persistComment(article, writer, "other comment");
+    CommentLike like1 = persistCommentLike(targetComment, liker1);
+    CommentLike like2 = persistCommentLike(targetComment, liker2);
+    CommentLike otherLike = persistCommentLike(otherComment, liker1);
+
+    em.clear();
+
+    // when
+    Long deletedCount=commentLikeRepository.deleteByCommentId(targetComment.getId());
+    em.flush();
+    em.clear();
+
+    // then
+    Assertions.assertAll(
+        ()->assertThat(deletedCount).isEqualTo(2L),
+        ()->assertThat(commentLikeRepository.countActiveLikesByCommentId(targetComment.getId())).isEqualTo(0L),
+        ()->assertThat(commentLikeRepository.countActiveLikesByCommentId(otherComment.getId())).isEqualTo(1L)
+    );
   }
 }
