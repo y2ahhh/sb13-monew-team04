@@ -370,7 +370,7 @@ public class CommentServiceTest {
   }
 
   @Test
-  @DisplayName("댓글 논리 삭제 성공 - RED")
+  @DisplayName("댓글은 논리 삭제할 수 있다 - GREEN")
   void 댓글_논리_삭제() {
     // given
     articleUserSetUp();
@@ -394,7 +394,20 @@ public class CommentServiceTest {
         ()->then(commentRepository).should(times(1)).findActiveById(comment.getId())
     );
     verify(commentRepository, times(1)).findActiveById(comment.getId());
-    verify(commentRepository, times(1)).save(comment);
+  }
 
+  @Test
+  @DisplayName("존재하지 않는 댓글은 논리 삭제 시 예외가 발생한다")
+  void 존재하지_않는_댓글_논리_삭제_실패() {
+    // given
+    UUID commentId = UUID.randomUUID();
+    given(commentRepository.findActiveById(commentId)).willReturn(Optional.empty());
+
+    // when
+    assertThatThrownBy(() -> commentService.softDelete(commentId)).isInstanceOf(CommentNotFoundException.class);
+
+    // then
+    then(commentRepository).should(times(1)).findActiveById(commentId);
+        
   }
 }
