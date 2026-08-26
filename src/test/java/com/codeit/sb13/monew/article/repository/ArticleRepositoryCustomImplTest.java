@@ -75,7 +75,7 @@ class ArticleRepositoryCustomImplTest {
     private List<ArticleSearchRow> search(ArticleSearchCondition condition) {
         em.flush();
         em.clear();
-        return articleRepository.search(condition);
+        return articleRepository.search(condition).rows();
     }
 
     private ArticleSearchCondition condition(String keyword, List<ArticleSource> sourceIn,

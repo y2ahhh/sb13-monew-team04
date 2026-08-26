@@ -1,6 +1,7 @@
 package com.codeit.sb13.monew.article.service;
 
 import com.codeit.sb13.monew.article.repository.dto.ArticleSearchCondition;
+import com.codeit.sb13.monew.article.repository.dto.ArticleSearchPage;
 import com.codeit.sb13.monew.article.repository.dto.ArticleSearchRow;
 import com.codeit.sb13.monew.article.s3.service.dto.ArticleBackupItem;
 import com.codeit.sb13.monew.article.service.dto.ArticleDto;
@@ -15,6 +16,7 @@ import com.codeit.sb13.monew.article.service.dto.ArticleSearchCommand;
 import com.codeit.sb13.monew.article.service.impl.ArticleServiceImpl;
 import com.codeit.sb13.monew.comment.repository.CommentLikeRepository;
 import com.codeit.sb13.monew.comment.repository.CommentRepository;
+import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
 import com.codeit.sb13.monew.global.exception.ApiErrorCode;
 import com.codeit.sb13.monew.global.exception.article.ArticleBackupDateInvalidException;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
@@ -361,7 +363,8 @@ class ArticleServiceTest {
                 30,
                 userId
         );
-        when(articleRepository.search(any(ArticleSearchCondition.class))).thenReturn(List.of());
+        when(articleRepository.search(any(ArticleSearchCondition.class)))
+                .thenReturn(new ArticleSearchPage(List.of(), false, 0L));
 
         // when
         articleService.searchArticles(command);
@@ -397,18 +400,33 @@ class ArticleServiceTest {
 
         Article article = Article.create("제목", "요약", "https://example.com/1",
                 LocalDateTime.now(), ArticleSource.NAVER);
+        // 다음 커서는 마지막 행의 id와 createdAt에서 뽑는다. 영속화되지 않은 엔티티는
+        // @GeneratedValue와 @CreatedDate가 채워지지 않아 둘 다 null이므로 직접 넣어준다.
+        UUID lastArticleId = UUID.randomUUID();
+        LocalDateTime lastCreatedAt = LocalDateTime.of(2026, 8, 20, 9, 0);
+        ReflectionTestUtils.setField(article, "id", lastArticleId);
+        ReflectionTestUtils.setField(article, "createdAt", lastCreatedAt);
+
         ArticleSearchRow row = new ArticleSearchRow(article, 3L, 5L, true);
         ArticleDto dto = new ArticleDto(UUID.randomUUID(), ArticleSource.NAVER,
                 "https://example.com/1", "제목", LocalDateTime.now(), "요약", 3L, 5L, true);
 
-        when(articleRepository.search(any(ArticleSearchCondition.class))).thenReturn(List.of(row));
+        when(articleRepository.search(any(ArticleSearchCondition.class)))
+                .thenReturn(new ArticleSearchPage(List.of(row), true, 42L));
         when(articleMapper.toDto(article, true, 3L, 5L)).thenReturn(dto);
 
         // when
-        List<ArticleDto> result = articleService.searchArticles(command);
+        CursorPageResponseDto<ArticleDto> result = articleService.searchArticles(command);
 
         // then
-        assertThat(result).containsExactly(dto);
+        assertThat(result.content()).containsExactly(dto);
+        assertThat(result.size()).isEqualTo(1);
+        assertThat(result.totalElements()).isEqualTo(42L);
+        assertThat(result.hasNext()).isTrue();
+        // publishDate 정렬이므로 nextCursor는 발행일이어야 한다.
+        assertThat(result.nextCursor()).isEqualTo(article.getDate().toString());
+        assertThat(result.nextAfter()).isEqualTo(lastCreatedAt.toString());
+        assertThat(result.nextIdAfter()).isEqualTo(lastArticleId.toString());
         verify(articleMapper).toDto(article, true, 3L, 5L);
     }
 
@@ -420,7 +438,8 @@ class ArticleServiceTest {
         ArticleSearchCommand command = new ArticleSearchCommand(
                 null, null, null, null,
                 ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, null, 50, userId);
-        when(articleRepository.search(any(ArticleSearchCondition.class))).thenReturn(List.of());
+        when(articleRepository.search(any(ArticleSearchCondition.class)))
+                .thenReturn(new ArticleSearchPage(List.of(), false, 0L));
 
         // when
         articleService.searchArticles(command);

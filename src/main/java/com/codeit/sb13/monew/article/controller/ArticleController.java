@@ -11,6 +11,7 @@ import com.codeit.sb13.monew.article.service.dto.ArticleDto;
 import com.codeit.sb13.monew.article.service.dto.ArticleSearchCommand;
 import com.codeit.sb13.monew.article.service.dto.ArticleViewDto;
 import com.codeit.sb13.monew.global.MonewHttpHeaders;
+import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
 import com.codeit.sb13.monew.global.exception.article.ArticleSearchConditionInvalidException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +40,7 @@ public class ArticleController implements ArticleApi {
 
     @Override
     @GetMapping
-    public ResponseEntity<List<ArticleDto>> getArticles(
+    public ResponseEntity<CursorPageResponseDto<ArticleDto>> getArticles(
             @ModelAttribute ArticleSearchRequest request,
             @RequestHeader(MonewHttpHeaders.REQUEST_USER_ID) UUID requestUserId
     ) {

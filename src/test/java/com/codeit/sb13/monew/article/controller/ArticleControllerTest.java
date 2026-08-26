@@ -10,6 +10,7 @@ import com.codeit.sb13.monew.article.service.ArticleService;
 import com.codeit.sb13.monew.article.service.dto.ArticleOrderBy;
 import com.codeit.sb13.monew.article.service.dto.ArticleSearchCommand;
 import com.codeit.sb13.monew.article.service.dto.ArticleViewDto;
+import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
 import com.codeit.sb13.monew.global.exception.article.ArticleRestoreFailedException;
 import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
 import com.codeit.sb13.monew.global.exception.article.ArticleViewConflictException;
@@ -262,11 +263,13 @@ class ArticleControllerTest {
     }
 
     @Test
-    @DisplayName("목록 조회 성공 시 200과 ArticleDto 배열을 반환한다")
+    @DisplayName("목록 조회 성공 시 200과 커서 페이지 응답을 반환한다")
     void getArticlesSuccess() throws Exception {
         // given
         when(articleService.searchArticles(any(ArticleSearchCommand.class)))
-                .thenReturn(List.of(articleDto));
+                .thenReturn(new CursorPageResponseDto<>(
+                        List.of(articleDto), "2026-08-20T12:00", "2026-08-20T09:00",
+                        articleId.toString(), 1, 42L, true));
 
         // when & then
         mockMvc.perform(get("/api/articles")
@@ -275,13 +278,18 @@ class ArticleControllerTest {
                         .param("direction", "DESC")
                         .param("limit", "50"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(articleId.toString()))
-                .andExpect(jsonPath("$[0].source").value("NAVER"))
-                .andExpect(jsonPath("$[0].title").value("Test Article"))
-                .andExpect(jsonPath("$[0].viewCount").value(7))
-                .andExpect(jsonPath("$[0].commentCount").value(0))
-                .andExpect(jsonPath("$[0].viewedByMe").value(true));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(articleId.toString()))
+                .andExpect(jsonPath("$.content[0].source").value("NAVER"))
+                .andExpect(jsonPath("$.content[0].title").value("Test Article"))
+                .andExpect(jsonPath("$.content[0].viewCount").value(7))
+                .andExpect(jsonPath("$.content[0].commentCount").value(0))
+                .andExpect(jsonPath("$.content[0].viewedByMe").value(true))
+                .andExpect(jsonPath("$.nextCursor").value("2026-08-20T12:00"))
+                .andExpect(jsonPath("$.nextIdAfter").value(articleId.toString()))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(42))
+                .andExpect(jsonPath("$.hasNext").value(true));
     }
 
     @Test
@@ -289,7 +297,8 @@ class ArticleControllerTest {
     void getArticlesBindsQueryParameters() throws Exception {
         // given
         when(articleService.searchArticles(any(ArticleSearchCommand.class)))
-                .thenReturn(List.of());
+                .thenReturn(new CursorPageResponseDto<>(
+                        List.of(), null, null, null, 0, 0L, false));
 
         // when
         mockMvc.perform(get("/api/articles")
