@@ -16,8 +16,8 @@ MID4-134는 10m seed scale에서 `20 rps`, `1m` 조건을 통과했지만 최대
 - 측정 시간: 각 단계 `1m`
 - VU 설정: `preAllocatedVUs=500`, `maxVUs=500`
 - measured RPS: k6 `handleSummary`가 저장한 `http_reqs.rate` 기준
-- 성공 판단: `error rate < 1%`, `dropped iterations = 0`, `p95 <= 1000 ms`, `p99 <= 2000 ms`
-- p95/p99 threshold는 activity-history k6 script의 기본 threshold와 동일하게 둔다.
+- 성공 판단: `error rate < 1%`, `checks rate > 99%`, `dropped iterations = 0`, `p95 < 1000 ms`, `p99 < 2000 ms`
+- p95/p99/checks threshold는 activity-history k6 script의 기본 threshold와 동일하게 둔다.
 
 10m seed의 실제 측정 시점 row count는 다음과 같다.
 
@@ -43,18 +43,18 @@ MID4-134는 10m seed scale에서 `20 rps`, `1m` 조건을 통과했지만 최대
 
 따라서 최대 요청량은 평균 응답 시간만으로 확정하지 않고, k6의 실제 도착률, VU 사용량, dropped iterations, p95/p99, DB 부하를 함께 확인한다.
 
-결과 표의 `measured RPS`는 k6 summary의 `http_reqs.rate` 값을 그대로 기록한 것이다. k6가 집계한 전체 실행 구간 기준 Counter rate이므로 `requests / 60초`로 계산한 값과 다를 수 있다. 요청량 판단은 `target rate`, `dropped iterations`, p95/p99 threshold를 함께 본다.
+결과 표의 `measured RPS`는 k6 summary의 `http_reqs.rate` 값을 그대로 기록한 것이다. k6가 집계한 전체 실행 구간 기준 Counter rate이므로 `requests / 60초`로 계산한 값과 다를 수 있다. 요청량 판단은 `target rate`, `checks rate`, `dropped iterations`, p95/p99 threshold를 함께 본다.
 
 ## 결과
 
-| target rate | requests | measured RPS | dropped iterations | error rate | avg | p95 | p99 | 판단 |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 50 rps | 3,001 | 53.31 | 0 | 0.00% | 19.86 ms | 24.98 ms | 29.29 ms | pass |
-| 100 rps | 6,001 | 106.60 | 0 | 0.00% | 19.49 ms | 25.11 ms | 29.38 ms | pass |
-| 150 rps | 9,001 | 160.13 | 0 | 0.00% | 20.54 ms | 25.76 ms | 31.19 ms | pass |
-| 200 rps | 12,001 | 213.38 | 0 | 0.00% | 21.97 ms | 32.20 ms | 88.07 ms | pass |
-| 250 rps | 13,563 | 233.66 | 1,438 | 0.00% | 1813.86 ms | 2515.98 ms | 2683.07 ms | dropped/threshold fail |
-| 300 rps | 14,158 | 243.99 | 3,842 | 0.00% | 1918.65 ms | 2406.79 ms | 2557.73 ms | dropped/threshold fail |
+| target rate | requests | measured RPS | dropped iterations | error rate | checks rate | avg | p95 | p99 | 판단 |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 50 rps | 3,001 | 53.31 | 0 | 0.00% | 100.00% | 19.86 ms | 24.98 ms | 29.29 ms | pass |
+| 100 rps | 6,001 | 106.60 | 0 | 0.00% | 100.00% | 19.49 ms | 25.11 ms | 29.38 ms | pass |
+| 150 rps | 9,001 | 160.13 | 0 | 0.00% | 100.00% | 20.54 ms | 25.76 ms | 31.19 ms | pass |
+| 200 rps | 12,001 | 213.38 | 0 | 0.00% | 100.00% | 21.97 ms | 32.20 ms | 88.07 ms | pass |
+| 250 rps | 13,563 | 233.66 | 1,438 | 0.00% | 100.00% | 1813.86 ms | 2515.98 ms | 2683.07 ms | dropped/threshold fail |
+| 300 rps | 14,158 | 243.99 | 3,842 | 0.00% | 100.00% | 1918.65 ms | 2406.79 ms | 2557.73 ms | dropped/threshold fail |
 
 ## DB 부하
 
