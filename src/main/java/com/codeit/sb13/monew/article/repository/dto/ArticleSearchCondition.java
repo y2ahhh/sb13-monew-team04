@@ -18,7 +18,8 @@ import java.util.UUID;
  * @param direction 정렬 방향
  * @param cursor 이전 페이지 마지막 항목의 정렬 기준 값. 첫 페이지면 {@code null}
  * @param after 이전 페이지 마지막 항목의 생성 시각(보조 커서). 첫 페이지면 {@code null}
- * @param idAfter 이전 페이지 마지막 항목의 id(3차 커서). 첫 페이지면 {@code null}
+ * @param idAfter 이전 페이지 마지막 항목의 id(3차 커서, 선택값). 첫 페이지이거나
+ *                클라이언트가 보내지 않으면 {@code null}
  * @param limit 조회할 최대 개수
  */
 public record ArticleSearchCondition(

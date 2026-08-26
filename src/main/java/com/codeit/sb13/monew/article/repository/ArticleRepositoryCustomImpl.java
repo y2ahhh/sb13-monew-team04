@@ -124,6 +124,11 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
      *
      * <p>id는 UUID라 크고 작음에 비즈니스적 의미는 없지만 항상 유일하므로, 정렬 기준과
      * 생성 시각이 모두 같은 기사가 페이지 경계에 걸려도 건너뛰거나 중복으로 반환되지 않는다.
+     *
+     * <p>다만 {@code idAfter}는 선택값이다. 생략되면 (정렬 기준, 생성 시각) 2단으로만
+     * 비교한다. {@code createdAt}은 나노초 정밀도라 두 기사가 완전히 같은 값을 갖는
+     * 경우가 사실상 없어 2단만으로도 정상 동작하고, {@code idAfter}는 그 희박한
+     * 동률까지 막는 안전망 역할만 한다.
      */
     private BooleanExpression keysetCondition(
             ArticleSearchCondition condition,
@@ -134,15 +139,18 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
         LocalDateTime after = condition.after();
         UUID idAfter = condition.idAfter();
 
-        // 세 값은 하나의 단위다. 일부만 오면 첫 페이지를 다시 돌려주게 되어
+        // cursor와 after는 하나의 단위다. 한쪽만 오면 첫 페이지를 다시 돌려주게 되어
         // 클라이언트가 같은 항목을 두 번 받는다. 조용히 넘기지 않고 거부한다.
+        // idAfter는 동률 타이브레이커라 선택값이다. 제공된 프론트엔드는 응답의
+        // nextIdAfter를 읽지 않고 cursor/after만 되돌려보내므로 필수로 요구하면
+        // 두 번째 페이지 요청이 전부 400이 된다.
         boolean noneProvided = !StringUtils.hasText(cursor) && after == null && idAfter == null;
         if (noneProvided) {
             return null;
         }
-        if (!StringUtils.hasText(cursor) || after == null || idAfter == null) {
+        if (!StringUtils.hasText(cursor) || after == null) {
             throw new ArticleSearchConditionInvalidException(
-                    "cursor, after, idAfter는 함께 전달해야 합니다.");
+                    "cursor와 after는 함께 전달해야 합니다.");
         }
 
         boolean ascending = condition.direction().isAscending();
@@ -178,12 +186,15 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
     ) {
         BooleanExpression createdAtAdvances =
                 ascending ? article.createdAt.gt(after) : article.createdAt.lt(after);
+
+        BooleanExpression keyset = primaryAdvances.or(primaryEq.and(createdAtAdvances));
+        if (idAfter == null) {
+            return keyset;
+        }
+
         BooleanExpression idAdvances =
                 ascending ? article.id.gt(idAfter) : article.id.lt(idAfter);
-
-        return primaryAdvances
-                .or(primaryEq.and(createdAtAdvances))
-                .or(primaryEq.and(article.createdAt.eq(after)).and(idAdvances));
+        return keyset.or(primaryEq.and(article.createdAt.eq(after)).and(idAdvances));
     }
 
     private LocalDateTime parseCursorAsDateTime(String cursor) {

@@ -484,6 +484,22 @@ class ArticleRepositoryCustomImplTest {
     }
 
     @Test
+    @DisplayName("idAfter 없이 cursor와 after만으로도 다음 페이지를 가져온다")
+    void cursorPagingWorksWithoutIdAfter() {
+        Article older = persistArticle("기사1", "요약", D1, ArticleSource.NAVER);
+        Article newer = persistArticle("기사2", "요약", D2, ArticleSource.CHOSUN);
+
+        ArticleSearchPage page = articleRepository.search(
+                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
+                        newer.getDate().toString(), newer.getCreatedAt(), null, 10));
+
+        assertThat(page.rows()).hasSize(1);
+        assertThat(page.rows().get(0).article().getId()).isEqualTo(older.getId());
+        // 커서 조건 없이 세는 값이라 전체 2건이 그대로 나와야 한다.
+        assertThat(page.totalElements()).isEqualTo(2L);
+    }
+
+    @Test
     @DisplayName("viewCount 정렬에서도 커서로 페이지를 끝까지 넘길 수 있다")
     void cursorPagingWorksForViewCountOrdering() {
         User u1 = persistUser();
