@@ -289,4 +289,16 @@ public class CommentControllerTest {
     then(commentService).shouldHaveNoInteractions();
   }
 
+
+  @Test
+  @DisplayName("댓글 논리 삭제 성공 - RED")
+  void 댓글_논리_삭제_성공() throws Exception {
+    // given
+    UUID commentId = UUID.randomUUID();
+    mockMvc.perform(delete("/api/comments/{commentId}", commentId))
+        .andExpect(status().isNoContent());
+
+    // then
+    then(commentService).should(times(1)).softDelete(commentId);
+  }
 }
