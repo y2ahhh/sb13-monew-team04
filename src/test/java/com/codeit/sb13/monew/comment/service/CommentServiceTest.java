@@ -34,6 +34,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -409,5 +410,30 @@ public class CommentServiceTest {
     // then
     then(commentRepository).should(times(1)).findActiveById(commentId);
         
+  }
+
+
+  @Test
+  @DisplayName("댓글 물리 삭제 성공 - RED")
+  void 댓글_물리_삭제() {
+    articleUserSetUp();
+
+    Comment comment=Comment.builder()
+        .article(article)
+        .user(user)
+        .content("테스트 댓글")
+        .build();
+    ReflectionTestUtils.setField(comment, "id", UUID.randomUUID());
+    ReflectionTestUtils.setField(comment, "createdAt", createdAt);
+
+    given(commentRepository.existsById(comment.getId())).willReturn(true);
+
+    // when
+    commentService.hardDelete(comment.getId());
+
+    // then
+    InOrder inOrder = inOrder(commentRepository, commentLikeRepository);
+    inOrder.verify(commentLikeRepository).deleteByCommentId(comment.getId());
+    inOrder.verify(commentRepository).deleteById(comment.getId());
   }
 }
