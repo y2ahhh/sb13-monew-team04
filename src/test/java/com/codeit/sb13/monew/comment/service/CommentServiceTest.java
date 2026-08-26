@@ -27,6 +27,7 @@ import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
@@ -58,19 +59,32 @@ public class CommentServiceTest {
   @InjectMocks
   private CommentServiceImpl commentService;
 
-  @Test
-  @DisplayName("댓글 생성 성공 - GREEN")
-  void 댓글_생성_성공() {
-    // given
-    Article article = Article.create("기사 제목", "기사 요약", "https://test.com/article",
-        LocalDateTime.now(), ArticleSource.NAVER);
-    User user = User.builder()
+  private Article article;
+  private User user;
+  private LocalDateTime createdAt = LocalDateTime.of(2024, 6, 1, 12, 0);
+
+  void articleUserSetUp() {
+    article = Article.create(
+        "기사 제목",
+        "기사 요약",
+        "https://test.com/article",
+        createdAt,
+        ArticleSource.NAVER);
+    user = User.builder()
         .email("test@test.com")
         .nickname("테스트 사용자")
         .password("Abcd!")
         .build();
     ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
     ReflectionTestUtils.setField(article, "id", UUID.randomUUID());
+
+  }
+
+  @Test
+  @DisplayName("댓글 생성 성공 - GREEN")
+  void 댓글_생성_성공() {
+    // given
+    articleUserSetUp();
     UUID commentId = UUID.randomUUID();
 
     CommentRegisterCommand command=new CommentRegisterCommand(article.getId(), user.getId(), "테스트 댓글");
@@ -110,7 +124,6 @@ public class CommentServiceTest {
     UUID requestUserId = UUID.randomUUID();
     UUID commentId = UUID.randomUUID();
     UUID writerId = UUID.randomUUID();
-    LocalDateTime createdAt = LocalDateTime.of(2024, 6, 1, 12, 0);
 
     CommentSearchCommand command=new CommentSearchCommand(articleId, CommentOrderBy.CREATED_AT,
         Direction.DESC, null, null, null, 50, requestUserId);
@@ -201,7 +214,6 @@ public class CommentServiceTest {
     UUID requestUserId = UUID.randomUUID();
     UUID commentId = UUID.randomUUID();
     UUID writerId = UUID.randomUUID();
-    LocalDateTime createdAt = LocalDateTime.of(2024, 6, 1, 12, 0);
 
     CommentSearchCommand command=new CommentSearchCommand(articleId, CommentOrderBy.LIKE_COUNT,
         Direction.ASC, null, null, null, 50, requestUserId);
@@ -264,19 +276,8 @@ public class CommentServiceTest {
   @DisplayName("댓글 작성자가 댓글 내용을 수정하면 수정된 댓글 정보를 반환한다 - GREEN")
   void 댓글_수정_성공 () {
     // given
-    LocalDateTime createdAt = LocalDateTime.of(2024, 6, 1, 12, 0);
-    User user = User.builder()
-        .email("test@test.com")
-        .nickname("테스트 사용자")
-        .password("Abcd!")
-        .build();
-    Article article = Article.create("기사 제목",
-        "기사 요약",
-        "https://test.com/article",
-        createdAt,
-        ArticleSource.NAVER);
-    ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
-    ReflectionTestUtils.setField(article, "id", UUID.randomUUID());
+
+    articleUserSetUp();
     Comment comment=Comment.builder()
         .article(article)
         .user(user)
@@ -366,5 +367,34 @@ public class CommentServiceTest {
         .isInstanceOf(InvalidCommentException.class);
     assertThatThrownBy(() -> comment.changeContent("a".repeat(501)))
         .isInstanceOf(InvalidCommentException.class);
+  }
+
+  @Test
+  @DisplayName("댓글 논리 삭제 성공 - RED")
+  void 댓글_논리_삭제() {
+    // given
+    articleUserSetUp();
+
+    Comment comment=Comment.builder()
+        .article(article)
+        .user(user)
+        .content("테스트 댓글")
+        .build();
+    ReflectionTestUtils.setField(comment, "id", UUID.randomUUID());
+    ReflectionTestUtils.setField(comment, "createdAt", createdAt);
+
+    given(commentRepository.findActiveById(comment.getId())).willReturn(Optional.of(comment));
+
+    // when
+    commentService.softDelete(comment.getId());
+
+    // then
+    Assertions.assertAll(
+        () -> assertThat(comment.getDeletedAt()).isNotNull(),
+        ()->then(commentRepository).should(times(1)).findActiveById(comment.getId())
+    );
+    verify(commentRepository, times(1)).findActiveById(comment.getId());
+    verify(commentRepository, times(1)).save(comment);
+
   }
 }
