@@ -465,4 +465,58 @@ class ArticleControllerTest {
 
         verify(articleService, never()).softDelete(any(UUID.class));
     }
+
+
+    @Test
+    @DisplayName("목록 조회 시 orderBy가 없으면 400과 ART_016을 반환한다")
+    void getArticlesWithoutOrderBy() throws Exception {
+        mockMvc.perform(get("/api/articles")
+                        .header(REQUEST_USER_ID, userId)
+                        .param("direction", "DESC")
+                        .param("limit", "50"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ART_016"));
+
+        verify(articleService, never()).searchArticles(any());
+    }
+
+    @Test
+    @DisplayName("목록 조회 시 direction이 없으면 400과 ART_016을 반환한다")
+    void getArticlesWithoutDirection() throws Exception {
+        mockMvc.perform(get("/api/articles")
+                        .header(REQUEST_USER_ID, userId)
+                        .param("orderBy", "publishDate")
+                        .param("limit", "50"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ART_016"));
+
+        verify(articleService, never()).searchArticles(any());
+    }
+
+    @Test
+    @DisplayName("목록 조회 시 limit이 1 미만이면 400과 ART_016을 반환한다")
+    void getArticlesWithInvalidLimit() throws Exception {
+        mockMvc.perform(get("/api/articles")
+                        .header(REQUEST_USER_ID, userId)
+                        .param("orderBy", "publishDate")
+                        .param("direction", "DESC")
+                        .param("limit", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ART_016"));
+
+        verify(articleService, never()).searchArticles(any());
+    }
+
+    @Test
+    @DisplayName("목록 조회 시 정의되지 않은 orderBy 값은 400을 반환한다")
+    void getArticlesWithUnknownOrderBy() throws Exception {
+        mockMvc.perform(get("/api/articles")
+                        .header(REQUEST_USER_ID, userId)
+                        .param("orderBy", "randomField")
+                        .param("direction", "DESC")
+                        .param("limit", "50"))
+                .andExpect(status().isBadRequest());
+
+        verify(articleService, never()).searchArticles(any());
+    }
 }
