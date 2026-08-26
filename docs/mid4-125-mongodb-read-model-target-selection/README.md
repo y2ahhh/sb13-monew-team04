@@ -13,6 +13,8 @@ MID4-132 RDB baseline, MID4-133 인덱스 최적화, MID4-134 최적화 후 재�
 | MID4-132 | [RDB baseline](../mid4-132-activity-history-rdb-baseline/README.md) | RDB 최적화 전 10m scale API 실패와 SQL 병목 후보 |
 | MID4-133 | RDB 인덱스 migration | 활동내역 read-path 인덱스 반영 |
 | MID4-134 | [RDB optimized remeasure](../mid4-134-rdb-optimized-remeasure/README.md) | RDB 최적화 후 API/SQL 재측정 결과 |
+| MID4-179 | [RDB throughput limit](../mid4-179-rdb-throughput-limit/README.md) | RDB 최적화 후 최대 요청량과 실패 구간 측정 |
+| MID4-96 | [MongoDB/Redis 적용 판단 기록](../mid4-96-mongodb-decision-record/README.md) | MongoDB 사전 설계와 후순위 결정 근거 |
 
 ## 측정 기준
 
@@ -118,7 +120,7 @@ Redis는 영구 저장소가 아니므로 활동내역 Read Model 저장소로 �
 
 ## MID4-96 연결
 
-MID4-96의 MongoDB/Redis 적용 여부 판단에는 이 문서를 근거로 연결한다. 현재 MID4-125 결론은 MongoDB `후순위`, Redis `미적용`이며, Outbox payload 타입은 DB별 JSON 계열 타입과 테스트 DB fallback 기준만 남긴다. MongoDB 환경구성은 MID4-96 또는 별도 후속 티켓에서 `적용` 결론이 확정된 뒤 진행한다.
+MID4-96의 MongoDB/Redis 적용 여부 판단에는 이 문서, [MID4-179 RDB 최대 요청량 측정](../mid4-179-rdb-throughput-limit/README.md), [MongoDB/Redis 적용 판단 기록](../mid4-96-mongodb-decision-record/README.md)을 근거로 연결한다. 현재 MID4-125 결론은 MongoDB `후순위`, Redis `미적용`이며, Outbox payload 타입은 DB별 JSON 계열 타입과 테스트 DB fallback 기준만 남긴다. MongoDB 환경구성은 MID4-96 또는 별도 후속 티켓에서 `적용` 결론이 확정된 뒤 진행한다.
 
 ## 완료 조건 대응
 
