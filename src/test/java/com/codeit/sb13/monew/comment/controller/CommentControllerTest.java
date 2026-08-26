@@ -254,7 +254,7 @@ public class CommentControllerTest {
 
 
   @Test
-  @DisplayName("댓글 정보 수정 성공 - RED")
+  @DisplayName("댓글 정보 수정 성공 - GREEN")
   void 댓글_수정_성공() throws Exception {
     UUID commentId = UUID.randomUUID();
     UUID requestUserId = UUID.randomUUID();
@@ -276,4 +276,17 @@ public class CommentControllerTest {
         .andExpect(jsonPath("$.likeCount").value(2))
         .andExpect(jsonPath("$.likedByMe").value(true));
   }
+
+  @Test
+  @DisplayName("빈 댓글 내용으로 수정을 시도하면 실패한다")
+  void 빈_댓글_내용_수정_실패() throws Exception {
+    mockMvc.perform(patch("/api/comments/{commentId}", UUID.randomUUID())
+            .header("Monew-Request-User-ID", UUID.randomUUID())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"content\":\" \"}"))
+        .andExpect(status().isBadRequest());
+
+    then(commentService).shouldHaveNoInteractions();
+  }
+
 }
