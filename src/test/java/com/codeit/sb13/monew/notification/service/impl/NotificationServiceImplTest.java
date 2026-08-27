@@ -276,7 +276,7 @@ class NotificationServiceImplTest {
             assertThat(notification1.isConfirmed()).isTrue();
             assertThat(notification2.isConfirmed()).isTrue();
 
-            verify(notificationRepository).saveAll(notifications);
+            verify(notificationRepository).confirmAllByUserId(eq(userId), any(LocalDateTime.class));
             assertThat(result).hasSize(2);
         }
 
@@ -399,7 +399,7 @@ class NotificationServiceImplTest {
         @DisplayName("확인 처리된 지 7일 경과한 알림을 삭제하고, 삭제 기준 시각으로 '지금으로부터 7일 전'을 넘긴다.")
         void 만료된_확인_알림_삭제() {
             // given
-            when(notificationRepository.deleteConfirmedBefore(any(LocalDateTime.class))).thenReturn(3L);
+            when(notificationRepository.deleteConfirmedBefore(any(LocalDateTime.class))).thenReturn(3);
 
             // when
             notificationServiceImpl.deleteConfirmedNotification();
@@ -417,7 +417,7 @@ class NotificationServiceImplTest {
         @DisplayName("삭제 건수가 0이어도 예외 없이 정상 종료된다.")
         void 삭제_건수_0이어도_정상_종료() {
             // given
-            when(notificationRepository.deleteConfirmedBefore(any(LocalDateTime.class))).thenReturn(0L);
+            when(notificationRepository.deleteConfirmedBefore(any(LocalDateTime.class))).thenReturn(0);
 
             // when & then
             notificationServiceImpl.deleteConfirmedNotification();
