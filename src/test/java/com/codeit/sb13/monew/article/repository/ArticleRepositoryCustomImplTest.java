@@ -496,6 +496,48 @@ class ArticleRepositoryCustomImplTest {
     }
 
     @Test
+    @DisplayName("cursor에 id가 없고 idAfter도 오지 않으면 예외를 던진다")
+    void cursorWithoutIdIsRejected() {
+        Article article = persistArticle("기사", "요약", D1, ArticleSource.NAVER);
+
+        // 3차 기준이 없으면 정렬 기준 값과 생성 시각이 같은 기사를 건너뛰게 된다.
+        assertThatThrownBy(() -> articleRepository.search(
+                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
+                        D1.toString(), article.getCreatedAt(), null, 10)))
+                .isInstanceOf(ArticleSearchConditionInvalidException.class);
+    }
+
+    @Test
+    @DisplayName("cursor에 실려 온 id가 UUID 형식이 아니면 예외를 던진다")
+    void cursorWithMalformedIdIsRejected() {
+        Article article = persistArticle("기사", "요약", D1, ArticleSource.NAVER);
+
+        assertThatThrownBy(() -> articleRepository.search(
+                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
+                        D1 + ArticleSearchCondition.CURSOR_DELIMITER + "not-a-uuid",
+                        article.getCreatedAt(), null, 10)))
+                .isInstanceOf(ArticleSearchConditionInvalidException.class);
+    }
+
+    @Test
+    @DisplayName("idAfter 파라미터가 오면 cursor에 id가 없어도 그 값을 3차 기준으로 쓴다")
+    void idAfterParameterTakesPrecedence() {
+        Article older = persistArticle("기사1", "요약", D1, ArticleSource.NAVER);
+        persistArticle("기사2", "요약", D2, ArticleSource.CHOSUN);
+
+        ArticleSearchPage first = firstPage(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, 1);
+        Article last = first.rows().get(0).article();
+
+        // 구형 클라이언트처럼 정렬 기준 값만 담은 커서 + idAfter 파라미터를 보낸다.
+        ArticleSearchPage second = articleRepository.search(
+                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
+                        last.getDate().toString(), last.getCreatedAt(), last.getId(), 10));
+
+        assertThat(second.rows()).hasSize(1);
+        assertThat(second.rows().get(0).article().getId()).isEqualTo(older.getId());
+    }
+
+    @Test
     @DisplayName("cursor에 id가 실려 오면 idAfter 파라미터 없이도 다음 페이지를 가져온다")
     void cursorCarriesIdWhenIdAfterIsAbsent() {
         Article older = persistArticle("기사1", "요약", D1, ArticleSource.NAVER);

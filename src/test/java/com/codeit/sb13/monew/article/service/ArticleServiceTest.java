@@ -455,6 +455,37 @@ class ArticleServiceTest {
     }
 
     @Test
+    @DisplayName("목록 조회 - viewCount 정렬이면 nextCursor는 조회수와 id로 만든다")
+    void testSearchArticlesBuildsCountCursor() {
+        // given
+        UUID userId = UUID.randomUUID();
+        ArticleSearchCommand command = new ArticleSearchCommand(
+                null, null, null, null,
+                ArticleOrderBy.VIEW_COUNT, Sort.Direction.DESC, null, null, null, 50, userId);
+
+        Article article = Article.create("제목", "요약", "https://example.com/1",
+                LocalDateTime.now(), ArticleSource.NAVER);
+        UUID lastArticleId = UUID.randomUUID();
+        ReflectionTestUtils.setField(article, "id", lastArticleId);
+        ReflectionTestUtils.setField(article, "createdAt", LocalDateTime.of(2026, 8, 20, 9, 0));
+
+        ArticleSearchRow row = new ArticleSearchRow(article, 3L, 5L, true);
+        ArticleDto dto = new ArticleDto(UUID.randomUUID(), ArticleSource.NAVER,
+                "https://example.com/1", "제목", LocalDateTime.now(), "요약", 3L, 5L, true);
+
+        when(articleRepository.search(any(ArticleSearchCondition.class)))
+                .thenReturn(new ArticleSearchPage(List.of(row), false, 1L));
+        when(articleMapper.toDto(article, true, 3L, 5L)).thenReturn(dto);
+
+        // when
+        CursorPageResponseDto<ArticleDto> result = articleService.searchArticles(command);
+
+        // then
+        assertThat(result.nextCursor())
+                .isEqualTo("5" + ArticleSearchCondition.CURSOR_DELIMITER + lastArticleId);
+    }
+
+    @Test
     @DisplayName("목록 조회 - 요청자 검증을 리포지토리 조회보다 먼저 수행한다")
     void testSearchArticlesValidatesUserFirst() {
         // given
