@@ -108,8 +108,11 @@ public interface CommentApi {
   @Parameter(name = "commentId", description = "댓글 ID", required = true)
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "댓글 논리 삭제 성공"),
-      @ApiResponse(responseCode = "404", description = "댓글 정보를 찾을 수 없음"),
-      @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+      @ApiResponse(responseCode = "404", description = "댓글 정보를 찾을 수 없음",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(responseCode = "500", description = "서버 내부 오류",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))
+      )
   })
   ResponseEntity<Void> softDeleteComment(
       @PathVariable UUID commentId
@@ -121,8 +124,10 @@ public interface CommentApi {
   @Parameter(name = "commentId", description = "댓글 ID", required = true)
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "댓글 물리 삭제 성공"),
-      @ApiResponse(responseCode = "404", description = "댓글 정보를 찾을 수 없음"),
-      @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+      @ApiResponse(responseCode = "404", description = "댓글 정보를 찾을 수 없음",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(responseCode = "500", description = "서버 내부 오류",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
   })
   ResponseEntity<Void> hardDeleteComment(
       @PathVariable UUID commentId
