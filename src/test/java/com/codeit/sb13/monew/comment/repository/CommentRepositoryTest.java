@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Sort.Direction;
 
+import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
@@ -438,6 +439,31 @@ class CommentRepositoryTest {
     }
 
     @Test
+    @DisplayName("articleId 없이도 cursor anchor를 기준으로 다음 페이지를 조회한다")
+    void search_uses_cursor_anchor_when_article_id_is_absent() {
+        User writer = userRepository.saveAndFlush(new User(
+            "cursor-without-article-writer@email.com", "작성자", "testPassword?"));
+        Article firstArticle = articleRepository.saveAndFlush(
+            createArticle("첫 번째 기사", "기사 내용", "cursor-without-article-link-1"));
+        Article secondArticle = articleRepository.saveAndFlush(
+            createArticle("두 번째 기사", "기사 내용", "cursor-without-article-link-2"));
+        Comment anchor = commentRepository.saveAndFlush(new Comment(firstArticle, writer, "첫 번째 댓글"));
+        Comment next = commentRepository.saveAndFlush(new Comment(secondArticle, writer, "두 번째 댓글"));
+        LocalDateTime anchorCreatedAt = LocalDateTime.of(2026, 8, 25, 12, 0);
+        updateCommentCreatedAt(anchor.getId(), anchorCreatedAt);
+        updateCommentCreatedAt(next.getId(), anchorCreatedAt.plusMinutes(1));
+        em.clear();
+
+        CommentSearchResult result = commentRepository.search(new CommentSearchCondition(
+            null, CommentOrderBy.CREATED_AT, Direction.ASC,
+            anchor.getId().toString(), null, 10, null));
+
+        assertThat(result.rows())
+            .extracting(CommentSearchProjection::id)
+            .containsExactly(next.getId());
+    }
+
+    @Test
     @DisplayName("생성일 내림차순 커서로 다음 페이지를 조회한다")
     void search_next_page_by_created_at_desc_cursor() {
         User requestUser = userRepository.saveAndFlush(new User("request-desc@email.com", "요청자", "testPassword!"));
@@ -668,13 +694,29 @@ class CommentRepositoryTest {
         Comment comment = commentRepository.saveAndFlush(new Comment(article, writer, "댓글"));
         em.clear();
 
-        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> commentRepository.search(
+        assertThat(catchThrowable(() -> commentRepository.search(
             new CommentSearchCondition(article.getId(), CommentOrderBy.CREATED_AT, Direction.ASC,
                 "invalid-date", LocalDateTime.now(), 10, null))))
             .isInstanceOf(CommentSearchConditionInvalidException.class);
-        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> commentRepository.search(
+        assertThat(catchThrowable(() -> commentRepository.search(
             new CommentSearchCondition(article.getId(), CommentOrderBy.LIKE_COUNT, Direction.ASC,
                 "invalid-like-count", LocalDateTime.now(), 10, null))))
+            .isInstanceOf(CommentSearchConditionInvalidException.class);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 UUID cursor라면 목록 조회에 실패한다")
+    void search_fails_when_cursor_anchor_does_not_exist() {
+        User writer = userRepository.saveAndFlush(new User(
+            "missing-cursor-writer@email.com", "작성자", "testPassword?"));
+        Article article = articleRepository.saveAndFlush(
+            createArticle("테스트 기사", "테스트 기사 내용", "missing-cursor-link"));
+        commentRepository.saveAndFlush(new Comment(article, writer, "댓글"));
+        em.clear();
+
+        assertThat(catchThrowable(() -> commentRepository.search(
+            new CommentSearchCondition(article.getId(), CommentOrderBy.CREATED_AT, Direction.ASC,
+                UUID.randomUUID().toString(), null, 10, null))))
             .isInstanceOf(CommentSearchConditionInvalidException.class);
     }
 
