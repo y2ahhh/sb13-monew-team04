@@ -91,15 +91,19 @@ VIEWED_ARTICLES_PATH
 
 ## k6 시나리오
 
-후속 보강 시나리오에서는 단일 활동내역 API인 `GET /api/user-activities/{userId}`를 같은 부하 단계로 측정한다.
+MID4-206 보강 시나리오에서는 단일 활동내역 API인 `GET /api/user-activities/{userId}`를 같은 부하 단계로 측정한다.
 
-| 시나리오 | 부하 | 시간 | 목적 |
-| --- | --- | --- | --- |
-| Smoke | 1~5 VU | 1분 | 인증, endpoint, 응답 검증 확인 |
-| Baseline | 10~20 VU | 3~5분 | 기본 응답 시간과 SQL 비용 확인 |
-| Average Load | 50 VU | 10분 | 일반 부하에서 p95/p99 확인 |
-| High Load | 100 VU | 10분 | 병목 발생 여부 확인 |
-| Stress | 50 -> 100 -> 200 -> 400 VU | 각 단계 3~5분 | 성능이 무너지는 지점 확인 |
+| 시나리오 | k6 값 | 부하 | 시간 | 목적 |
+| --- | --- | --- | --- | --- |
+| Smoke | `smoke` | 1~5 VU | 1분 | 인증, endpoint, 응답 검증 확인 |
+| Baseline | `baseline` | 10~20 VU | 3~5분 | 기본 응답 시간과 SQL 비용 확인 |
+| Average Load | `average` | 50 VU | 10분 | 일반 부하에서 p95/p99 확인 |
+| High Load | `high-load` | 100 VU | 10분 | 병목 발생 여부 확인 |
+| Stress | `stress` | 50 -> 100 -> 200 -> 400 VU | 각 단계 3~5분 | 성능이 무너지는 지점 확인 |
+
+MID4-206 구현 기본값은 위 범위 안의 대표값으로 둔다. 기본값은 Smoke 1 VU 1분, Baseline 20 VU 5분, Average Load 50 VU 10분, High Load 100 VU 10분, Stress 각 단계 3분이다.
+
+VU 기준 시나리오는 iteration 사이에 `K6_SLEEP_SECONDS`를 적용한다. 기본값은 1초이며, 최대 반복 부하를 확인할 때는 0으로 조정한다.
 
 VU 기준 측정과 별도로 RPS 기준 측정을 필수 보강 시나리오로 수행한다.
 
@@ -108,14 +112,20 @@ RPS 기준 측정은 요청 스케줄을 따라가는지 확인하기 위한 시
 ```text
 50 req/s
 100 req/s
+150 req/s
 200 req/s
+250 req/s
 ```
+
+RPS 기준 측정은 MID4-206의 `throughput` 시나리오로 실행하며, `K6_SLEEP_SECONDS`를 적용하지 않는다. 기존 MID4-179 결과에서 `baseline`이 RPS 측정 의미로 사용된 기록이 있으나, MID4-206 기준 `baseline`은 VU 기반 기본 비교이고 `throughput`이 RPS 기반 보강 측정이다.
 
 RPS 기준 측정은 `GET /api/user-activities/{userId}` composite API에만 적용한다. 별도 endpoint 또는 query-level 계측이 없으면 구독 관심사, 최근 댓글, 좋아요 댓글, 조회 기사별 RPS와 p95/p99를 결과로 기록하지 않는다.
 
 ## 요청 구성
 
-대표 사용자 ID 순환은 후속 보강 k6 시나리오에서 검토한다. 현재 측정 근거는 `00000001-0000-4000-8000-000000000001` 단일 target user 기준이다.
+MID4-206에서 `K6_TARGET_USER_IDS`와 `K6_USER_PICK_STRATEGY`로 대표 사용자 ID 순환을 지원한다. 사용자 목록을 지정하지 않으면 `00000001-0000-4000-8000-000000000001` 단일 target user 기준으로 측정한다.
+
+`K6_VARIANT=rdb|mongo`는 결과 파일과 summary를 구분하기 위한 메타데이터다. 실제 RDB/MongoDB 전환은 애플리케이션 실행 설정 또는 배포 상태에서 맞춘 뒤 같은 k6 조건을 각각 실행한다.
 
 ```text
 user-empty
@@ -155,6 +165,7 @@ k6와 애플리케이션, DB에서 아래 지표를 함께 수집한다.
 
 ```text
 http_req_failed < 1%
+checks rate > 99%
 dropped_iterations = 0
 p95 < 200ms
 p99 < 500ms
@@ -180,7 +191,7 @@ MID4-179에서 수행한 k6 측정은 MongoDB Read Model을 바로 적용하지 
 - MongoDB Read Model 구현 전후 동일 조건 비교는 수행하지 않았다.
 ```
 
-따라서 현재 문서에서는 k6 부족분을 한계로 명시하고, multi-user, fan-out worst-case, 장시간 soak, 반복 측정, read/write 혼합 부하 검증은 별도 Jira 티켓에서 보강한다.
+MID4-206에서는 위 한계 중 multi-user 요청 분포, VU 단계별 부하, RPS 보강 시나리오, RDB/MongoDB 결과 구분용 메타데이터를 먼저 보강했다. 다만 fan-out worst-case, 장시간 soak, 같은 조건 반복 측정, read/write 혼합 부하 검증은 아직 별도 Jira 티켓에서 다룰 후속 범위다.
 
 ## 제외 조건 필터 비용 측정
 
