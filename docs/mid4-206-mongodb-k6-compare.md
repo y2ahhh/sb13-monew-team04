@@ -103,7 +103,8 @@ DB CPU와 커넥션 풀 대기는 가능한 경우 함께 기록한다. 수집 �
 - 대상 사용자는 기본 사용자 `00000001-0000-4000-8000-000000000001`이다.
 - smoke는 단일 사용자와 2명 round-robin 사용자 분포를 모두 확인했다.
 - 측정은 로컬 dev 애플리케이션과 Docker Postgres 기준이다.
-- 추가 측정은 160~190 rps 경계값, 주요 시나리오 총 5회 반복, 100 rps 30분 soak 기준으로 수행했다.
+- 추가 측정은 160~190 rps 경계값, 주요 시나리오 총 5회 반복, 100 rps 30분 soak, 150 rps 30분 soak, 190 rps 5분 경계 기준으로 수행했다.
+- 장시간 부하에서는 dev profile의 Hibernate SQL DEBUG 로그가 결과를 왜곡할 수 있어 `org.hibernate.SQL`과 `org.hibernate.orm.jdbc.batch` 로그 레벨을 `warn`으로 낮춘 뒤 150 rps 30분 soak와 190 rps 5분 경계 측정을 재수행했다.
 - raw k6 로그와 summary JSON은 `scripts/performance/activity-history/k6/results/mid4-206-mongodb-k6-compare/`에 저장되며 Git에는 포함하지 않는다.
 - MongoDB Read Model 구현은 이번 작업 범위가 아니므로 실제 MongoDB 부하 측정은 수행하지 않았다.
 
@@ -140,6 +141,7 @@ DB CPU와 커넥션 풀 대기는 가능한 경우 함께 기록한다. 수집 �
 | rdb | throughput | 170 rps | 1m | 10,200 | 169.65 | 24.83ms | 40.84ms | 0.00% | 100.00% | 0 | 56.43% | N/A | active 1, idle 10, idle in transaction 1 | 통과 |
 | rdb | throughput | 180 rps | 1m | 10,801 | 179.64 | 31.78ms | 58.70ms | 0.00% | 100.00% | 0 | 61.86% | N/A | active 1, idle 10, idle in transaction 1 | 통과 |
 | rdb | throughput | 190 rps | 1m | 11,401 | 189.63 | 70.80ms | 321.32ms | 0.00% | 100.00% | 0 | 68.67% | N/A | active 2, idle 9, idle in transaction 1 | 단기 경계 통과, DB CPU 70% 근접 |
+| rdb | throughput | 190 rps | 5m | 57,000 | 190.70 | 32.81ms | 42.47ms | 0.01% | 99.99% | 0 | 57.62% | N/A | active 1, idle 9, idle in transaction 2 | 5분 경계 통과, dial i/o timeout 7건 관찰 |
 | rdb | throughput | 200 rps | 1m | 10,967 | 178.96 | 3,198.98ms | 3,361.01ms | 0.00% | 100.00% | 1,034 | 56.29% | N/A | active 1, idle 8, idle in transaction 3 | 실패, VU 부족 및 지연/dropped 기준 초과 |
 | rdb | throughput | 250 rps | 1m | 12,734 | 202.58 | 2,737.13ms | 3,027.10ms | 0.00% | 100.00% | 2,266 | 86.68% | N/A | active 1, idle 11 | 실패, VU 부족 및 지연/dropped 기준 초과 |
 
@@ -148,8 +150,9 @@ DB CPU와 커넥션 풀 대기는 가능한 경우 함께 기록한다. 수집 �
 | variant | scenario | rate | duration | requests | RPS | p95 | p99 | error rate | checks rate | dropped iterations | Postgres CPU | MongoDB CPU | 커넥션 대기 | 판단 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | rdb | throughput-soak | 100 rps | 30m | 180,000 | 100.14 | 26.71ms | 31.04ms | 0.04% | 99.96% | 0 | 28.65% | N/A | active 1, idle 11 | 수치 기준 통과, timeout 경고 80건 관찰 |
+| rdb | throughput-soak | 150 rps | 30m | 270,001 | 150.50 | 28.40ms | 35.13ms | 0.07% | 99.93% | 0 | 38.73% | N/A | active 2, idle 10 | 수치 기준 통과, dial i/o timeout 183건 관찰 |
 
-이번 RDB 기준에서는 VU 시나리오가 high-load까지 성공 기준을 만족했다. stress에서는 400 VU ramp 구간에서 p95/p99가 임시 성공 기준을 초과하고 timeout 경고가 발생했다. RPS 기준 1분 측정은 190 rps까지 통과했지만 DB CPU가 70%에 근접하고 p99가 321.32ms까지 상승했다. 200 rps부터는 k6가 최대 500 VU에 도달하면서 `dropped_iterations`가 발생했다. 반복 안정 구간은 150 rps, 단기 경계 통과 구간은 190 rps로 본다.
+이번 RDB 기준에서는 VU 시나리오가 high-load까지 성공 기준을 만족했다. stress에서는 400 VU ramp 구간에서 p95/p99가 임시 성공 기준을 초과하고 timeout 경고가 발생했다. RPS 기준 1분 측정은 190 rps까지 통과했지만 DB CPU가 70%에 근접하고 p99가 321.32ms까지 상승했다. 장시간 재측정에서는 150 rps 30분과 190 rps 5분이 수치 기준을 통과했지만, 두 실행 모두 `dial: i/o timeout` 경고가 일부 관찰됐다. 200 rps부터는 k6가 최대 500 VU에 도달하면서 `dropped_iterations`가 발생했다. 반복 안정 구간은 150 rps, 5분 경계 통과 구간은 190 rps로 본다.
 
 ## 완료 확인
 
@@ -162,5 +165,8 @@ DB CPU와 커넥션 풀 대기는 가능한 경우 함께 기록한다. 수집 �
 - [x] RDB 기준 160~190 rps 경계값 측정을 완료했다.
 - [x] RDB 기준 baseline, average, high-load, 150 rps를 총 5회 샘플로 반복 측정했다.
 - [x] RDB 기준 100 rps 30분 soak 측정을 완료했다.
+- [x] RDB 기준 SQL DEBUG 로그를 낮춘 조건에서 150 rps 30분 soak 측정을 완료했다.
+- [x] RDB 기준 SQL DEBUG 로그를 낮춘 조건에서 190 rps 5분 경계 측정을 완료했다.
+- [x] 신규 실행 raw 로그의 timeout warning을 간단 확인했다.
 
 MongoDB 실제 비교 측정은 MongoDB Read Model 구현과 애플리케이션 전환 설정이 준비된 뒤 같은 시나리오로 반복한다.

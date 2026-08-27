@@ -237,7 +237,7 @@ MongoDB 적용 검토는 RDB 쿼리와 인덱스 최적화를 반영한 뒤에�
 
 성능 측정 결과는 측정 단계, 데이터 규모, 시나리오별로 분리해 기록한다. API p95/p99와 RPS는 `GET /api/user-activities/{userId}` composite API 기준으로만 기록한다.
 
-MID4-206에서 2026-08-27 기준 10m seed scale 데이터를 새로 적재하고 smoke 워밍업을 포함해 RDB 기준 k6 측정을 완료했다. 추가로 160~190 rps 경계값, 주요 시나리오 총 5회 반복, 100 rps 30분 soak를 측정했다. 상세 실행 로그와 summary 파일명은 [MID4-206 MongoDB 적용 대비 k6 비교 테스트 보강](../mid4-206-mongodb-k6-compare.md)에 기록한다.
+MID4-206에서 2026-08-27 기준 10m seed scale 데이터를 새로 적재하고 smoke 워밍업을 포함해 RDB 기준 k6 측정을 완료했다. 추가로 160~190 rps 경계값, 주요 시나리오 총 5회 반복, 100 rps 30분 soak, 150 rps 30분 soak, 190 rps 5분 경계 측정을 수행했다. 상세 실행 로그와 summary 파일명은 [MID4-206 MongoDB 적용 대비 k6 비교 테스트 보강](../mid4-206-mongodb-k6-compare.md)에 기록한다.
 
 | 측정 단계 | 데이터 규모 | 시나리오 | API | p95 | p99 | error rate | RPS | dropped iterations | 요청당 SQL | 주요 join | DB CPU | 커넥션 대기 | 판단 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -248,8 +248,10 @@ MID4-206에서 2026-08-27 기준 10m seed scale 데이터를 새로 적재하고
 | 현재 RDB baseline | 10m seed scale | Stress, 50 -> 100 -> 200 -> 400 VU | GET /api/user-activities/{userId} | 1,361.57ms | 1,595.57ms | 0.01% | 103.03 | 0 | 미계측 | composite API 내부 조회 | 2.38% | active 1, idle 11 | 지연 기준 초과 |
 | 현재 RDB baseline | 10m seed scale | Throughput, 150 rps, 총 5회 | GET /api/user-activities/{userId} | 평균 35.09ms | 평균 47.56ms | 최대 0.00% | 평균 150.12 | 0 | 미계측 | composite API 내부 조회 | 최대 52.89% | active/idle 위주 | 반복 안정 통과 |
 | 현재 RDB baseline | 10m seed scale | Throughput, 190 rps | GET /api/user-activities/{userId} | 70.80ms | 321.32ms | 0.00% | 189.63 | 0 | 미계측 | composite API 내부 조회 | 68.67% | active 2, idle 9, idle in transaction 1 | 단기 경계 통과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 190 rps, 5분 | GET /api/user-activities/{userId} | 32.81ms | 42.47ms | 0.01% | 190.70 | 0 | 미계측 | composite API 내부 조회 | 57.62% | active 1, idle 9, idle in transaction 2 | 경계 통과, dial i/o timeout 경고 7건 관찰 |
 | 현재 RDB baseline | 10m seed scale | Throughput, 200 rps | GET /api/user-activities/{userId} | 3,198.98ms | 3,361.01ms | 0.00% | 178.96 | 1,034 | 미계측 | composite API 내부 조회 | 56.29% | active 1, idle 8, idle in transaction 3 | 지연/dropped 기준 초과 |
 | 현재 RDB baseline | 10m seed scale | Throughput Soak, 100 rps, 30분 | GET /api/user-activities/{userId} | 26.71ms | 31.04ms | 0.04% | 100.14 | 0 | 미계측 | composite API 내부 조회 | 28.65% | active 1, idle 11 | 수치 기준 통과, timeout 경고 관찰 |
+| 현재 RDB baseline | 10m seed scale | Throughput Soak, 150 rps, 30분 | GET /api/user-activities/{userId} | 28.40ms | 35.13ms | 0.07% | 150.50 | 0 | 미계측 | composite API 내부 조회 | 38.73% | active 2, idle 10 | 수치 기준 통과, dial i/o timeout 경고 183건 관찰 |
 
 인덱스 또는 쿼리 최적화를 반영한 경우에는 SQL/query별 개선 폭을 따로 기록한다.
 
