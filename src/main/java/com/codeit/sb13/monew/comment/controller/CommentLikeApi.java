@@ -54,7 +54,7 @@ public interface CommentLikeApi {
 
   @Operation(
       summary = "댓글 좋아요 취소",
-      description = "사용자가 특정 댓글에 좋아요를 취소하는 기능입니다."
+      description = "사용자가 특정 댓글에 좋아요를 취소합니다."
   )
   @ApiResponses({
       @ApiResponse(

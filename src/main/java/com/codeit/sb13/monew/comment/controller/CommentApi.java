@@ -78,7 +78,7 @@ public interface CommentApi {
 
   @Operation(
       summary = "댓글 정보 수정",
-      description = "댓글 작성자만 본인의 댓글 내용을 수정할 수 있습니다.")
+      description = "댓글 작성자만 본인의 댓글 내용을 수정합니다.")
   @Parameters({
       @Parameter(name = "commentId", description = "댓글 ID", required = true),
       @Parameter(name = MonewHttpHeaders.REQUEST_USER_ID, description = "요청자 ID", required = true)
@@ -104,7 +104,7 @@ public interface CommentApi {
 
   @Operation(
       summary = "댓글 논리 삭제",
-      description = "댓글을 논리적으로 삭제할 수 있습니다.")
+      description = "댓글을 논리적으로 삭제합니다.")
   @Parameter(name = "commentId", description = "댓글 ID", required = true)
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "댓글 논리 삭제 성공"),
@@ -117,7 +117,7 @@ public interface CommentApi {
 
   @Operation(
       summary = "댓글 물리 삭제",
-      description = "댓글을 물리적으로 삭제할 수 있습니다.")
+      description = "댓글을 물리적으로 삭제합니다.")
   @Parameter(name = "commentId", description = "댓글 ID", required = true)
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "댓글 물리 삭제 성공"),
