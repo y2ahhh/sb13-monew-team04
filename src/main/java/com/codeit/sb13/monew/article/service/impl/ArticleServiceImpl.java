@@ -152,9 +152,7 @@ public class ArticleServiceImpl implements ArticleService {
     }
 
     private String resolveSummary(ArticleRequest request) {
-        return StringUtils.hasText(request.getSummary())
-                ? request.getSummary()
-                : request.getTitle();
+        return request.getSummary() == null ? "" : request.getSummary();
     }
 
     @Override

@@ -198,10 +198,9 @@ class ArticleServiceTest {
     }
 
     @Test
-    @DisplayName("기사 생성 - 요약이 비어 있으면 제목으로 대체한다")
-    void testCreateFallsBackToTitleWhenSummaryIsBlank() {
+    @DisplayName("기사 생성 - 요약이 null이면 빈 문자열로 채운다")
+    void testCreateFillsNullSummaryWithEmptyString() {
         // given
-        // RSS 피드에 따라 description과 content:encoded가 모두 비어 있는 항목이 들어온다.
         articleRequest.setSummary(null);
         when(articleRepository.findByLink(articleRequest.getLink()))
                 .thenReturn(Optional.empty());
@@ -212,7 +211,7 @@ class ArticleServiceTest {
         Article result = articleService.create(articleRequest);
 
         // then
-        assertThat(result.getSummary()).isEqualTo(articleRequest.getTitle());
+        assertThat(result.getSummary()).isEmpty();
     }
 
     @Test
