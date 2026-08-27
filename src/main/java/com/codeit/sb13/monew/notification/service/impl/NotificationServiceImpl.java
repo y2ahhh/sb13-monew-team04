@@ -114,8 +114,9 @@ public class NotificationServiceImpl implements NotificationService {
             return List.of();
         }
 
+        List<UUID> targetIds = targets.stream().map(Notification::getId).toList();
         LocalDateTime now = LocalDateTime.now();
-        notificationRepository.confirmAllByUserId(userId, now);
+        notificationRepository.confirmAllByUserId(userId, targetIds, now);
         targets.forEach(n -> n.confirm(now));
 
         return targets.stream().map(mapper::toResult).toList();

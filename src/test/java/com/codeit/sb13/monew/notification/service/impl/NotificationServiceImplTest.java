@@ -259,6 +259,10 @@ class NotificationServiceImplTest {
 
             Notification notification1 = Notification.create(user, "알림1", UUID.randomUUID(), ResourceType.COMMENT);
             Notification notification2 = Notification.create(user, "알림2", UUID.randomUUID(), ResourceType.INTEREST);
+            UUID notificationId1 = UUID.randomUUID();
+            UUID notificationId2 = UUID.randomUUID();
+            ReflectionTestUtils.setField(notification1, "id", notificationId1);
+            ReflectionTestUtils.setField(notification2, "id", notificationId2);
             List<Notification> notifications = List.of(notification1, notification2);
 
             when(notificationRepository.findByUser_IdAndConfirmedFalse(userId)).thenReturn(notifications);
@@ -276,7 +280,8 @@ class NotificationServiceImplTest {
             assertThat(notification1.isConfirmed()).isTrue();
             assertThat(notification2.isConfirmed()).isTrue();
 
-            verify(notificationRepository).confirmAllByUserId(eq(userId), any(LocalDateTime.class));
+            verify(notificationRepository).confirmAllByUserId(
+                    eq(userId), eq(List.of(notificationId1, notificationId2)), any(LocalDateTime.class));
             assertThat(result).hasSize(2);
         }
 

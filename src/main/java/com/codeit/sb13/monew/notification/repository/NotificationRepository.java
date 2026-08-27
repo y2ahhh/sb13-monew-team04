@@ -25,8 +25,9 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
             n.confirmedAt = :now
         WHERE n.user.id = :userId
         AND n.confirmed = false
+        AND n.id IN :ids
     """)
-    int confirmAllByUserId(@Param("userId") UUID userId, @Param("now") LocalDateTime now);
+    int confirmAllByUserId(@Param("userId") UUID userId, @Param("ids") List<UUID> ids, @Param("now") LocalDateTime now);
 
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM Notification n WHERE n.confirmed = true AND n.confirmedAt < :time")
