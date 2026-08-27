@@ -472,14 +472,26 @@ class ArticleRepositoryCustomImplTest {
 
 
     @Test
-    @DisplayName("커서 세 값 중 일부만 오면 예외를 던진다")
+    @DisplayName("cursor와 after 중 일부만 오면 예외를 던진다")
     void partialCursorIsRejected() {
-        persistArticle("기사", "요약", D1, ArticleSource.NAVER);
+        Article article = persistArticle("기사", "요약", D1, ArticleSource.NAVER);
 
-        // cursor만 있고 after, idAfter가 없다.
+        // cursor만 있고 after가 없다.
         assertThatThrownBy(() -> articleRepository.search(
                 page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
                         D1.toString(), null, null, 10)))
+                .isInstanceOf(ArticleSearchConditionInvalidException.class);
+
+        // after만 있고 cursor가 없다.
+        assertThatThrownBy(() -> articleRepository.search(
+                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
+                        null, article.getCreatedAt(), null, 10)))
+                .isInstanceOf(ArticleSearchConditionInvalidException.class);
+
+        // idAfter는 선택값이지만 단독으로는 페이지를 특정할 수 없다.
+        assertThatThrownBy(() -> articleRepository.search(
+                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
+                        null, null, article.getId(), 10)))
                 .isInstanceOf(ArticleSearchConditionInvalidException.class);
     }
 

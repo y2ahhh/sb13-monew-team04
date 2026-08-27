@@ -198,6 +198,24 @@ class ArticleServiceTest {
     }
 
     @Test
+    @DisplayName("기사 생성 - 요약이 비어 있으면 제목으로 대체한다")
+    void testCreateFallsBackToTitleWhenSummaryIsBlank() {
+        // given
+        // RSS 피드에 따라 description과 content:encoded가 모두 비어 있는 항목이 들어온다.
+        articleRequest.setSummary(null);
+        when(articleRepository.findByLink(articleRequest.getLink()))
+                .thenReturn(Optional.empty());
+        when(articleRepository.saveAndFlush(any(Article.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        Article result = articleService.create(articleRequest);
+
+        // then
+        assertThat(result.getSummary()).isEqualTo(articleRequest.getTitle());
+    }
+
+    @Test
     @DisplayName("기사 생성 실패 - 중복된 링크")
     void testCreateDuplicateLink() {
         // given
