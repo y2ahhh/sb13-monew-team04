@@ -58,18 +58,16 @@ public interface CommentLikeApi {
   )
   @ApiResponses({
       @ApiResponse(
-          responseCode = "204",
+          responseCode = "200",
           description = "댓글 좋아요 취소 성공"
       ),
       @ApiResponse(
           responseCode = "404",
-          description = "댓글, 사용자 또는 댓글 좋아요 정보를 찾을 수 없음",
-          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))
+          description = "댓글, 사용자 또는 댓글 좋아요 정보를 찾을 수 없음"
       ),
       @ApiResponse(
           responseCode = "500",
-          description = "서버 내부 오류 발생",
-          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))
+          description = "서버 내부 오류 발생"
       )
   })
   ResponseEntity<Void> unlikeComment(
