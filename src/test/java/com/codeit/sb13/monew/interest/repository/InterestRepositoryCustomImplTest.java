@@ -440,6 +440,40 @@ class InterestRepositoryCustomImplTest {
     }
 
     @Test
+    @DisplayName("cursor만 있고 after가 없으면 InterestSearchConditionInvalidException을 던진다")
+    void search_cursorWithoutAfter_throwsException() {
+        persistInterest("스포츠", "키워드");
+        em.flush();
+        em.clear();
+
+        InterestSearchConditionInvalidException e = catchThrowableOfType(
+                () -> interestRepository.search(new InterestSearchCondition(
+                        null, InterestOrderBy.NAME, Sort.Direction.ASC,
+                        UUID.randomUUID(), null, 10, null)),
+                InterestSearchConditionInvalidException.class);
+
+        assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.INTEREST_SEARCH_CONDITION_INVALID);
+        assertThat(e.getDetails()).containsEntry("reason", "cursor와 after는 함께 전달해야 합니다.");
+    }
+
+    @Test
+    @DisplayName("after만 있고 cursor가 없으면 InterestSearchConditionInvalidException을 던진다")
+    void search_afterWithoutCursor_throwsException() {
+        persistInterest("스포츠", "키워드");
+        em.flush();
+        em.clear();
+
+        InterestSearchConditionInvalidException e = catchThrowableOfType(
+                () -> interestRepository.search(new InterestSearchCondition(
+                        null, InterestOrderBy.NAME, Sort.Direction.ASC,
+                        null, LocalDateTime.now(), 10, null)),
+                InterestSearchConditionInvalidException.class);
+
+        assertThat(e.getApiErrorCode()).isEqualTo(ApiErrorCode.INTEREST_SEARCH_CONDITION_INVALID);
+        assertThat(e.getDetails()).containsEntry("reason", "cursor와 after는 함께 전달해야 합니다.");
+    }
+
+    @Test
     @DisplayName("검색 결과가 없으면 빈 목록과 함께 구독 정보 조회도 건너뛴다")
     void search_noResults_returnsEmptyPage() {
         UUID requester = persistUser();

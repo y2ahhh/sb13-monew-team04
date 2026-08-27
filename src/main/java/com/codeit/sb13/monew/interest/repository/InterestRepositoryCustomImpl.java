@@ -120,13 +120,20 @@ public class InterestRepositoryCustomImpl implements InterestRepositoryCustom {
      * 어긋나, 페이지 경계에서 항목이 누락되거나 중복될 수 있다. 여기서는 대신 {@code cursor}가
      * 가리키는 행을 매 요청마다 다시 조회해, 그 시점 기준 정확한 값으로 비교한다.</p>
      *
-     * <p>{@code cursor} 또는 {@code after}가 없으면 첫 페이지 조회로 보고 조회 자체를
-     * 생략한다. {@code cursor}로 조회했는데 행이 없으면 그 사이 관심사가 삭제된 것이므로,
-     * 더 이상 정확한 이어보기 위치를 계산할 수 없다는 뜻으로 예외를 던진다.</p>
+     * <p>{@code cursor}와 {@code after}가 둘 다 없으면 첫 페이지 조회로 보고 조회 자체를
+     * 생략한다. 둘 중 하나만 있으면 클라이언트가 커서를 일부만 보낸 잘못된 요청이므로,
+     * 이를 첫 페이지 조회로 처리해 조용히 첫 페이지를 다시 돌려주는 대신(클라이언트 입장에서는
+     * 이전 페이지 항목이 중복으로 보인다) 예외를 던져 요청 자체가 잘못됐음을 알린다.
+     * {@code cursor}로 조회했는데 행이 없으면 그 사이 관심사가 삭제된 것이므로, 더 이상
+     * 정확한 이어보기 위치를 계산할 수 없다는 뜻으로 예외를 던진다.</p>
      */
     private AnchorRow resolveAnchor(UUID cursor, LocalDateTime after, NumberExpression<Long> subscriberCountExpr) {
-        if (cursor == null || after == null) {
+        if (cursor == null && after == null) {
             return null;
+        }
+
+        if (cursor == null || after == null) {
+            throw new InterestSearchConditionInvalidException("cursor와 after는 함께 전달해야 합니다.");
         }
 
         // Projections.constructor로 AnchorRow에 바로 매핑하는 대신, 조회 결과를 Tuple로

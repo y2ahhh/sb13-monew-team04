@@ -382,8 +382,8 @@ class InterestServiceTest {
     }
 
     @Test
-    @DisplayName("정렬 기준이 이름이면 마지막 항목의 이름을 다음 커서로 돌려준다")
-    void search_orderByName_buildsNextCursorFromLastItemName() {
+    @DisplayName("정렬 기준이 이름이어도 마지막 항목의 id를 다음 커서로 돌려준다")
+    void search_orderByName_buildsNextCursorFromLastItemId() {
         // given
         LocalDateTime now = LocalDateTime.now();
         Interest first = interestWithIdAndCreatedAt("가나다", now);
@@ -412,8 +412,8 @@ class InterestServiceTest {
     }
 
     @Test
-    @DisplayName("정렬 기준이 구독자 수면 마지막 항목의 구독자 수를 다음 커서로 돌려준다")
-    void search_orderBySubscriberCount_buildsNextCursorFromLastItemSubscriberCount() {
+    @DisplayName("정렬 기준이 구독자 수여도 마지막 항목의 id를 다음 커서로 돌려준다")
+    void search_orderBySubscriberCount_buildsNextCursorFromLastItemId() {
         // given
         LocalDateTime now = LocalDateTime.now();
         Interest first = interestWithIdAndCreatedAt("스포츠", now);
