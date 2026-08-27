@@ -499,16 +499,23 @@ class ArticleRepositoryCustomImplTest {
     @DisplayName("idAfter 없이 cursor와 after만으로도 다음 페이지를 가져온다")
     void cursorPagingWorksWithoutIdAfter() {
         Article older = persistArticle("기사1", "요약", D1, ArticleSource.NAVER);
-        Article newer = persistArticle("기사2", "요약", D2, ArticleSource.CHOSUN);
+        persistArticle("기사2", "요약", D2, ArticleSource.CHOSUN);
 
-        ArticleSearchPage page = articleRepository.search(
+        // 커서 값은 조회 결과에서 뽑는다. 영속성 컨텍스트가 들고 있는 createdAt은
+        // 나노초까지 남아 있지만 저장된 값은 마이크로초로 잘려, 그대로 커서로 쓰면
+        // 커서 기준이 된 기사 자신이 다음 페이지에 다시 딸려 나온다.
+        ArticleSearchPage first = firstPage(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, 1);
+        ArticleSearchRow last = first.rows().get(0);
+
+        ArticleSearchPage second = articleRepository.search(
                 page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
-                        newer.getDate().toString(), newer.getCreatedAt(), null, 10));
+                        last.article().getDate().toString(),
+                        last.article().getCreatedAt(), null, 10));
 
-        assertThat(page.rows()).hasSize(1);
-        assertThat(page.rows().get(0).article().getId()).isEqualTo(older.getId());
+        assertThat(second.rows()).hasSize(1);
+        assertThat(second.rows().get(0).article().getId()).isEqualTo(older.getId());
         // 커서 조건 없이 세는 값이라 전체 2건이 그대로 나와야 한다.
-        assertThat(page.totalElements()).isEqualTo(2L);
+        assertThat(second.totalElements()).isEqualTo(2L);
     }
 
     @Test
