@@ -369,7 +369,7 @@ class ArticleServiceTest {
     void testSearchArticlesPassesCondition() {
         // given
         UUID userId = UUID.randomUUID();
-        UUID idAfter = UUID.randomUUID();
+        UUID cursor = UUID.randomUUID();
         ArticleSearchCommand command = new ArticleSearchCommand(
                 "반도체",
                 List.of(ArticleSource.NAVER, ArticleSource.CHOSUN),
@@ -377,9 +377,8 @@ class ArticleServiceTest {
                 LocalDateTime.of(2026, 8, 31, 0, 0),
                 ArticleOrderBy.VIEW_COUNT,
                 Sort.Direction.ASC,
-                "10",
+                cursor,
                 LocalDateTime.of(2026, 8, 20, 12, 0),
-                idAfter,
                 30,
                 userId
         );
@@ -403,9 +402,8 @@ class ArticleServiceTest {
         assertThat(condition.requestUserId()).isEqualTo(userId);
         assertThat(condition.orderBy()).isEqualTo(ArticleOrderBy.VIEW_COUNT);
         assertThat(condition.direction()).isEqualTo(Sort.Direction.ASC);
-        assertThat(condition.cursor()).isEqualTo("10");
+        assertThat(condition.cursor()).isEqualTo(cursor);
         assertThat(condition.after()).isEqualTo(LocalDateTime.of(2026, 8, 20, 12, 0));
-        assertThat(condition.idAfter()).isEqualTo(idAfter);
         assertThat(condition.limit()).isEqualTo(30);
     }
 
@@ -416,7 +414,7 @@ class ArticleServiceTest {
         UUID userId = UUID.randomUUID();
         ArticleSearchCommand command = new ArticleSearchCommand(
                 null, null, null, null,
-                ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, null, 50, userId);
+                ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, 50, userId);
 
         Article article = Article.create("제목", "요약", "https://example.com/1",
                 LocalDateTime.now(), ArticleSource.NAVER);
@@ -443,45 +441,11 @@ class ArticleServiceTest {
         assertThat(result.size()).isEqualTo(1);
         assertThat(result.totalElements()).isEqualTo(42L);
         assertThat(result.hasNext()).isTrue();
-        // publishDate 정렬이므로 nextCursor는 "발행일|id" 형태여야 한다.
-        assertThat(result.nextCursor()).isEqualTo(
-                article.getDate().toString()
-                        + ArticleSearchCondition.CURSOR_DELIMITER
-                        + lastArticleId);
+        // 정렬 기준과 무관하게 nextCursor는 마지막 기사의 id다.
+        assertThat(result.nextCursor()).isEqualTo(lastArticleId.toString());
         assertThat(result.nextAfter()).isEqualTo(lastCreatedAt.toString());
-        assertThat(result.nextIdAfter()).isEqualTo(lastArticleId.toString());
+        assertThat(result.nextIdAfter()).isNull();
         verify(articleMapper).toDto(article, true, 3L, 5L);
-    }
-
-    @Test
-    @DisplayName("목록 조회 - viewCount 정렬이면 nextCursor는 조회수와 id로 만든다")
-    void testSearchArticlesBuildsCountCursor() {
-        // given
-        UUID userId = UUID.randomUUID();
-        ArticleSearchCommand command = new ArticleSearchCommand(
-                null, null, null, null,
-                ArticleOrderBy.VIEW_COUNT, Sort.Direction.DESC, null, null, null, 50, userId);
-
-        Article article = Article.create("제목", "요약", "https://example.com/1",
-                LocalDateTime.now(), ArticleSource.NAVER);
-        UUID lastArticleId = UUID.randomUUID();
-        ReflectionTestUtils.setField(article, "id", lastArticleId);
-        ReflectionTestUtils.setField(article, "createdAt", LocalDateTime.of(2026, 8, 20, 9, 0));
-
-        ArticleSearchRow row = new ArticleSearchRow(article, 3L, 5L, true);
-        ArticleDto dto = new ArticleDto(UUID.randomUUID(), ArticleSource.NAVER,
-                "https://example.com/1", "제목", LocalDateTime.now(), "요약", 3L, 5L, true);
-
-        when(articleRepository.search(any(ArticleSearchCondition.class)))
-                .thenReturn(new ArticleSearchPage(List.of(row), false, 1L));
-        when(articleMapper.toDto(article, true, 3L, 5L)).thenReturn(dto);
-
-        // when
-        CursorPageResponseDto<ArticleDto> result = articleService.searchArticles(command);
-
-        // then
-        assertThat(result.nextCursor())
-                .isEqualTo("5" + ArticleSearchCondition.CURSOR_DELIMITER + lastArticleId);
     }
 
     @Test
@@ -491,7 +455,7 @@ class ArticleServiceTest {
         UUID userId = UUID.randomUUID();
         ArticleSearchCommand command = new ArticleSearchCommand(
                 null, null, null, null,
-                ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, null, 50, userId);
+                ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, 50, userId);
         when(articleRepository.search(any(ArticleSearchCondition.class)))
                 .thenReturn(new ArticleSearchPage(List.of(), false, 0L));
 

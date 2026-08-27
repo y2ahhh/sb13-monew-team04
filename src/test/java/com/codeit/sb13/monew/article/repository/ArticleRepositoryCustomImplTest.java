@@ -86,12 +86,14 @@ class ArticleRepositoryCustomImplTest {
 
     /**
      * 커서를 넘겨 다음 페이지를 조회하는 조건을 만든다.
+     *
+     * <p>{@code cursor}는 이전 페이지 마지막 기사의 id다. 정렬 기준 값은 리포지토리가
+     * 이 id로 앵커 행을 다시 조회해 얻는다.</p>
      */
     private ArticleSearchCondition page(ArticleOrderBy orderBy, Sort.Direction direction,
-                                        String cursor, LocalDateTime after, UUID idAfter,
-                                        int limit) {
+                                        UUID cursor, LocalDateTime after, int limit) {
         return new ArticleSearchCondition(null, null, null, null,
-                orderBy, direction, cursor, after, idAfter, limit, null);
+                orderBy, direction, cursor, after, limit, null);
     }
 
     /**
@@ -101,24 +103,18 @@ class ArticleRepositoryCustomImplTest {
     private ArticleSearchPage nextPage(ArticleSearchPage current, ArticleOrderBy orderBy,
                                        Sort.Direction direction, int limit) {
         List<ArticleSearchRow> rows = current.rows();
-        ArticleSearchRow last = rows.get(rows.size() - 1);
-
-        String cursor = switch (orderBy) {
-            case COMMENT_COUNT -> String.valueOf(last.commentCount());
-            case VIEW_COUNT -> String.valueOf(last.viewCount());
-            case PUBLISH_DATE -> last.article().getDate().toString();
-        };
+        Article last = rows.get(rows.size() - 1).article();
 
         em.flush();
         em.clear();
-        return articleRepository.search(page(orderBy, direction, cursor,
-                last.article().getCreatedAt(), last.article().getId(), limit));
+        return articleRepository.search(page(orderBy, direction,
+                last.getId(), last.getCreatedAt(), limit));
     }
 
     private ArticleSearchPage firstPage(ArticleOrderBy orderBy, Sort.Direction direction, int limit) {
         em.flush();
         em.clear();
-        return articleRepository.search(page(orderBy, direction, null, null, null, limit));
+        return articleRepository.search(page(orderBy, direction, null, null, limit));
     }
 
     /**
@@ -134,12 +130,12 @@ class ArticleRepositoryCustomImplTest {
                                              LocalDateTime from, LocalDateTime to, UUID userId) {
         // 이 헬퍼의 기본값: 발행일 내림차순, 커서 없음.
         return new ArticleSearchCondition(keyword, sourceIn, from, to,
-                ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, null, 100, userId);
+                ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, null, null, 100, userId);
     }
 
     private ArticleSearchCondition sortedBy(ArticleOrderBy orderBy, Sort.Direction direction) {
         return new ArticleSearchCondition(null, null, null, null,
-                orderBy, direction, null, null, null, 100, null);
+                orderBy, direction, null, null, 100, null);
     }
 
     private List<String> titlesOf(List<ArticleSearchRow> rows) {
@@ -479,80 +475,41 @@ class ArticleRepositoryCustomImplTest {
         // cursor만 있고 after가 없다.
         assertThatThrownBy(() -> articleRepository.search(
                 page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
-                        D1.toString(), null, null, 10)))
+                        article.getId(), null, 10)))
                 .isInstanceOf(ArticleSearchConditionInvalidException.class);
 
         // after만 있고 cursor가 없다.
         assertThatThrownBy(() -> articleRepository.search(
                 page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
-                        null, article.getCreatedAt(), null, 10)))
-                .isInstanceOf(ArticleSearchConditionInvalidException.class);
-
-        // idAfter는 선택값이지만 단독으로는 페이지를 특정할 수 없다.
-        assertThatThrownBy(() -> articleRepository.search(
-                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
-                        null, null, article.getId(), 10)))
+                        null, article.getCreatedAt(), 10)))
                 .isInstanceOf(ArticleSearchConditionInvalidException.class);
     }
 
     @Test
-    @DisplayName("cursor에 id가 없고 idAfter도 오지 않으면 예외를 던진다")
-    void cursorWithoutIdIsRejected() {
+    @DisplayName("커서가 가리키는 기사가 사라졌으면 예외를 던진다")
+    void missingAnchorIsRejected() {
         Article article = persistArticle("기사", "요약", D1, ArticleSource.NAVER);
+        em.flush();
 
-        // 3차 기준이 없으면 정렬 기준 값과 생성 시각이 같은 기사를 건너뛰게 된다.
+        // 그 사이 물리 삭제된 상황. 이어보기 위치를 계산할 수 없다.
         assertThatThrownBy(() -> articleRepository.search(
                 page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
-                        D1.toString(), article.getCreatedAt(), null, 10)))
+                        UUID.randomUUID(), article.getCreatedAt(), 10)))
                 .isInstanceOf(ArticleSearchConditionInvalidException.class);
     }
 
     @Test
-    @DisplayName("cursor에 실려 온 id가 UUID 형식이 아니면 예외를 던진다")
-    void cursorWithMalformedIdIsRejected() {
-        Article article = persistArticle("기사", "요약", D1, ArticleSource.NAVER);
-
-        assertThatThrownBy(() -> articleRepository.search(
-                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
-                        D1 + ArticleSearchCondition.CURSOR_DELIMITER + "not-a-uuid",
-                        article.getCreatedAt(), null, 10)))
-                .isInstanceOf(ArticleSearchConditionInvalidException.class);
-    }
-
-    @Test
-    @DisplayName("idAfter 파라미터가 오면 cursor에 id가 없어도 그 값을 3차 기준으로 쓴다")
-    void idAfterParameterTakesPrecedence() {
+    @DisplayName("cursor가 가리키는 기사의 현재 값을 기준으로 다음 페이지를 가져온다")
+    void nextPageIsBuiltFromAnchorRow() {
         Article older = persistArticle("기사1", "요약", D1, ArticleSource.NAVER);
         persistArticle("기사2", "요약", D2, ArticleSource.CHOSUN);
 
         ArticleSearchPage first = firstPage(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, 1);
         Article last = first.rows().get(0).article();
 
-        // 구형 클라이언트처럼 정렬 기준 값만 담은 커서 + idAfter 파라미터를 보낸다.
         ArticleSearchPage second = articleRepository.search(
                 page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
-                        last.getDate().toString(), last.getCreatedAt(), last.getId(), 10));
-
-        assertThat(second.rows()).hasSize(1);
-        assertThat(second.rows().get(0).article().getId()).isEqualTo(older.getId());
-    }
-
-    @Test
-    @DisplayName("cursor에 id가 실려 오면 idAfter 파라미터 없이도 다음 페이지를 가져온다")
-    void cursorCarriesIdWhenIdAfterIsAbsent() {
-        Article older = persistArticle("기사1", "요약", D1, ArticleSource.NAVER);
-        persistArticle("기사2", "요약", D2, ArticleSource.CHOSUN);
-
-        // 커서 값은 조회 결과에서 뽑는다. 영속성 컨텍스트가 들고 있는 createdAt은
-        // 나노초까지 남아 있지만 저장된 값은 마이크로초로 잘려, 그대로 커서로 쓰면
-        // 커서 기준이 된 기사 자신이 다음 페이지에 다시 딸려 나온다.
-        ArticleSearchPage first = firstPage(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, 1);
-        Article last = first.rows().get(0).article();
-
-        ArticleSearchPage second = articleRepository.search(
-                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
-                        last.getDate() + ArticleSearchCondition.CURSOR_DELIMITER + last.getId(),
-                        last.getCreatedAt(), null, 10));
+                        last.getId(), last.getCreatedAt(), 10));
 
         assertThat(second.rows()).hasSize(1);
         assertThat(second.rows().get(0).article().getId()).isEqualTo(older.getId());
@@ -582,8 +539,7 @@ class ArticleRepositoryCustomImplTest {
 
         ArticleSearchPage second = articleRepository.search(
                 page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
-                        last.getDate() + ArticleSearchCondition.CURSOR_DELIMITER + last.getId(),
-                        last.getCreatedAt(), null, 2));
+                        last.getId(), last.getCreatedAt(), 2));
 
         List<UUID> collected = new ArrayList<>();
         first.rows().forEach(row -> collected.add(row.article().getId()));
