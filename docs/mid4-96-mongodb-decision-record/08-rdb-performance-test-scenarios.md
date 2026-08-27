@@ -84,7 +84,7 @@ VIEWED_ARTICLES_PATH
 - 최신순 정렬에서 filesort 또는 temp sort 비용이 큰 경우
 - join 대상 row 수가 데이터 증가에 따라 크게 늘어나는 경우
 - 논리삭제, 취소, 구독 해제 제외 조건 때문에 후보 row를 과도하게 읽는 경우
-- 같은 endpoint가 반복 호출될 때 DB CPU 또는 커넥션 대기 병목을 만드는 경우
+- 같은 endpoint가 반복 호출될 때 Postgres 컨테이너 CPU(docker stats) 또는 커넥션 대기 병목을 만드는 경우
 ```
 
 인덱스를 추가한 경우에는 적용 전후를 같은 데이터 규모와 같은 k6 시나리오에서 비교한다.
@@ -116,6 +116,8 @@ RPS 기준 측정은 요청 스케줄을 따라가는지 확인하기 위한 시
 200 req/s
 250 req/s
 ```
+
+원인 분리나 경계 확인이 필요하면 300 req/s를 추가하고, 이때는 `preAllocatedVUs`와 `maxVUs`를 충분히 높여 k6 부하 생성기 부족과 서버 응답 지연을 분리한다.
 
 RPS 기준 측정은 MID4-206의 `throughput` 시나리오로 실행하며, `K6_SLEEP_SECONDS`를 적용하지 않는다. 기존 MID4-179 결과에서 `baseline`이 RPS 측정 의미로 사용된 기록이 있으나, MID4-206 기준 `baseline`은 VU 기반 기본 비교이고 `throughput`이 RPS 기반 보강 측정이다.
 
@@ -156,7 +158,7 @@ k6와 애플리케이션, DB에서 아래 지표를 함께 수집한다.
 | --- | --- |
 | k6 | `http_req_duration p95`, `http_req_duration p99`, `http_req_failed`, RPS, `dropped_iterations` |
 | 애플리케이션 | composite API response time, 요청 1건당 SQL 개수, 커넥션 풀 대기 |
-| RDB | 쿼리 실행 시간, 실행 계획, 인덱스 사용 여부, DB CPU, slow query |
+| RDB | 쿼리 실행 시간, 실행 계획, 인덱스 사용 여부, Postgres 컨테이너 CPU(docker stats), slow query |
 | 비교 판단 | composite API p95/p99 증가율, SQL/query별 join 비용, error rate |
 
 임시 성공 기준은 다음과 같이 둔다.
@@ -169,13 +171,15 @@ checks rate > 99%
 dropped_iterations = 0
 p95 < 200ms
 p99 < 500ms
-DB CPU 지속 70% 미만
+Postgres 컨테이너 CPU(docker stats) 지속 70% 미만
 커넥션 풀 대기 거의 없음
 ```
 
+Postgres 컨테이너 CPU(docker stats)는 k6 컨테이너 CPU를 합산한 값이 아니며, Docker CPU 표기 기준이라 100%를 초과할 수 있다. 결과 표의 CPU 값은 별도 표기가 없으면 실행 중 수집한 순간 스냅샷이며 평균, 최대, 지속 사용률이 아니다. 따라서 70% 기준은 지속 관측이 가능한 경우의 판단 기준이고, 표의 스냅샷 값이 70%를 넘는 경우에는 추가 확인이 필요한 신호로 해석한다.
+
 프로젝트 환경에서 위 기준을 그대로 만족하기 어렵다면 composite API의 데이터 증가에 따른 악화 폭과 SQL/query별 상대 비용을 함께 본다.
 
-## 현재 k6 측정 한계
+## MID4-179 기준 측정 한계와 MID4-206 보강 범위
 
 MID4-179에서 수행한 k6 측정은 MongoDB Read Model을 바로 적용하지 않아도 된다는 현재 판단의 참고 근거다. 다만 다음 한계가 있으므로 운영 환경의 최종 처리량 보장값으로 사용하지 않는다.
 
@@ -191,7 +195,7 @@ MID4-179에서 수행한 k6 측정은 MongoDB Read Model을 바로 적용하지 
 - MongoDB Read Model 구현 전후 동일 조건 비교는 수행하지 않았다.
 ```
 
-MID4-206에서는 위 한계 중 multi-user 요청 분포, VU 단계별 부하, RPS 보강 시나리오, RDB/MongoDB 결과 구분용 메타데이터를 먼저 보강했다. 다만 fan-out worst-case, 장시간 soak, 같은 조건 반복 측정, read/write 혼합 부하 검증은 아직 별도 Jira 티켓에서 다룰 후속 범위다.
+MID4-206에서는 위 한계 중 multi-user 요청 분포, VU 단계별 부하, RPS 보강 시나리오, 장시간 soak, 같은 조건 반복 측정, RDB/MongoDB 결과 구분용 메타데이터를 먼저 보강했다. 다만 fan-out worst-case, read/write 혼합 부하 검증, MongoDB Read Model 구현 후 동일 조건 비교는 아직 별도 Jira 티켓에서 다룰 후속 범위다.
 
 ## 제외 조건 필터 비용 측정
 
@@ -237,21 +241,47 @@ MongoDB 적용 검토는 RDB 쿼리와 인덱스 최적화를 반영한 뒤에�
 
 성능 측정 결과는 측정 단계, 데이터 규모, 시나리오별로 분리해 기록한다. API p95/p99와 RPS는 `GET /api/user-activities/{userId}` composite API 기준으로만 기록한다.
 
-MID4-206에서 2026-08-27 기준 10m seed scale 데이터를 새로 적재하고 smoke 워밍업을 포함해 RDB 기준 k6 측정을 완료했다. 추가로 160~190 rps 경계값, 주요 시나리오 총 5회 반복, 100 rps 30분 soak, 150 rps 30분 soak, 190 rps 5분 경계 측정을 수행했다. 상세 실행 로그와 summary 파일명은 [MID4-206 MongoDB 적용 대비 k6 비교 테스트 보강](../mid4-206-mongodb-k6-compare.md)에 기록한다.
+MID4-206에서 2026-08-27~28 기준 10m seed scale 데이터를 새로 적재하고 smoke 워밍업을 포함해 RDB 기준 k6 측정을 완료했다. 추가로 160~190 rps 경계값, 주요 시나리오 총 5회 반복, 100/150/190 rps 30분 soak, 190 rps 5분 경계, 200/250/300 rps 원인 분리 측정을 수행했다. 이후 `dev-sql-warn` 조건에서 200/250/300 rps 동일 조건 3회 반복, 250/300 rps 10분 soak, stress 재측정, 5명 round-robin 200/250/300 rps 측정을 추가 수행했다. 상세 실행 로그, summary 파일명, 결과 용도 구분 기준은 [MID4-206 MongoDB 적용 대비 k6 비교 테스트 보강](../mid4-206-mongodb-k6-compare.md)에 기록한다.
 
-| 측정 단계 | 데이터 규모 | 시나리오 | API | p95 | p99 | error rate | RPS | dropped iterations | 요청당 SQL | 주요 join | DB CPU | 커넥션 대기 | 판단 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 현재 RDB baseline | 10m seed scale | Smoke, 1 VU, 워밍업 | GET /api/user-activities/{userId} | 39.99ms | 47.71ms | 0.00% | 0.97 | 0 | 미계측 | composite API 내부 조회 | 0.08% | active 1, idle 11 | 응답 검증 통과 |
-| 현재 RDB baseline | 10m seed scale | Baseline, 20 VU, 5분 | GET /api/user-activities/{userId} | 26.84ms | 48.05ms | 0.00% | 19.50 | 0 | 미계측 | composite API 내부 조회 | 5.15% | active 1, idle 11 | 통과 |
-| 현재 RDB baseline | 10m seed scale | Average, 50 VU, 10분 | GET /api/user-activities/{userId} | 38.37ms | 81.65ms | 0.00% | 48.59 | 0 | 미계측 | composite API 내부 조회 | 16.60% | active 1, idle 11 | 통과 |
-| 현재 RDB baseline | 10m seed scale | High Load, 100 VU, 10분 | GET /api/user-activities/{userId} | 52.67ms | 109.44ms | 0.01% | 96.29 | 0 | 미계측 | composite API 내부 조회 | 25.80% | active 1, idle 11 | 통과 |
-| 현재 RDB baseline | 10m seed scale | Stress, 50 -> 100 -> 200 -> 400 VU | GET /api/user-activities/{userId} | 1,361.57ms | 1,595.57ms | 0.01% | 103.03 | 0 | 미계측 | composite API 내부 조회 | 2.38% | active 1, idle 11 | 지연 기준 초과 |
-| 현재 RDB baseline | 10m seed scale | Throughput, 150 rps, 총 5회 | GET /api/user-activities/{userId} | 평균 35.09ms | 평균 47.56ms | 최대 0.00% | 평균 150.12 | 0 | 미계측 | composite API 내부 조회 | 최대 52.89% | active/idle 위주 | 반복 안정 통과 |
-| 현재 RDB baseline | 10m seed scale | Throughput, 190 rps | GET /api/user-activities/{userId} | 70.80ms | 321.32ms | 0.00% | 189.63 | 0 | 미계측 | composite API 내부 조회 | 68.67% | active 2, idle 9, idle in transaction 1 | 단기 경계 통과 |
-| 현재 RDB baseline | 10m seed scale | Throughput, 190 rps, 5분 | GET /api/user-activities/{userId} | 32.81ms | 42.47ms | 0.01% | 190.70 | 0 | 미계측 | composite API 내부 조회 | 57.62% | active 1, idle 9, idle in transaction 2 | 경계 통과, dial i/o timeout 경고 7건 관찰 |
-| 현재 RDB baseline | 10m seed scale | Throughput, 200 rps | GET /api/user-activities/{userId} | 3,198.98ms | 3,361.01ms | 0.00% | 178.96 | 1,034 | 미계측 | composite API 내부 조회 | 56.29% | active 1, idle 8, idle in transaction 3 | 지연/dropped 기준 초과 |
-| 현재 RDB baseline | 10m seed scale | Throughput Soak, 100 rps, 30분 | GET /api/user-activities/{userId} | 26.71ms | 31.04ms | 0.04% | 100.14 | 0 | 미계측 | composite API 내부 조회 | 28.65% | active 1, idle 11 | 수치 기준 통과, timeout 경고 관찰 |
-| 현재 RDB baseline | 10m seed scale | Throughput Soak, 150 rps, 30분 | GET /api/user-activities/{userId} | 28.40ms | 35.13ms | 0.07% | 150.50 | 0 | 미계측 | composite API 내부 조회 | 38.73% | active 2, idle 10 | 수치 기준 통과, dial i/o timeout 경고 183건 관찰 |
+`dev-default-debug`는 `application-dev.yaml` 기본 로그 조건이며 `org.hibernate.SQL=debug`, `org.hibernate.orm.jdbc.batch=trace`가 켜진 상태다. `dev-sql-warn`은 같은 dev profile에서 SQL/배치 로그를 `warn`으로 낮춘 상태다. 별도 override 기록이 없는 초기 로컬 측정은 `dev-default-debug` 참고값으로 보고, 최종 경계 판단은 `dev-sql-warn` 재측정값을 우선한다.
+
+성능 결과는 `로그 조건`, `사용자 조건`, `preAllocatedVUs`, `maxVUs`, `시나리오`, `duration`, `실행 순서/워밍업 상태`가 같은 경우에만 직접 비교한다. 조건이 2개 이상 다른 결과끼리는 원인 판단에 사용하지 않는다. 결과 용도 구분값은 MID4-206 문서의 정의를 따른다.
+
+| 측정 단계 | 데이터 규모 | 시나리오 | 로그 조건 | 사용자/VU 조건 | 결과 용도 | API | p95 | p99 | error rate | RPS | dropped iterations | 요청당 SQL | 주요 join | Postgres 컨테이너 CPU(docker stats) | 커넥션 대기 | 판단 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 현재 RDB baseline | 10m seed scale | Smoke, 1 VU, 워밍업 | dev-default-debug | 단일(1명, round-robin)/VU 기준 | debug-reference | GET /api/user-activities/{userId} | 39.99ms | 47.71ms | 0.00% | 0.97 | 0 | 미계측 | composite API 내부 조회 | 0.08% | active 1, idle 11 | 응답 검증 통과 |
+| 현재 RDB baseline | 10m seed scale | Baseline, 20 VU, 5분 | dev-default-debug | 단일(1명, round-robin)/VU 기준 | debug-reference | GET /api/user-activities/{userId} | 26.84ms | 48.05ms | 0.00% | 19.50 | 0 | 미계측 | composite API 내부 조회 | 5.15% | active 1, idle 11 | 참고 통과 |
+| 현재 RDB baseline | 10m seed scale | Average, 50 VU, 10분 | dev-default-debug | 단일(1명, round-robin)/VU 기준 | debug-reference | GET /api/user-activities/{userId} | 38.37ms | 81.65ms | 0.00% | 48.59 | 0 | 미계측 | composite API 내부 조회 | 16.60% | active 1, idle 11 | 참고 통과 |
+| 현재 RDB baseline | 10m seed scale | Average, 50 VU, 10분, 5명 round-robin | dev-sql-warn | 5명 round-robin/VU 기준 | multi-user-reference | GET /api/user-activities/{userId} | 31.19ms | 47.88ms | 0.00% | 49.16 | 0 | 미계측 | composite API 내부 조회 | 13.25% | active 1, idle 11 | 다중 사용자 재측정 통과 |
+| 현재 RDB baseline | 10m seed scale | High Load, 100 VU, 10분 | dev-default-debug | 단일(1명, round-robin)/VU 기준 | debug-reference | GET /api/user-activities/{userId} | 52.67ms | 109.44ms | 0.01% | 96.29 | 0 | 미계측 | composite API 내부 조회 | 25.80% | active 1, idle 11 | 참고 통과 |
+| 현재 RDB baseline | 10m seed scale | High Load, 100 VU, 10분, 5명 round-robin | dev-sql-warn | 5명 round-robin/VU 기준 | multi-user-reference | GET /api/user-activities/{userId} | 38.76ms | 67.89ms | 0.02% | 97.50 | 0 | 미계측 | composite API 내부 조회 | 31.31% | active 1, idle 11 | 다중 사용자 재측정 통과 |
+| 현재 RDB baseline | 10m seed scale | Stress, 50 -> 100 -> 200 -> 400 VU | dev-default-debug | 단일(1명, round-robin)/VU 기준 | debug-reference | GET /api/user-activities/{userId} | 1,361.57ms | 1,595.57ms | 0.01% | 103.03 | 0 | 미계측 | composite API 내부 조회 | 2.38% | active 1, idle 11 | 지연 기준 초과 |
+| 현재 RDB baseline | 10m seed scale | Stress, 50 -> 100 -> 200 -> 400 VU, 재측정 | dev-sql-warn | 단일(1명, round-robin)/VU 기준 | stress-reference | GET /api/user-activities/{userId} | 101.35ms | 186.74ms | 0.01% | 130.41 | 0 | 미계측 | composite API 내부 조회 | 2.10%(30초 지점) | active 1, idle 10, idle in transaction 1 | 수치 기준 통과, dial i/o timeout 경고 14건 관찰 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 150 rps, 총 5회 | dev-default-debug | 단일(1명, round-robin)/pre=max 500 | debug-reference | GET /api/user-activities/{userId} | 평균 35.09ms | 평균 47.56ms | 최대 0.00% | 평균 150.12 | 0 | 미계측 | composite API 내부 조회 | 최대 52.89% | active/idle 위주 | 반복 안정 참고 통과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 150 rps, 5분, 5명 round-robin | dev-sql-warn | 5명 round-robin/pre=max 500 | multi-user-reference | GET /api/user-activities/{userId} | 21.65ms | 25.56ms | 0.00% | 150.71 | 0 | 미계측 | composite API 내부 조회 | 38.87% | active 1, idle 10, idle in transaction 1 | 다중 사용자 재측정 통과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 190 rps | dev-default-debug | 단일(1명, round-robin)/pre=max 500 | debug-reference | GET /api/user-activities/{userId} | 70.80ms | 321.32ms | 0.00% | 189.63 | 0 | 미계측 | composite API 내부 조회 | 68.67% | active 2, idle 9, idle in transaction 1 | 단기 경계 참고 통과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 190 rps, 5분 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | boundary-reference | GET /api/user-activities/{userId} | 32.81ms | 42.47ms | 0.01% | 190.70 | 0 | 미계측 | composite API 내부 조회 | 57.62% | active 1, idle 9, idle in transaction 2 | 경계 통과, dial i/o timeout 경고 7건 관찰 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 200 rps, maxVUs 500 | dev-default-debug | 단일(1명, round-robin)/pre=max 500 | debug-reference | GET /api/user-activities/{userId} | 3,198.98ms | 3,361.01ms | 0.00% | 178.96 | 1,034 | 미계측 | composite API 내부 조회 | 56.29% | active 1, idle 8, idle in transaction 3 | 참고 실패, VU 부족 및 DEBUG 로그 영향 가능성 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 200 rps, pre/max VU 1000 | dev-sql-warn | 단일(1명, round-robin)/pre=max 1000 | vu-headroom-reference | GET /api/user-activities/{userId} | 46.49ms | 162.73ms | 0.00% | 204.30 | 0 | 미계측 | composite API 내부 조회 | 58.40% | active 1, idle 7, idle in transaction 4 | VU 한도 참고 통과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 200 rps, pre/max VU 500, 첫 실행 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | warmup-anomaly | GET /api/user-activities/{userId} | 294.49ms | 2,654.48ms | 0.00% | 202.61 | 145 | 미계측 | composite API 내부 조회 | 54.55% | active 3, idle 8, idle in transaction 1 | 첫 실행 `Insufficient VUs` 1건, 최종 기준 제외 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 200 rps, pre/max VU 500, 재실행 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | final-baseline | GET /api/user-activities/{userId} | 20.51ms | 24.04ms | 0.00% | 205.15 | 0 | 미계측 | composite API 내부 조회 | 52.82% | active 2, idle 8, idle in transaction 2 | 재실행 통과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 250 rps, maxVUs 500 | dev-default-debug | 단일(1명, round-robin)/pre=max 500 | debug-reference | GET /api/user-activities/{userId} | 2,737.13ms | 3,027.10ms | 0.00% | 202.58 | 2,266 | 미계측 | composite API 내부 조회 | 86.68% | active 1, idle 11 | 참고 실패, VU 부족 및 DEBUG 로그 영향 가능성 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 250 rps, pre/max VU 1000 | dev-sql-warn | 단일(1명, round-robin)/pre=max 1000 | vu-headroom-reference | GET /api/user-activities/{userId} | 163.52ms | 441.06ms | 0.00% | 255.18 | 0 | 미계측 | composite API 내부 조회 | 85.94% | active 1, idle 8, idle in transaction 3 | VU 한도 참고 통과, Postgres 컨테이너 CPU(docker stats) 70% 초과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 250 rps, pre/max VU 500 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | final-baseline | GET /api/user-activities/{userId} | 24.34ms | 29.55ms | 0.00% | 256.68 | 0 | 미계측 | composite API 내부 조회 | 76.85% | active 2, idle 8, idle in transaction 2 | 응답 기준 통과, Postgres 컨테이너 CPU(docker stats) 70% 초과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 300 rps, pre/max VU 1000 | dev-sql-warn | 단일(1명, round-robin)/pre=max 1000 | vu-headroom-reference | GET /api/user-activities/{userId} | 613.79ms | 858.04ms | 0.00% | 306.36 | 0 | 미계측 | composite API 내부 조회 | 126.29% | active 1, idle 10, idle in transaction 1 | 참고 실패, VU 부족은 아님 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 300 rps, pre/max VU 500 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | final-baseline | GET /api/user-activities/{userId} | 24.63ms | 31.71ms | 0.00% | 307.50 | 0 | 미계측 | composite API 내부 조회 | 91.81% | active 3, idle 9 | 응답 기준 통과, Postgres 컨테이너 CPU(docker stats) 70% 초과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 200 rps, pre/max VU 500, 3회 반복 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | final-baseline | GET /api/user-activities/{userId} | 평균 24.30ms (20.90~30.12ms) | 평균 30.49ms (24.75~40.26ms) | 최대 0.00% | 평균 205.94 | 0 | 미계측 | composite API 내부 조회 | 최대 63.44% | active/idle 위주 | 3회 반복 통과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 250 rps, pre/max VU 500, 3회 반복 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | final-baseline | GET /api/user-activities/{userId} | 평균 26.63ms (22.67~29.05ms) | 평균 34.30ms (29.51~38.15ms) | 최대 0.00% | 평균 257.22 | 0 | 미계측 | composite API 내부 조회 | 최대 78.97% | active/idle 위주 | 3회 반복 통과, Postgres 컨테이너 CPU(docker stats) 70% 초과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 300 rps, pre/max VU 500, 3회 반복 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | final-baseline | GET /api/user-activities/{userId} | 평균 55.63ms (24.35~106.98ms) | 평균 92.92ms (29.66~200.06ms) | 최대 0.00% | 평균 308.77 | 0 | 미계측 | composite API 내부 조회 | 최대 124.29% | active/idle 위주 | 3회 반복 통과, Postgres 컨테이너 CPU(docker stats) 100% 초과 스냅샷 포함 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 200 rps, 1분, 5명 round-robin | dev-sql-warn | 5명 round-robin/pre=max 500 | multi-user-reference | GET /api/user-activities/{userId} | 27.76ms | 33.93ms | 0.00% | 204.63 | 0 | 미계측 | composite API 내부 조회 | 47.21% | active 1, idle 10, idle in transaction 1 | 다중 사용자 1분 통과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 250 rps, 1분, 5명 round-robin | dev-sql-warn | 5명 round-robin/pre=max 500 | multi-user-reference | GET /api/user-activities/{userId} | 30.42ms | 40.73ms | 0.00% | 260.75 | 0 | 미계측 | composite API 내부 조회 | 74.15% | active 3, idle 8, idle in transaction 1 | 다중 사용자 1분 통과, Postgres 컨테이너 CPU(docker stats) 70% 초과 |
+| 현재 RDB baseline | 10m seed scale | Throughput, 300 rps, 1분, 5명 round-robin | dev-sql-warn | 5명 round-robin/pre=max 500 | multi-user-reference | GET /api/user-activities/{userId} | 40.23ms | 87.79ms | 0.00% | 309.95 | 0 | 미계측 | composite API 내부 조회 | 80.99% | active 5, idle 6, idle in transaction 1 | 다중 사용자 1분 통과, Postgres 컨테이너 CPU(docker stats) 70% 초과 |
+| 현재 RDB baseline | 10m seed scale | Throughput Soak, 100 rps, 30분 | dev-default-debug | 단일(1명, round-robin)/pre=max 500 | soak-reference | GET /api/user-activities/{userId} | 26.71ms | 31.04ms | 0.04% | 100.14 | 0 | 미계측 | composite API 내부 조회 | 28.65% | active 1, idle 11 | 수치 기준 통과, timeout 경고 관찰 |
+| 현재 RDB baseline | 10m seed scale | Throughput Soak, 150 rps, 30분 | dev-default-debug | 단일(1명, round-robin)/pre=max 500 | debug-reference | GET /api/user-activities/{userId} | 3,156.80ms | 29,750.32ms | 0.88% | 122.23 | 46,828 | 미계측 | composite API 내부 조회 | 76.08% | active 1, idle 8, idle in transaction 3 | 비교 제외, SQL DEBUG 로그 출력 영향 가능성 |
+| 현재 RDB baseline | 10m seed scale | Throughput Soak, 150 rps, 30분 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | soak-reference | GET /api/user-activities/{userId} | 28.40ms | 35.13ms | 0.07% | 150.50 | 0 | 미계측 | composite API 내부 조회 | 38.73% | active 2, idle 10 | 수치 기준 통과, dial i/o timeout 경고 183건 관찰 |
+| 현재 RDB baseline | 10m seed scale | Throughput Soak, 190 rps, 30분 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | soak-reference | GET /api/user-activities/{userId} | 37.29ms | 52.11ms | 0.02% | 191.89 | 0 | 미계측 | composite API 내부 조회 | 57.98% | active 2, idle 10 | 수치 기준 통과, dial i/o timeout 경고 53건 관찰 |
+| 현재 RDB baseline | 10m seed scale | Throughput Soak, 250 rps, 10분 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | soak-reference | GET /api/user-activities/{userId} | 49.41ms | 136.01ms | 0.02% | 257.65 | 0 | 미계측 | composite API 내부 조회 | 82.73% | active 1, idle 9, idle in transaction 2 | 10분 수치 기준 통과, dial i/o timeout 경고 28건 관찰 |
+| 현재 RDB baseline | 10m seed scale | Throughput Soak, 300 rps, 10분 | dev-sql-warn | 단일(1명, round-robin)/pre=max 500 | soak-reference | GET /api/user-activities/{userId} | 1,692.74ms | 1,934.22ms | 0.02% | 307.25 | 1,159 | 미계측 | composite API 내부 조회 | 116.15% | active 1, idle 11 | 실패, dropped/latency 기준 초과 |
 
 인덱스 또는 쿼리 최적화를 반영한 경우에는 SQL/query별 개선 폭을 따로 기록한다.
 
