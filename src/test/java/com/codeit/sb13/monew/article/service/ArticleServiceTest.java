@@ -444,8 +444,11 @@ class ArticleServiceTest {
         assertThat(result.size()).isEqualTo(1);
         assertThat(result.totalElements()).isEqualTo(42L);
         assertThat(result.hasNext()).isTrue();
-        // publishDate 정렬이므로 nextCursor는 발행일이어야 한다.
-        assertThat(result.nextCursor()).isEqualTo(article.getDate().toString());
+        // publishDate 정렬이므로 nextCursor는 "발행일|id" 형태여야 한다.
+        assertThat(result.nextCursor()).isEqualTo(
+                article.getDate().toString()
+                        + ArticleSearchCondition.CURSOR_DELIMITER
+                        + lastArticleId);
         assertThat(result.nextAfter()).isEqualTo(lastCreatedAt.toString());
         assertThat(result.nextIdAfter()).isEqualTo(lastArticleId.toString());
         verify(articleMapper).toDto(article, true, 3L, 5L);

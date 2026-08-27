@@ -204,6 +204,11 @@ public class ArticleServiceImpl implements ArticleService {
      * <p>응답 DTO가 아니라 {@code ArticleSearchRow}에서 뽑는다. keyset의 보조 기준이
      * {@code article.createdAt}인데 {@code ArticleDto}에는 그 필드가 없기 때문이다.
      * 세 커서를 모두 같은 출처에서 만들어야 한 항목의 값끼리 어긋나지 않는다.
+     *
+     * <p>정렬 기준 값과 id를 {@code "정렬 기준 값|id"} 하나로 묶어 내려준다. 제공된
+     * 프론트엔드는 {@code nextIdAfter}를 읽지 않고 {@code cursor}만 그대로 되돌려보내는데,
+     * 3차 기준인 id가 빠지면 정렬 기준 값과 생성 시각이 같은 기사가 페이지 경계에서
+     * 누락되기 때문이다. 클라이언트는 이 문자열을 해석할 필요가 없다.
      */
     private String nextCursor(List<ArticleSearchRow> rows, ArticleOrderBy orderBy) {
         if (rows.isEmpty()) {
@@ -211,11 +216,13 @@ public class ArticleServiceImpl implements ArticleService {
         }
 
         ArticleSearchRow last = rows.get(rows.size() - 1);
-        return switch (orderBy) {
+        String sortValue = switch (orderBy) {
             case COMMENT_COUNT -> String.valueOf(last.commentCount());
             case VIEW_COUNT -> String.valueOf(last.viewCount());
             case PUBLISH_DATE -> last.article().getDate().toString();
         };
+
+        return sortValue + ArticleSearchCondition.CURSOR_DELIMITER + last.article().getId();
     }
 
     private String nextAfter(List<ArticleSearchRow> rows) {

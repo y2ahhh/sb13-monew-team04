@@ -125,10 +125,15 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
      * <p>id는 UUID라 크고 작음에 비즈니스적 의미는 없지만 항상 유일하므로, 정렬 기준과
      * 생성 시각이 모두 같은 기사가 페이지 경계에 걸려도 건너뛰거나 중복으로 반환되지 않는다.
      *
-     * <p>다만 {@code idAfter}는 선택값이다. 생략되면 (정렬 기준, 생성 시각) 2단으로만
-     * 비교한다. {@code createdAt}은 나노초 정밀도라 두 기사가 완전히 같은 값을 갖는
-     * 경우가 사실상 없어 2단만으로도 정상 동작하고, {@code idAfter}는 그 희박한
-     * 동률까지 막는 안전망 역할만 한다.
+     * <p>3차 기준은 생략할 수 없다. 정렬은 언제나 id까지 3단으로 하므로, 비교를 2단으로
+     * 줄이면 정렬 기준 값과 생성 시각이 모두 같은 기사가 페이지 경계에 걸렸을 때 다음
+     * 페이지에서 영영 빠진다. {@code viewCount}/{@code commentCount} 정렬은 대부분의
+     * 기사가 같은 값을 가져 특히 위험하다.
+     *
+     * <p>다만 {@code idAfter}를 별도 파라미터로 요구하지는 않는다. 제공된 프론트엔드는
+     * 응답의 {@code nextIdAfter}를 읽지 않고 {@code cursor}/{@code after}만 되돌려보내기
+     * 때문이다. 대신 {@code cursor}를 {@code "정렬 기준 값|id"} 형태로 만들어 id를 함께
+     * 실어 보낸다. 클라이언트는 커서를 해석하지 않고 그대로 돌려주기만 하면 된다.
      */
     private BooleanExpression keysetCondition(
             ArticleSearchCondition condition,
@@ -141,9 +146,6 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
 
         // cursor와 after는 하나의 단위다. 한쪽만 오면 첫 페이지를 다시 돌려주게 되어
         // 클라이언트가 같은 항목을 두 번 받는다. 조용히 넘기지 않고 거부한다.
-        // idAfter는 동률 타이브레이커라 선택값이다. 제공된 프론트엔드는 응답의
-        // nextIdAfter를 읽지 않고 cursor/after만 되돌려보내므로 필수로 요구하면
-        // 두 번째 페이지 요청이 전부 400이 된다.
         boolean noneProvided = !StringUtils.hasText(cursor) && after == null && idAfter == null;
         if (noneProvided) {
             return null;
@@ -153,22 +155,50 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
                     "cursor와 after는 함께 전달해야 합니다.");
         }
 
+        // 커서에 실려 온 id가 3차 기준이다. idAfter 파라미터를 직접 보낸 클라이언트가
+        // 있으면 그 값을 우선한다.
+        String cursorValue = cursorValue(cursor);
+        UUID tiebreakerId = idAfter != null ? idAfter : cursorId(cursor);
+        if (tiebreakerId == null) {
+            throw new ArticleSearchConditionInvalidException(
+                    "cursor에 3차 정렬 기준(id)이 없습니다: " + cursor);
+        }
+
         boolean ascending = condition.direction().isAscending();
 
         if (condition.orderBy() == ArticleOrderBy.PUBLISH_DATE) {
-            LocalDateTime cursorDate = parseCursorAsDateTime(cursor);
+            LocalDateTime cursorDate = parseCursorAsDateTime(cursorValue);
             return keyset(article.date.eq(cursorDate),
                     ascending ? article.date.gt(cursorDate) : article.date.lt(cursorDate),
-                    ascending, after, idAfter);
+                    ascending, after, tiebreakerId);
         }
 
         NumberExpression<Long> countExpr =
                 condition.orderBy() == ArticleOrderBy.COMMENT_COUNT ? commentCountExpr : viewCountExpr;
-        long cursorCount = parseCursorAsCount(cursor);
+        long cursorCount = parseCursorAsCount(cursorValue);
 
         return keyset(countExpr.eq(cursorCount),
                 ascending ? countExpr.gt(cursorCount) : countExpr.lt(cursorCount),
-                ascending, after, idAfter);
+                ascending, after, tiebreakerId);
+    }
+
+    private String cursorValue(String cursor) {
+        int index = cursor.lastIndexOf(ArticleSearchCondition.CURSOR_DELIMITER);
+        return index < 0 ? cursor : cursor.substring(0, index);
+    }
+
+    private UUID cursorId(String cursor) {
+        int index = cursor.lastIndexOf(ArticleSearchCondition.CURSOR_DELIMITER);
+        if (index < 0) {
+            return null;
+        }
+
+        String value = cursor.substring(index + 1);
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            throw new ArticleSearchConditionInvalidException("커서의 id 값이 올바르지 않습니다: " + value);
+        }
     }
 
     /**
@@ -186,15 +216,12 @@ public class ArticleRepositoryCustomImpl implements ArticleRepositoryCustom {
     ) {
         BooleanExpression createdAtAdvances =
                 ascending ? article.createdAt.gt(after) : article.createdAt.lt(after);
-
-        BooleanExpression keyset = primaryAdvances.or(primaryEq.and(createdAtAdvances));
-        if (idAfter == null) {
-            return keyset;
-        }
-
         BooleanExpression idAdvances =
                 ascending ? article.id.gt(idAfter) : article.id.lt(idAfter);
-        return keyset.or(primaryEq.and(article.createdAt.eq(after)).and(idAdvances));
+
+        return primaryAdvances
+                .or(primaryEq.and(createdAtAdvances))
+                .or(primaryEq.and(article.createdAt.eq(after)).and(idAdvances));
     }
 
     private LocalDateTime parseCursorAsDateTime(String cursor) {

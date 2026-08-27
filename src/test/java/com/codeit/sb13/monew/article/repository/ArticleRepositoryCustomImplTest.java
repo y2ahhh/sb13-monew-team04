@@ -496,8 +496,8 @@ class ArticleRepositoryCustomImplTest {
     }
 
     @Test
-    @DisplayName("idAfter 없이 cursor와 after만으로도 다음 페이지를 가져온다")
-    void cursorPagingWorksWithoutIdAfter() {
+    @DisplayName("cursor에 id가 실려 오면 idAfter 파라미터 없이도 다음 페이지를 가져온다")
+    void cursorCarriesIdWhenIdAfterIsAbsent() {
         Article older = persistArticle("기사1", "요약", D1, ArticleSource.NAVER);
         persistArticle("기사2", "요약", D2, ArticleSource.CHOSUN);
 
@@ -505,17 +505,49 @@ class ArticleRepositoryCustomImplTest {
         // 나노초까지 남아 있지만 저장된 값은 마이크로초로 잘려, 그대로 커서로 쓰면
         // 커서 기준이 된 기사 자신이 다음 페이지에 다시 딸려 나온다.
         ArticleSearchPage first = firstPage(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, 1);
-        ArticleSearchRow last = first.rows().get(0);
+        Article last = first.rows().get(0).article();
 
         ArticleSearchPage second = articleRepository.search(
                 page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
-                        last.article().getDate().toString(),
-                        last.article().getCreatedAt(), null, 10));
+                        last.getDate() + ArticleSearchCondition.CURSOR_DELIMITER + last.getId(),
+                        last.getCreatedAt(), null, 10));
 
         assertThat(second.rows()).hasSize(1);
         assertThat(second.rows().get(0).article().getId()).isEqualTo(older.getId());
         // 커서 조건 없이 세는 값이라 전체 2건이 그대로 나와야 한다.
         assertThat(second.totalElements()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("정렬 기준 값과 생성 시각이 모두 같은 기사가 페이지 경계에 걸려도 누락되지 않는다")
+    void tiedRowsAreNotSkippedAtPageBoundary() {
+        Article a = persistArticle("동률1", "요약", D1, ArticleSource.NAVER);
+        Article b = persistArticle("동률2", "요약", D1, ArticleSource.CHOSUN);
+        Article c = persistArticle("동률3", "요약", D1, ArticleSource.HANKYUNG);
+        em.flush();
+
+        // created_at은 updatable=false라 더티 체킹으로는 못 바꾼다. 세 기사가 같은
+        // 마이크로초에 저장된 상황을 네이티브 쿼리로 강제한다. date까지 같으므로
+        // 3차 기준인 id만이 순서를 가른다.
+        em.getEntityManager()
+                .createNativeQuery("update articles set created_at = ?1")
+                .setParameter(1, LocalDateTime.of(2026, 8, 26, 12, 0))
+                .executeUpdate();
+        em.clear();
+
+        ArticleSearchPage first = firstPage(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC, 2);
+        Article last = first.rows().get(1).article();
+
+        ArticleSearchPage second = articleRepository.search(
+                page(ArticleOrderBy.PUBLISH_DATE, Sort.Direction.DESC,
+                        last.getDate() + ArticleSearchCondition.CURSOR_DELIMITER + last.getId(),
+                        last.getCreatedAt(), null, 2));
+
+        List<UUID> collected = new ArrayList<>();
+        first.rows().forEach(row -> collected.add(row.article().getId()));
+        second.rows().forEach(row -> collected.add(row.article().getId()));
+
+        assertThat(collected).containsExactlyInAnyOrder(a.getId(), b.getId(), c.getId());
     }
 
     @Test
