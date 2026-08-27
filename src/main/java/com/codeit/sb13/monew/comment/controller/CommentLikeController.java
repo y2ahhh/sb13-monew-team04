@@ -35,6 +35,6 @@ public class CommentLikeController implements CommentLikeApi {
       @RequestHeader("Monew-Request-User-ID") UUID requestUserId
   ) {
     commentLikeService.unlikeComment(new CommentLikeRegisterCommand(commentId, requestUserId));
-    return ResponseEntity.status(HttpStatus.OK).build(); // Swagger API "204 삭제 성공" 을 따른다
+    return ResponseEntity.status(HttpStatus.OK).build(); // Swagger API "200 삭제 성공" 을 따른다
   }
 }
