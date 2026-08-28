@@ -24,6 +24,8 @@ jobs:
     name: build-and-push-image
     runs-on: ubuntu-latest
     permissions:
+      contents: read    # actions/checkout이 저장소 코드를 읽기 위해 필요.
+                         # job-level permissions는 workflow 상단 값을 상속하지 않고 완전히 덮어쓰므로, 여기서도 명시해야 한다.
       packages: write   # GHCR(GitHub Container Registry)에 이미지를 push하기 위해 필요
     outputs:
       image_sha: ${{ steps.meta.outputs.image_sha }}
