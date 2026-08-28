@@ -148,11 +148,9 @@ public class UserServiceImpl implements UserService {
 
     if (updatedCount == 0) {
       validateExists(userId);
-
-      log.warn("논리 삭제 실패 - 이미 삭제된 계정 - userId: {}", userId);
       throw new AlreadyDeletedUserException(userId);
     }
-    log.info("논리 삭재 성공 - userId: {}", userId);
+    log.info("논리 삭제 성공 - userId: {}", userId);
   }
 
   @Override
