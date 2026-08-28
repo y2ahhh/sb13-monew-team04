@@ -17,7 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 삭제 이벤트에 따라 활동 관련 row의 노출 상태를 일괄 갱신한다.
  *
  * <p>노출 상태와 대상 조건은 항상 {@link ActivityDeletionTarget} 기준으로 함께 결정한다.
- * 외부 서비스는 {@code ActivityVisibilityStatus}를 직접 넘기지 않고 삭제 이벤트별 명시 메서드를 호출한다.</p>
+ * 외부 서비스는 {@code ActivityVisibilityStatus}를 직접 넘기지 않고 삭제 이벤트별 명시 메서드를 호출한다.
+ * 현재 MID4-222 범위에서는 기사 삭제 이벤트만 지원한다.</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -85,34 +86,19 @@ public class ActivityVisibilityUpdater {
     }
 
     private BooleanExpression articleViewTargetCondition(ActivityDeletionTarget target) {
-        return switch (target.cause()) {
-            case ARTICLE -> articleView.article.id.eq(target.targetId());
-            // TODO: USER 삭제 작업 진행 시 articleView 대상 조건 검토 필요.
-            case COMMENT, USER -> unsupportedCause(target);
-        };
+        // TODO: USER 삭제 작업 진행 시 articleView 대상 조건 검토 필요.
+        return articleView.article.id.eq(target.targetId());
     }
 
     private BooleanExpression commentTargetCondition(ActivityDeletionTarget target) {
-        return switch (target.cause()) {
-            case ARTICLE -> comment.article.id.eq(target.targetId());
-            // TODO: USER 삭제 작업 진행 시 comment 대상 조건 검토 필요.
-            // TODO: COMMENT 삭제 작업 진행 시 comment 대상 조건 검토 필요.
-            case COMMENT, USER -> unsupportedCause(target);
-        };
+        // TODO: USER 삭제 작업 진행 시 comment 대상 조건 검토 필요.
+        // TODO: COMMENT 삭제 작업 진행 시 comment 대상 조건 검토 필요.
+        return comment.article.id.eq(target.targetId());
     }
 
     private BooleanExpression commentLikeTargetCondition(ActivityDeletionTarget target) {
-        return switch (target.cause()) {
-            case ARTICLE -> commentLike.comment.article.id.eq(target.targetId());
-            // TODO: USER 삭제 작업 진행 시 commentLike 대상 조건 검토 필요.
-            // TODO: COMMENT 삭제 작업 진행 시 commentLike 대상 조건 검토 필요.
-            case COMMENT, USER -> unsupportedCause(target);
-        };
-    }
-
-    private BooleanExpression unsupportedCause(ActivityDeletionTarget target) {
-        throw new UnsupportedOperationException(
-                "아직 지원하지 않는 활동 노출 상태 갱신 대상입니다: " + target.cause()
-        );
+        // TODO: USER 삭제 작업 진행 시 commentLike 대상 조건 검토 필요.
+        // TODO: COMMENT 삭제 작업 진행 시 commentLike 대상 조건 검토 필요.
+        return commentLike.comment.article.id.eq(target.targetId());
     }
 }
