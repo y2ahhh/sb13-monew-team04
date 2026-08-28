@@ -30,6 +30,10 @@ public class ActivityVisibilityUpdater {
     /**
      * 기사 삭제 시 해당 기사와 연결된 활성 활동 row를 {@code ARTICLE_DELETED} 상태로 숨긴다.
      *
+     * <p>이 메서드는 bulk update 이후 오래된 활동 엔티티 상태를 재사용하지 않도록
+     * 영속성 컨텍스트를 초기화한다. 같은 트랜잭션에서 이미 조회한 엔티티 상태가 필요하면
+     * 이 메서드 호출 후 다시 조회해야 한다.</p>
+     *
      * @param articleId 삭제된 기사 id
      * @return 활동 테이블별 갱신 건수
      */
@@ -45,11 +49,14 @@ public class ActivityVisibilityUpdater {
         long commentCount = hideComments(target);
         long commentLikeCount = hideCommentLikes(target);
 
-        return new ArticleActivityVisibilityUpdateResult(
+        ArticleActivityVisibilityUpdateResult result = new ArticleActivityVisibilityUpdateResult(
                 articleViewCount,
                 commentCount,
                 commentLikeCount
         );
+        entityManager.clear();
+
+        return result;
     }
 
     private long hideArticleViews(ActivityDeletionTarget target) {

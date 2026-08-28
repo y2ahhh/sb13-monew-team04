@@ -90,6 +90,41 @@ class ArticleSoftDeleteVisibilityStatusIntegrationTest {
     }
 
     @Test
+    @DisplayName("softDelete clears persistence context after bulk visibility status updates")
+    void softDeleteClearsPersistenceContextAfterBulkVisibilityStatusUpdates() {
+        Article article = saveArticle("clear-context");
+        User user = saveUser("clear-context");
+        ArticleView articleView = articleViewRepository.save(
+                ArticleView.create(article, user, LocalDateTime.now()));
+        Comment comment = commentRepository.save(Comment.builder()
+                .article(article)
+                .user(user)
+                .content("clear context comment")
+                .build());
+        CommentLike commentLike = commentLikeRepository.save(CommentLike.builder()
+                .comment(comment)
+                .likedBy(user)
+                .build());
+        flushAndClear();
+
+        ArticleView managedArticleView = articleViewRepository.findById(articleView.getId()).orElseThrow();
+        Comment managedComment = commentRepository.findById(comment.getId()).orElseThrow();
+        CommentLike managedCommentLike = commentLikeRepository.findById(commentLike.getId()).orElseThrow();
+        assertThat(entityManager.contains(managedArticleView)).isTrue();
+        assertThat(entityManager.contains(managedComment)).isTrue();
+        assertThat(entityManager.contains(managedCommentLike)).isTrue();
+
+        articleService.softDelete(article.getId());
+
+        assertThat(entityManager.contains(managedArticleView)).isFalse();
+        assertThat(entityManager.contains(managedComment)).isFalse();
+        assertThat(entityManager.contains(managedCommentLike)).isFalse();
+        assertThat(articleViewStatus(articleView.getId())).isEqualTo(ARTICLE_DELETED);
+        assertThat(commentStatus(comment.getId())).isEqualTo(ARTICLE_DELETED);
+        assertThat(commentLikeStatus(commentLike.getId())).isEqualTo(ARTICLE_DELETED);
+    }
+
+    @Test
     @DisplayName("softDelete does not overwrite non ACTIVE visibility status")
     void softDeleteDoesNotOverwriteNonActiveVisibilityStatus() {
         Article article = saveArticle("preserve-status");
