@@ -114,6 +114,14 @@ Postgres 컨테이너 CPU(docker stats)와 커넥션 풀 대기는 가능한 경
 - raw k6 로그와 summary JSON은 `scripts/performance/activity-history/k6/results/mid4-206-mongodb-k6-compare/`에 저장되며 Git에는 포함하지 않는다.
 - MongoDB Read Model 구현은 이번 작업 범위가 아니므로 실제 MongoDB 부하 측정은 수행하지 않았다.
 
+## 로그 조건 분기 이유
+
+초기 측정은 개발 중 SQL 확인과 응답 검증을 함께 보기 위해 dev profile 기본 로그 조건인 `dev-default-debug`로 실행했다. 이 조건은 SQL과 batch 동작을 확인하는 데 유용하지만, `org.hibernate.SQL=debug`와 `org.hibernate.orm.jdbc.batch=trace` 출력이 많아지면 장시간 또는 고부하 테스트에서 애플리케이션 로그 I/O가 응답 시간과 처리량에 영향을 줄 수 있다.
+
+따라서 `dev-default-debug` 결과는 기존 동작 확인용 `debug-reference`로 보존하고, 최종 처리량 경계와 반복 측정 기준에서는 제외한다. `dev-sql-warn`은 같은 dev profile을 유지하되 SQL/배치 로그만 `warn`으로 낮춘 조건이며, MID4-206의 최종 RDB 기준값과 후속 테스트의 기본 로그 조건으로 사용한다.
+
+서로 다른 로그 조건의 결과는 직접 비교하지 않는다. 두 조건을 함께 볼 때는 SQL DEBUG/TRACE 출력이 부하 생성과 응답 시간에 끼친 영향을 분리하기 위한 참고 자료로만 해석한다.
+
 ## 테스트 결과 구분 기준
 
 성능 결과는 `로그 조건`, `사용자 조건`, `preAllocatedVUs`, `maxVUs`, `시나리오`, `duration`, `실행 순서/워밍업 상태`가 같은 경우에만 직접 비교한다. 조건이 2개 이상 다른 결과끼리는 원인 판단에 사용하지 않는다.
@@ -230,3 +238,5 @@ baseline, average, high-load, 150 rps는 기존 1회 측정에 4회 추가 측�
 - [x] 신규 실행 raw 로그의 timeout warning을 간단 확인했다.
 
 MongoDB 실제 비교 측정은 MongoDB Read Model 구현과 애플리케이션 전환 설정이 준비된 뒤 같은 시나리오로 반복한다.
+
+fan-out worst-case와 read/write 혼합 부하 후속 테스트 조건은 [RDB 조회 성능 측정 시나리오](./mid4-96-mongodb-decision-record/08-rdb-performance-test-scenarios.md#후속-테스트-공통-고정-조건)의 고정 조건을 따른다. 후속 테스트는 별도 실행 결과로 기록하며, MID4-206의 완료된 RDB 기준 결과와 직접 합산하지 않는다.

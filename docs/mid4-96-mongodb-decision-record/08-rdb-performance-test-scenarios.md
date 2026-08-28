@@ -197,6 +197,110 @@ MID4-179에서 수행한 k6 측정은 MongoDB Read Model을 바로 적용하지 
 
 MID4-206에서는 위 한계 중 multi-user 요청 분포, VU 단계별 부하, RPS 보강 시나리오, 장시간 soak, 같은 조건 반복 측정, RDB/MongoDB 결과 구분용 메타데이터를 먼저 보강했다. 다만 fan-out worst-case, read/write 혼합 부하 검증, MongoDB Read Model 구현 후 동일 조건 비교는 아직 별도 Jira 티켓에서 다룰 후속 범위다.
 
+## 후속 테스트 공통 고정 조건
+
+fan-out worst-case와 read/write 혼합 부하는 MID4-206 결과와 별도 후속 테스트로 실행한다. 이번 문서는 실행 조건만 고정하고, 실제 실행 결과는 테스트 완료 후 결과 기록 표에 추가한다.
+
+| 항목 | 고정값 |
+| --- | --- |
+| 기준 DB | RDB PostgreSQL |
+| 데이터 규모 | `SEED_SCALE=10m` |
+| 애플리케이션 profile | `dev` |
+| 로그 조건 | `dev-sql-warn` |
+| SQL 로그 override | `org.hibernate.SQL=warn`, `org.hibernate.orm.jdbc.batch=warn`, `org.hibernate.orm.jdbc.bind=off` |
+| k6 실행 위치 | Docker compose k6 |
+| 기준 read API | `GET /api/user-activities/{userId}` |
+| 기준 사용자 | `00000001-0000-4000-8000-000000000001` |
+| 기본 사용자 전략 | `round-robin` |
+| throughput 기본 VU | `preAllocatedVUs=500`, `maxVUs=500` |
+| CPU 수집 | `StatsDelaySeconds=30` 기준 `docker stats --no-stream` |
+| CPU 해석 | k6 컨테이너 CPU를 제외한 Postgres 컨테이너 순간 스냅샷 |
+| read 성공 기준 | `http_req_failed < 1%`, `checks rate > 99%`, `dropped_iterations = 0`, `p95 < 200ms`, `p99 < 500ms` |
+| 결과 비교 기준 | 로그 조건, 데이터, 사용자 수, VU/RPS, duration, 실행 순서가 모두 같을 때만 직접 비교 |
+
+로그 조건을 `dev-sql-warn`으로 고정하는 이유는 MID4-206에서 확인한 SQL DEBUG/TRACE 로그 출력 영향 때문이다. `dev-default-debug`는 SQL/query 확인용으로만 사용하고, 성능 결과에는 `debug-reference`로 기록한다. 후속 테스트의 최종 판단값은 `dev-sql-warn` 조건에서 수집한 결과만 사용한다. 상세 기준은 [MID4-206 MongoDB 적용 대비 k6 비교 테스트 보강](../mid4-206-mongodb-k6-compare.md#로그-조건-분기-이유)을 따른다.
+
+각 테스트 실행 전에는 10m seed를 새로 적재한다. fan-out worst-case는 10m seed 적재 후 fan-out overlay를 적용하고 `ANALYZE`를 실행한 상태에서 측정한다. read/write 혼합 부하는 실행 중 DB 상태가 변하므로 시나리오 또는 반복 실행 단위마다 10m seed를 다시 적재한 결과만 직접 비교한다.
+
+## Fan-out Worst-case Read Test
+
+목적은 전체 테이블 규모가 아니라 특정 댓글, 기사, 관심사에 관계 데이터가 집중될 때 카운트 서브쿼리와 `users.deleted_at` 확인 비용이 커지는지 검증하는 것이다. 결과 용도는 `rdb-fanout-read`로 기록한다.
+
+| 대상 | 고정 집중 조건 |
+| --- | --- |
+| 최근 댓글 10개 | 댓글당 좋아요 1,000개 |
+| 최근 조회 기사 10개 | 기사당 댓글 1,000개 |
+| 최근 조회 기사 10개 | 기사당 조회 사용자 10,000명 |
+| 구독 관심사 50개 | 관심사당 구독자 1,000명 |
+| 편중 관심사 1개 | 구독자 50,000명 |
+
+관계 데이터에 사용하는 사용자는 서로 다른 사용자로 구성한다. 동일 사용자를 반복 사용하면 PostgreSQL `Memoize`가 사용자 PK 조회 결과를 재사용해 `users.deleted_at` 반복 조회 위험을 작게 측정할 수 있다.
+
+| 단계 | 시나리오 | 부하 | 시간 | 목적 |
+| --- | --- | --- | --- | --- |
+| 1 | smoke | 1 VU | 1분 | overlay 데이터와 응답 구조 확인 |
+| 2 | throughput | 100 rps | 1분 | 낮은 처리량 기준 확인 |
+| 3 | throughput | 150 rps | 1분 | MID4-206 안정 구간과 비교 |
+| 4 | throughput | 200 rps | 1분 | 기존 RDB 기준 경계와 비교 |
+| 5 | throughput-soak | 100/150/200 rps 중 성공 기준을 모두 만족한 가장 높은 RPS | 10분 | 단기 통과값의 유지 여부 확인 |
+
+100/150/200 rps가 모두 실패하면 soak는 실행하지 않고 실패한 최대 부하 지점을 `reference` 결과로만 기록한다. 필수 확인 항목은 API p95/p99, `pk_users` index scan loops, 카운트 서브쿼리별 실행 시간, `shared hit`, `shared read`, Postgres 컨테이너 CPU(docker stats), 커넥션 대기다.
+
+## RDB Read/Write Mixed Load Test
+
+목적은 RDB 기준에서 쓰기 요청이 섞였을 때 활동내역 read 성능이 얼마나 흔들리는지 확인하는 것이다. 현재 Outbox 구현은 없으므로 결과 용도는 `rdb-mixed-no-outbox`로 기록한다. Outbox 구현 후 같은 조건으로 재측정할 때만 `rdb-mixed-with-outbox`와 비교한다.
+
+| API 태그 | 비율 80/20 | 비율 50/50 | 요청 |
+| --- | ---: | ---: | --- |
+| `activity-history-read` | 80% | 50% | `GET /api/user-activities/{userId}` |
+| `comment-create` | 5% | 10% | `POST /api/comments` |
+| `comment-like-toggle` | 5% | 15% | `POST`와 `DELETE /api/comments/{commentId}/comment-likes`를 1:1로 교대 실행 |
+| `article-view` | 5% | 15% | `POST /api/articles/{articleId}/article-views` |
+| `subscription-toggle` | 5% | 10% | `POST`와 `DELETE /api/interests/{interestId}/subscriptions`를 1:1로 교대 실행 |
+
+write 요청은 테스트 전용 사용자와 테스트 전용 기사, 댓글, 관심사 ID pool을 사용한다. 멱등 API라도 중복 요청 때문에 error rate가 왜곡되지 않도록 `comment-like-toggle`과 `subscription-toggle`은 같은 VU 안에서 같은 target을 `POST -> DELETE` 순서로 교대 실행한다.
+
+| 단계 | read/write 비율 | 시나리오 | 부하 | 시간 | 목적 |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 80/20 | smoke | 5 VU | 1분 | 인증, payload, 응답 검증 |
+| 2 | 80/20 | average | 50 VU | 10분 | 일반 혼합 부하 확인 |
+| 3 | 80/20 | throughput | 100 rps | 1분 | 요청 도착률 기준 확인 |
+| 4 | 80/20 | throughput | 150 rps | 1분 | read 안정 구간에서 write 영향 확인 |
+| 5 | 50/50 | throughput-reference | 100 rps | 1분 | write 비중 증가 참고값 확보 |
+
+결과는 전체 p95/p99만 기록하지 않는다. `api` tag 기준으로 `activity-history-read`, `comment-create`, `comment-like-toggle`, `article-view`, `subscription-toggle`의 p95/p99, error rate, checks rate를 분리 기록한다.
+
+## 후속 테스트 결과 기록 표
+
+fan-out worst-case 실행 결과는 아래 표에 추가한다.
+
+| 결과 용도 | seed 조건 | 시나리오 | 부하 | 시간 | p95 | p99 | error rate | checks rate | dropped iterations | `pk_users` loops | Postgres CPU | 커넥션 대기 | 판단 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `rdb-fanout-read` | 10m + fan-out overlay |  |  |  |  |  |  |  |  |  |  |  |  |
+
+read/write 혼합 부하 실행 결과는 아래 표에 추가한다.
+
+| 결과 용도 | mix ratio | 시나리오 | 부하 | 시간 | api tag | p95 | p99 | error rate | checks rate | dropped iterations | Postgres CPU | 커넥션 대기 | 판단 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `rdb-mixed-no-outbox` | 80/20 |  |  |  | `activity-history-read` |  |  |  |  |  |  |  |  |
+| `rdb-mixed-no-outbox` | 80/20 |  |  |  | `comment-create` |  |  |  |  |  |  |  |  |
+| `rdb-mixed-no-outbox` | 80/20 |  |  |  | `comment-like-toggle` |  |  |  |  |  |  |  |  |
+| `rdb-mixed-no-outbox` | 80/20 |  |  |  | `article-view` |  |  |  |  |  |  |  |  |
+| `rdb-mixed-no-outbox` | 80/20 |  |  |  | `subscription-toggle` |  |  |  |  |  |  |  |  |
+
+## 후속 테스트 변경 관리 기준
+
+고정 조건이 바뀐 결과는 기존 결과와 직접 비교하지 않는다. `preAllocatedVUs`, `maxVUs`, duration, 사용자 수, 로그 레벨, seed overlay 조건, read/write 비율 중 하나라도 다르면 별도 결과 용도를 부여한다.
+
+| 결과 용도 | 사용 조건 |
+| --- | --- |
+| `rdb-fanout-read` | RDB, 10m seed, fan-out overlay, read-only 측정 |
+| `rdb-mixed-no-outbox` | RDB, 10m seed, Outbox 미구현, read/write 혼합 측정 |
+| `rdb-mixed-with-outbox` | RDB, 10m seed, Outbox 구현 후 read/write 혼합 재측정 |
+| `mongo-fanout-read` | MongoDB Read Model 구현 후 fan-out overlay와 같은 사용자 조건으로 read-only 측정 |
+
+실행 조건을 바꿔 원인을 분리할 때는 `reference` 결과로만 기록한다. 예를 들어 `preAllocatedVUs=1000`, `maxVUs=1000`으로 바꾼 결과는 VU 한도 확인용이며, `preAllocatedVUs=500`, `maxVUs=500` 기준 결과와 직접 비교하지 않는다.
+
 ## 제외 조건 필터 비용 측정
 
 논리삭제 사용자, 논리삭제 기사, 논리삭제 댓글이 많은 데이터에서는 제외 조건 필터 비용을 별도로 측정한다.
@@ -243,7 +347,7 @@ MongoDB 적용 검토는 RDB 쿼리와 인덱스 최적화를 반영한 뒤에�
 
 MID4-206에서 2026-08-27~28 기준 10m seed scale 데이터를 새로 적재하고 smoke 워밍업을 포함해 RDB 기준 k6 측정을 완료했다. 추가로 160~190 rps 경계값, 주요 시나리오 총 5회 반복, 100/150/190 rps 30분 soak, 190 rps 5분 경계, 200/250/300 rps 원인 분리 측정을 수행했다. 이후 `dev-sql-warn` 조건에서 200/250/300 rps 동일 조건 3회 반복, 250/300 rps 10분 soak, stress 재측정, 5명 round-robin 200/250/300 rps 측정을 추가 수행했다. 상세 실행 로그, summary 파일명, 결과 용도 구분 기준은 [MID4-206 MongoDB 적용 대비 k6 비교 테스트 보강](../mid4-206-mongodb-k6-compare.md)에 기록한다.
 
-`dev-default-debug`는 `application-dev.yaml` 기본 로그 조건이며 `org.hibernate.SQL=debug`, `org.hibernate.orm.jdbc.batch=trace`가 켜진 상태다. `dev-sql-warn`은 같은 dev profile에서 SQL/배치 로그를 `warn`으로 낮춘 상태다. 별도 override 기록이 없는 초기 로컬 측정은 `dev-default-debug` 참고값으로 보고, 최종 경계 판단은 `dev-sql-warn` 재측정값을 우선한다.
+`dev-default-debug`는 `application-dev.yaml` 기본 로그 조건이며 `org.hibernate.SQL=debug`, `org.hibernate.orm.jdbc.batch=trace`가 켜진 상태다. `dev-sql-warn`은 같은 dev profile에서 SQL/배치 로그를 `warn`으로 낮춘 상태다. 별도 override 기록이 없는 초기 로컬 측정은 `dev-default-debug` 참고값으로 보고, 최종 경계 판단은 `dev-sql-warn` 재측정값을 우선한다. 로그 조건 분기 이유는 MID4-206 문서의 `로그 조건 분기 이유` 섹션을 따른다.
 
 성능 결과는 `로그 조건`, `사용자 조건`, `preAllocatedVUs`, `maxVUs`, `시나리오`, `duration`, `실행 순서/워밍업 상태`가 같은 경우에만 직접 비교한다. 조건이 2개 이상 다른 결과끼리는 원인 판단에 사용하지 않는다. 결과 용도 구분값은 MID4-206 문서의 정의를 따른다.
 
