@@ -3,6 +3,8 @@ param(
     [string] $Scenario = 'smoke',
     [ValidateSet('rdb', 'mongo')]
     [string] $Variant = 'rdb',
+    [ValidateSet('baseline', 'mixed')]
+    [string] $K6Script = 'baseline',
     [int[]] $Rates = @(50, 100, 150, 200, 250),
     [string] $Duration = '',
     [string] $BaseUrl = 'http://host.docker.internal:8080',
@@ -12,6 +14,12 @@ param(
     [string] $UserPickStrategy = 'round-robin',
     [string] $UserIdHeaderName = 'Monew-Request-User-ID',
     [string] $Authorization = '',
+    [ValidateSet('80/20', '50/50')]
+    [string] $MixRatio = '80/20',
+    [string[]] $MixArticleIds = @(),
+    [string[]] $MixCommentIds = @(),
+    [string[]] $MixInterestIds = @(),
+    [string[]] $MixWriteUserIds = @(),
     [int] $SmokeVus = 1,
     [int] $BaselineVus = 20,
     [int] $AverageVus = 50,
@@ -58,6 +66,30 @@ function Get-StatsContainers {
         $containers += $MongoContainer
     }
     return $containers
+}
+
+function Resolve-K6ScriptPath {
+    if ($K6Script -eq 'mixed') {
+        return '/scripts/activity-history-mixed.js'
+    }
+
+    return '/scripts/activity-history-baseline.js'
+}
+
+function Resolve-RunVariantLabel {
+    if ($K6Script -eq 'mixed') {
+        return "$Variant-mixed-$($MixRatio -replace '/', '-')"
+    }
+
+    return $Variant
+}
+
+function Resolve-SummaryPrefix {
+    if ($K6Script -eq 'mixed') {
+        return 'activity-history-mixed'
+    }
+
+    return 'activity-history'
 }
 
 function Invoke-DockerStats {
@@ -146,6 +178,7 @@ function New-K6Environment {
     )
 
     $environment = @{
+        K6_SCRIPT = Resolve-K6ScriptPath
         K6_SCENARIO = $Scenario
         K6_VARIANT = $Variant
         K6_BASE_URL = $BaseUrl
@@ -155,6 +188,11 @@ function New-K6Environment {
         K6_USER_PICK_STRATEGY = $UserPickStrategy
         K6_USER_ID_HEADER_NAME = $UserIdHeaderName
         K6_AUTHORIZATION = $Authorization
+        K6_MIX_RATIO = $MixRatio
+        K6_MIX_ARTICLE_IDS = ($MixArticleIds -join ',')
+        K6_MIX_COMMENT_IDS = ($MixCommentIds -join ',')
+        K6_MIX_INTEREST_IDS = ($MixInterestIds -join ',')
+        K6_MIX_WRITE_USER_IDS = ($MixWriteUserIds -join ',')
         K6_SUMMARY_PATH = "/results/mid4-206-mongodb-k6-compare/$SummaryName"
         K6_HTTP_REQ_FAILED_RATE_THRESHOLD = '0.01'
         K6_HTTP_REQ_DURATION_P95_THRESHOLD = '200'
@@ -196,18 +234,19 @@ function Invoke-K6Run {
     )
 
     $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $runVariantLabel = Resolve-RunVariantLabel
     $runLabel = if ($Scenario -eq 'throughput') {
-        "$Variant-$Scenario-${RunRate}rps-$timestamp"
+        "$runVariantLabel-$Scenario-${RunRate}rps-$timestamp"
     } elseif ($Scenario -eq 'stress') {
-        "$Variant-$Scenario-$timestamp"
+        "$runVariantLabel-$Scenario-$timestamp"
     } else {
         $vus = Get-ScenarioVus
-        "$Variant-$Scenario-${vus}vus-$timestamp"
+        "$runVariantLabel-$Scenario-${vus}vus-$timestamp"
     }
-    $summaryName = "activity-history-$runLabel-summary.json"
+    $summaryName = "$(Resolve-SummaryPrefix)-$runLabel-summary.json"
     $k6Environment = New-K6Environment $RunRate $summaryName
 
-    Write-Output "k6 run start: $runLabel"
+    Write-Output "k6 run start: $runLabel script=$K6Script"
     Invoke-DockerStats 'before' $runLabel
     Invoke-PgActivitySnapshot 'before' $runLabel
 

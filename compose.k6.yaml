@@ -4,6 +4,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
+      K6_SCRIPT: ${K6_SCRIPT:-/scripts/activity-history-baseline.js}
       K6_BASE_URL: ${K6_BASE_URL:-http://host.docker.internal:8080}
       K6_ACTIVITY_HISTORY_PATH_TEMPLATE: ${K6_ACTIVITY_HISTORY_PATH_TEMPLATE:-/api/user-activities/{userId}}
       K6_VARIANT: ${K6_VARIANT:-rdb}
@@ -11,6 +12,11 @@ services:
       K6_TARGET_USER_IDS: ${K6_TARGET_USER_IDS:-}
       K6_USER_PICK_STRATEGY: ${K6_USER_PICK_STRATEGY:-single}
       K6_USER_ID_HEADER_NAME: ${K6_USER_ID_HEADER_NAME:-Monew-Request-User-ID}
+      K6_MIX_RATIO: ${K6_MIX_RATIO:-80/20}
+      K6_MIX_ARTICLE_IDS: ${K6_MIX_ARTICLE_IDS:-}
+      K6_MIX_COMMENT_IDS: ${K6_MIX_COMMENT_IDS:-}
+      K6_MIX_INTEREST_IDS: ${K6_MIX_INTEREST_IDS:-}
+      K6_MIX_WRITE_USER_IDS: ${K6_MIX_WRITE_USER_IDS:-}
       K6_EXPECTED_STATUS: ${K6_EXPECTED_STATUS:-200}
       K6_SCENARIO: ${K6_SCENARIO:-smoke}
       K6_SMOKE_VUS: ${K6_SMOKE_VUS:-1}
@@ -42,4 +48,4 @@ services:
       - ./scripts/performance/activity-history/k6/results:/results
     command:
       - run
-      - /scripts/activity-history-baseline.js
+      - ${K6_SCRIPT:-/scripts/activity-history-baseline.js}
