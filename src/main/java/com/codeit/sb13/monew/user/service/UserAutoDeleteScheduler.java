@@ -1,6 +1,7 @@
 package com.codeit.sb13.monew.user.service;
 
 import com.codeit.sb13.monew.global.service.AdvisoryLockService;
+import com.codeit.sb13.monew.user.service.config.UserScheduleProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -14,10 +15,15 @@ public class UserAutoDeleteScheduler {
   private static final String LOCK_KEY = "user-auto-delete";
 
   private final UserService userService;
+  private final UserScheduleProperties props;
   private final AdvisoryLockService advisoryLockService;
 
-  @Scheduled(cron = "0 0 1 * * *", zone = "Asia/Seoul")
+  @Scheduled(cron = "${monew.user.schedule.cron}", zone = "Asia/Seoul")
   public void userAutoDeleteScheduler() {
+    if (!props.enabled()) {
+      log.info("사용자 자동 삭제 스케줄러가 비활성화되어 작업을 건너뜁니다.");
+      return;
+    }
 
     boolean executed = advisoryLockService.executeWithLock(LOCK_KEY, userService::autoDeleteExpiredUsers);
 
