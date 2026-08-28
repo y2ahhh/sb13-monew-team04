@@ -8,6 +8,27 @@
 
 MongoDB Read Model 적용 여부는 이 문서에서 결정하지 않는다. 이 문서의 결과 표와 병목 판단 기준을 바탕으로 `MID4-125`에서 MongoDB 적용 대상을 선정한다.
 
+처음 읽는 사람은 [MID4-206 활동내역 조회 성능 테스트 결과](../mid4-206-mongodb-k6-compare.md)를 먼저 보면 된다. MID4-206 문서는 “무슨 테스트를 했고 결과가 무엇인지”를 설명하는 보고서이고, 이 문서는 “그 테스트를 어떤 조건과 SQL 기준으로 다시 실행할지”를 남기는 상세 기준 문서다.
+
+## 읽는 방법
+
+이 문서에서 쓰는 테스트 이름은 아래 의미로 읽는다.
+
+| 문서의 이름 | 쉬운 의미 |
+| --- | --- |
+| Smoke | API가 정상 응답하는지 먼저 확인하는 시동 확인 테스트 |
+| Baseline | 기본 상태에서 응답 시간이 어느 정도인지 보는 기준 테스트 |
+| Average Load | 평소 수준의 동시 사용자를 가정한 일반 사용량 테스트 |
+| High Load | 사용자가 많아진 상황을 가정한 높은 사용량 테스트 |
+| Stress | 부하를 단계적으로 올려 어느 지점부터 느려지는지 보는 한계 테스트 |
+| Throughput | 1초에 정해진 요청 수를 계속 보내며 처리량을 보는 테스트 |
+| Soak | 같은 부하를 오래 유지해도 안정적인지 보는 장시간 유지 테스트 |
+| Fan-out | 좋아요, 조회, 구독이 특정 글이나 관심사에 몰린 상황을 보는 데이터 몰림 테스트 |
+| Exclusion | 삭제, 취소, 구독 해제 데이터를 걸러낼 때 비용을 보는 테스트 |
+| Mixed | 조회 요청과 쓰기 요청이 함께 들어오는 상황을 보는 읽기/쓰기 혼합 테스트 |
+
+`p95`, `p99`, `RPS`, `VU`, `dropped_iterations` 같은 측정 용어는 MID4-206 문서의 `읽기 전에 알아둘 말` 섹션을 따른다.
+
 측정은 다음 순서로 진행한다.
 
 ```text
@@ -223,7 +244,7 @@ fan-out worst-case, 제외 조건 필터 비용, read/write 혼합 부하는 MID
 
 각 테스트 실행 전에는 10m seed를 새로 적재한다. fan-out worst-case는 10m seed 적재 후 fan-out overlay를 적용하고 `ANALYZE`를 실행한 상태에서 측정한다. 제외 조건 필터 비용은 10m seed 적재 후 `exclusion-overlay.sql`을 적용하고, fan-out overlay와 동시에 적용하지 않는다. read/write 혼합 부하는 실행 중 DB 상태가 변하므로 시나리오 또는 반복 실행 단위마다 10m seed를 다시 적재한 결과만 직접 비교한다.
 
-## Fan-out Worst-case Read Test
+## 데이터 몰림 조회 테스트 (fan-out worst-case)
 
 목적은 전체 테이블 규모가 아니라 특정 댓글, 기사, 관심사에 관계 데이터가 집중될 때 카운트 서브쿼리와 `users.deleted_at` 확인 비용이 커지는지 검증하는 것이다. 100 rps 이상 고부하 확인 결과는 `rdb-fanout-read`로 기록하고, 고부하가 모두 실패한 뒤 같은 조건에서 낮은 RPS 경계를 찾는 결과는 `rdb-fanout-boundary-reference`로 분리한다.
 
@@ -256,7 +277,7 @@ fan-out worst-case, 제외 조건 필터 비용, read/write 혼합 부하는 MID
 
 100/150/200 rps가 모두 실패하면 기존 고부하 soak는 실행하지 않는다. 대신 같은 고정 조건에서 10/20/30/40/50 rps lower-bound ladder를 실행하고, 50 rps가 통과할 때만 60/70/80/90 rps를 추가한다. 최고 통과 RPS는 `rdb-fanout-boundary-reference`로 10분 soak를 1회 실행한다. 모든 lower-bound ladder가 실패하면 `capacity < 10 rps`로 기록한다. 필수 확인 항목은 API p95/p99, `pk_users` index scan loops, 카운트 서브쿼리별 실행 시간, `shared hit`, `shared read`, Postgres 컨테이너 CPU(docker stats), 커넥션 대기다.
 
-## RDB Read/Write Mixed Load Test
+## 읽기/쓰기 혼합 부하 테스트 (RDB read/write mixed)
 
 목적은 RDB 기준에서 쓰기 요청이 섞였을 때 활동내역 read 성능이 얼마나 흔들리는지 확인하는 것이다. 현재 Outbox 구현은 없으므로 결과 용도는 `rdb-mixed-no-outbox`로 기록한다. Outbox 구현 후 같은 조건으로 재측정할 때만 `rdb-mixed-with-outbox`와 비교한다.
 
