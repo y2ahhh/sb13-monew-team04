@@ -84,11 +84,17 @@ jobs:
 
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # latest 태그로 새 이미지만 받아온다. (postgres 이미지는 이미 로컬에 있으므로 다시 받지 않음)
-            docker compose -f compose.prod.yaml --env-file .env.prod pull app
+            # build-and-push 잡이 방금 빌드해서 올린 이미지를 SHA 태그로 못박아 둔다.
+            # MONEW_IMAGE는 셸 환경변수로 넘기므로 --env-file(.env.prod)에 있는 값보다 우선 적용되고,
+            # compose.prod.yaml의 image: ${MONEW_IMAGE:-...latest} 기본값도 덮어쓴다.
+            # 이렇게 해야 방금 테스트를 통과한 커밋과 실제 배포되는 이미지가 항상 일치한다.
+            IMAGE_SHA="${{ needs.build-and-push.outputs.image_sha }}"
+
+            # latest 태그가 아니라 위에서 고정한 SHA 태그 이미지를 받아온다.
+            MONEW_IMAGE="$IMAGE_SHA" docker compose -f compose.prod.yaml --env-file .env.prod pull app
 
             # 이미지가 바뀐 서비스만 재생성해서 컨테이너를 교체한다. DB 컨테이너는 그대로 유지된다.
-            docker compose -f compose.prod.yaml --env-file .env.prod up -d --no-deps app
+            MONEW_IMAGE="$IMAGE_SHA" docker compose -f compose.prod.yaml --env-file .env.prod up -d --no-deps app
 
             # 더 이상 어떤 컨테이너도 참조하지 않는 이전 이미지(dangling image)를 정리해 디스크를 아낀다.
             docker image prune -f
