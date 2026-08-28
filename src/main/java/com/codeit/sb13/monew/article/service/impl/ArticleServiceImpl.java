@@ -1,5 +1,7 @@
 package com.codeit.sb13.monew.article.service.impl;
 
+import com.codeit.sb13.monew.activity.service.ActivityVisibilityUpdater;
+import com.codeit.sb13.monew.activity.service.ArticleActivityVisibilityUpdateResult;
 import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.article.mapper.ArticleMapper;
@@ -40,6 +42,7 @@ public class ArticleServiceImpl implements ArticleService {
     private final ArticleViewRepository articleViewRepository;
     private final CommentRepository commentRepository;
     private final CommentLikeRepository commentLikeRepository;
+    private final ActivityVisibilityUpdater activityVisibilityUpdater;
     private final ArticleMapper articleMapper;
     private final UserService userService;
 
@@ -162,15 +165,14 @@ public class ArticleServiceImpl implements ArticleService {
         article.softDelete();
         articleRepository.save(article);
 
-        Long hiddenArticleViews = articleViewRepository.hideActiveArticleView(id);
-        Long hiddenCommentCount = commentRepository.hideActiveCommentsByArticleId(id);
-        Long hiddenCommentLikeCount = commentLikeRepository.hideActiveCommentLikeByArticleId(id);
+        ArticleActivityVisibilityUpdateResult updateResult =
+                activityVisibilityUpdater.hideActiveByDeletedArticle(id);
         log.info(
                 "기사 논리 삭제 완료 - articleId: {}, 숨김 처리된 조회 기록 수: {}, 댓글 수: {}, 댓글 좋아요 수: {}",
                 id,
-                hiddenArticleViews,
-                hiddenCommentCount,
-                hiddenCommentLikeCount
+                updateResult.articleViewCount(),
+                updateResult.commentCount(),
+                updateResult.commentLikeCount()
         );
     }
 

@@ -130,12 +130,4 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> 
       """)
   Long deleteByCommentId(@Param("commentId") UUID commentId);
 
-  @Modifying(flushAutomatically = true)
-  @Query("""
-    UPDATE CommentLike CL
-    SET CL.visibilityStatus = 'ARTICLE_DELETED'
-    WHERE CL.comment.article.id = :articleId
-      AND CL.visibilityStatus = 'ACTIVE'
-  """)
-  Long hideActiveCommentLikeByArticleId(@Param("articleId") UUID articleId);
 }

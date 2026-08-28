@@ -6,7 +6,6 @@ import com.codeit.sb13.monew.article.repository.dto.RecentArticleViewActivityPro
 import com.codeit.sb13.monew.user.domain.User;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -78,12 +77,4 @@ public interface ArticleViewRepository extends JpaRepository<ArticleView, UUID> 
             """)
     List<RecentArticleViewActivityProjection> findRecentArticleViewActivities(@Param("userId") UUID userId);
 
-    @Modifying(flushAutomatically = true)
-    @Query("""
-        UPDATE ArticleView av
-        SET av.visibilityStatus = 'ARTICLE_DELETED'
-        WHERE av.article.id = :articleId
-        AND av.visibilityStatus = 'ACTIVE'
-    """)
-    Long hideActiveArticleView(@Param("articleId") UUID articleId);
 }
