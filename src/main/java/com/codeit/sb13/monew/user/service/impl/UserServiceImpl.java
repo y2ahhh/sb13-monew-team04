@@ -45,9 +45,12 @@ public class UserServiceImpl implements UserService {
 
   @Transactional
   public UserCreateResult signUp(UserCreateCommand command) {
+    log.debug("회원가입 요청 - email: {}", command.email());
+
     boolean emailExists = userRepository.existsByEmail(command.email());
 
     if (emailExists) {
+      log.warn("회원가입 실패 -이메일 중복 - email: {}", command.email());
       throw new DuplicateEmailException(command.email());
     }
 
@@ -62,11 +65,16 @@ public class UserServiceImpl implements UserService {
     try {
       User saveUser = userRepository.saveAndFlush(user);
       UserCreateResult result = userMapper.toResult(saveUser);
+      log.info("회원가입 성공 - email: {}", command.email());
       return result;
+
     } catch (DataIntegrityViolationException e) {
       if (isEmailUniqueViolation(e)) {
+        log.warn("회원가입 실패 - 동시성으로 인한 이메일 중복 - email: {}", command.email());
         throw new DuplicateEmailException(command.email());
       }
+
+      log.error("회원가입 실패 - 예상치 못한 무결성 위반 - email: {}", command.email(), e);
       throw e;
     }
   }
@@ -74,10 +82,18 @@ public class UserServiceImpl implements UserService {
   @Override
   @Transactional(readOnly = true)
   public UserLoginResult login(UserLoginCommand command) {
+    log.debug("로그인 요청 - email: {}", command.email());
+
     User user = userRepository.findByEmail(command.email())
-        .orElseThrow(() -> new LoginUserNotFoundException(command.email()));
+        .orElseThrow(() -> {
+          log.warn("로그인 실패 - 존재하지 않는 이메일 - email: {}", command.email());
+          return new LoginUserNotFoundException(command.email());
+        });
+
     LocalDateTime deletedAt = user.getDeletedAt();
+
     if(deletedAt != null) {
+      log.warn("로그인 실패 - 삭제된 사용자 - email: {}", command.email());
       throw new LoginUserNotFoundException(command.email());
     }
 
@@ -85,18 +101,26 @@ public class UserServiceImpl implements UserService {
 
     boolean matches = passwordEncoder.matches(command.password(), password);
     if (!matches) {
+      log.warn("로그인 실패 - 비밀번호 불일치 - email: {}", command.email());
       throw new InvalidPasswordException(command.email());
     }
+      log.info("로그인 성공 - email: {}", command.email());
     return userMapper.toLoginResult(user);
   }
 
   @Override
   @Transactional
   public UserUpdateNicknameResult updateNickname(UserUpdateNicknameCommand command) {
+    log.debug("닉네임 변경 요청 - userId: {}, nickname: {}", command.userId(), command.nickname());
+
     User user = userRepository.findById(command.userId())
-        .orElseThrow(() -> new UserNotFoundException(command.userId()));
+        .orElseThrow(() -> {
+          log.warn("닉네임 변경 실패 - 사용자를 찾을 수 없음 - userId: {}", command.userId());
+          return new UserNotFoundException(command.userId());});
     user.updateNickname(command.nickname());
     User saveUser = userRepository.saveAndFlush(user);
+
+    log.info("닉네임 변경 성공 - userId: {}, nickname: {}", command.userId(), command.nickname());
     return userMapper.toUpdateNicknameResult(saveUser);
   }
 
@@ -119,12 +143,16 @@ public class UserServiceImpl implements UserService {
   @Override
   @Transactional
   public void deleteUser(UUID userId) {
+    log.debug("논리 삭제 요청 - userId: {}", userId);
     int updatedCount = userRepository.softDeleteIfNotDeleted(userId, LocalDateTime.now());
 
     if (updatedCount == 0) {
       validateExists(userId);
+
+      log.warn("논리 삭제 실패 - 이미 삭제된 계정 - userId: {}", userId);
       throw new AlreadyDeletedUserException(userId);
     }
+    log.info("논리 삭재 성공 - userId: {}", userId);
   }
 
   @Override
@@ -138,6 +166,7 @@ public class UserServiceImpl implements UserService {
   public void autoDeleteExpiredUsers() {
     LocalDateTime threshold = LocalDateTime.now().minusDays(1);
     List<User> expiredUsers = userRepository.findByDeletedAtBefore(threshold);
+    log.info("사용자 자동 삭제 대상 조회 완료 - 대상 수: {}", expiredUsers.size());
 
     for (User user : expiredUsers) {
       try {
