@@ -1,11 +1,6 @@
 package com.codeit.sb13.monew.user.service.impl;
 
-import com.codeit.sb13.monew.article.repository.ArticleViewRepository;
-import com.codeit.sb13.monew.comment.repository.CommentLikeRepository;
-import com.codeit.sb13.monew.comment.repository.CommentRepository;
 import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
-import com.codeit.sb13.monew.interest.repository.SubscribeRepository;
-import com.codeit.sb13.monew.notification.repository.NotificationRepository;
 import com.codeit.sb13.monew.user.domain.User;
 import com.codeit.sb13.monew.user.exception.AlreadyDeletedUserException;
 import com.codeit.sb13.monew.user.exception.DuplicateEmailException;
@@ -37,9 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl implements UserService {
 
   private final UserRepository userRepository;
-
   private final UserHardDeleteExecutor userHardDeleteExecutor;
-
   private final PasswordEncoder passwordEncoder;
   private final UserMapper userMapper;
 
@@ -50,7 +43,6 @@ public class UserServiceImpl implements UserService {
     boolean emailExists = userRepository.existsByEmail(command.email());
 
     if (emailExists) {
-      log.warn("회원가입 실패 -이메일 중복 - email: {}", command.email());
       throw new DuplicateEmailException(command.email());
     }
 
@@ -70,7 +62,6 @@ public class UserServiceImpl implements UserService {
 
     } catch (DataIntegrityViolationException e) {
       if (isEmailUniqueViolation(e)) {
-        log.warn("회원가입 실패 - 동시성으로 인한 이메일 중복 - email: {}", command.email());
         throw new DuplicateEmailException(command.email());
       }
 
@@ -85,15 +76,11 @@ public class UserServiceImpl implements UserService {
     log.debug("로그인 요청 - email: {}", command.email());
 
     User user = userRepository.findByEmail(command.email())
-        .orElseThrow(() -> {
-          log.warn("로그인 실패 - 존재하지 않는 이메일 - email: {}", command.email());
-          return new LoginUserNotFoundException(command.email());
-        });
+        .orElseThrow(() -> new LoginUserNotFoundException(command.email()));
 
     LocalDateTime deletedAt = user.getDeletedAt();
 
-    if(deletedAt != null) {
-      log.warn("로그인 실패 - 삭제된 사용자 - email: {}", command.email());
+    if (deletedAt != null) {
       throw new LoginUserNotFoundException(command.email());
     }
 
@@ -101,10 +88,10 @@ public class UserServiceImpl implements UserService {
 
     boolean matches = passwordEncoder.matches(command.password(), password);
     if (!matches) {
-      log.warn("로그인 실패 - 비밀번호 불일치 - email: {}", command.email());
       throw new InvalidPasswordException(command.email());
     }
-      log.info("로그인 성공 - email: {}", command.email());
+
+    log.info("로그인 성공 - email: {}", command.email());
     return userMapper.toLoginResult(user);
   }
 
@@ -114,9 +101,8 @@ public class UserServiceImpl implements UserService {
     log.debug("닉네임 변경 요청 - userId: {}, nickname: {}", command.userId(), command.nickname());
 
     User user = userRepository.findById(command.userId())
-        .orElseThrow(() -> {
-          log.warn("닉네임 변경 실패 - 사용자를 찾을 수 없음 - userId: {}", command.userId());
-          return new UserNotFoundException(command.userId());});
+        .orElseThrow(() -> new UserNotFoundException(command.userId()));
+
     user.updateNickname(command.nickname());
     User saveUser = userRepository.saveAndFlush(user);
 
@@ -134,10 +120,9 @@ public class UserServiceImpl implements UserService {
   @Override
   @Transactional(readOnly = true)
   public void validateExists(UUID userId) {
-    if(!userRepository.existsById(userId)) {
+    if (!userRepository.existsById(userId)) {
       throw new UserNotFoundException(userId);
     }
-
   }
 
   @Override
@@ -170,10 +155,10 @@ public class UserServiceImpl implements UserService {
       try {
         userHardDeleteExecutor.hardDeleteExpiredUser(user.getId(), threshold);
       } catch (Exception e) {
+        // 예외를 밖으로 던지지 않고 스케줄러 루프를 계속 진행하므로 이 error 로그는 필수 유지
         log.error("사용자 자동 물리 삭제 실패 - userId: {}, 사유: {}", user.getId(), e.getMessage());
       }
     }
-
   }
 
   private boolean isEmailUniqueViolation(DataIntegrityViolationException e) {
@@ -181,4 +166,3 @@ public class UserServiceImpl implements UserService {
     return message != null && message.contains("uk_users_email");
   }
 }
-

@@ -32,9 +32,7 @@ public class UserHardDeleteExecutor {
     log.debug("물리 삭제 요청 - userId: {}", userId);
 
     userRepository.findById(userId)
-        .orElseThrow(() -> {
-          log.warn("물리 삭제 실패 - 사용자를 찾지 못함 - userId: {}", userId);
-          return new UserNotFoundException(userId);});
+        .orElseThrow(() ->  new UserNotFoundException(userId));
 
     deleteAllRelateData(userId);
     log.info("물리 삭제 성공 - userId: {}", userId);
@@ -58,10 +56,7 @@ public class UserHardDeleteExecutor {
     log.debug("논리 삭제 후 하루 경과 검토 - userId: {}", userId);
 
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> {
-          log.warn("물리 실패 - 사용자를 찾을 수 없음 - userId: {}", userId);
-          return new UserNotFoundException(userId);
-        });
+        .orElseThrow(() -> new UserNotFoundException(userId));
     LocalDateTime deletedAt = user.getDeletedAt();
     if(deletedAt != null &&  deletedAt.isBefore(threshold)) {
       deleteAllRelateData(userId);
