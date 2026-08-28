@@ -7,9 +7,11 @@ on:
     branches:
       - main
 
+# 전역 권한은 read로 최소화하고, 실제로 필요한 job에만 필요한 권한만 따로 부여한다.
+# (deploy job은 이 GITHUB_TOKEN을 EC2로 전달하는데, EC2가 침해되더라도
+#  이 토큰으로 GHCR에 쓰기(악성 이미지 push)까지는 못 하도록 범위를 좁혀두는 것)
 permissions:
   contents: read
-  packages: write   # GHCR(GitHub Container Registry)에 이미지를 push하기 위해 필요
 
 # 같은 이름의 배포가 동시에 두 개 뛰지 않도록 한다.
 # cancel-in-progress: false → 이미 서버에 배포 중인 작업을 도중에 끊지 않고, 새 배포는 줄을 서서 기다린다.
@@ -21,14 +23,16 @@ jobs:
   build-and-push:
     name: build-and-push-image
     runs-on: ubuntu-latest
+    permissions:
+      packages: write   # GHCR(GitHub Container Registry)에 이미지를 push하기 위해 필요
     outputs:
       image_sha: ${{ steps.meta.outputs.image_sha }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -43,10 +47,10 @@ jobs:
           echo "image_latest=${IMAGE}:latest" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Build and push image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           push: true
@@ -63,9 +67,11 @@ jobs:
     name: deploy-to-ec2
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      packages: read   # EC2에서 이미지를 pull만 하므로 read면 충분하다
     steps:
       - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
