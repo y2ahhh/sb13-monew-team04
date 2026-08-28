@@ -81,4 +81,13 @@ public interface CommentRepository extends JpaRepository<Comment, UUID>, Comment
 
   // 기사 댓글 수 집계. 논리 삭제된 댓글과 탈퇴 사용자의 댓글을 제외한다. (MID4-163)
   long countByArticle_IdAndDeletedAtIsNullAndUser_DeletedAtIsNull(UUID articleId);
+
+  @Modifying(flushAutomatically = true)
+  @Query("""
+    UPDATE Comment c
+    SET c.visibilityStatus = 'ARTICLE_DELETED'
+    WHERE c.visibilityStatus = 'ACTIVE'
+    AND c.article.id =:articleId
+  """)
+  Long hideActiveCommentsByArticleId(@Param("articleId") UUID articleId);
 }
