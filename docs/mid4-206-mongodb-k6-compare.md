@@ -145,17 +145,15 @@ WHERE interest_id = :interestId
 
 이 상태는 단순한 성능용 컬럼만은 아니다. “삭제된 사용자, 삭제된 댓글, 삭제된 기사와 연결된 활동을 현재 사용자 화면과 카운트에 포함할 것인가”라는 비즈니스 기준을 저장한 값으로 볼 수 있다.
 
-복구는 `USER_DELETED`를 무조건 `ACTIVE`로 되돌리는 방식이 아니라 재계산 방식으로 처리한다. 예를 들어 사용자가 복구되면 `USER_DELETED` 후보 row를 다시 보고, 연결된 댓글이나 기사가 아직 삭제 상태라면 `COMMENT_DELETED` 또는 `ARTICLE_DELETED`로 바꾼다. 모두 살아 있는 경우에만 `ACTIVE`가 된다.
+이번 작은 개선 범위는 복구 처리가 아니라 삭제 이벤트 시점의 노출 상태 갱신이다. 상태 갱신은 현재 `ACTIVE`인 row에만 적용한다.
 
-여러 삭제 원인이 동시에 남아 있으면 단일 status에는 하나만 저장해야 하므로 우선순위를 둔다.
+예를 들어 사용자 삭제 시에는 사용자와 연결된 `ACTIVE` row만 `USER_DELETED`로 바꾼다. 댓글 삭제 시에는 댓글과 연결된 `ACTIVE` row만 `COMMENT_DELETED`로 바꾸고, 기사 삭제 시에는 기사와 연결된 `ACTIVE` row만 `ARTICLE_DELETED`로 바꾼다.
 
-```text
-ARTICLE_DELETED > COMMENT_DELETED > USER_DELETED > ACTIVE
-```
+이미 `USER_DELETED`, `COMMENT_DELETED`, `ARTICLE_DELETED` 상태인 row는 다른 삭제 이벤트에서 덮어쓰지 않는다. 이 기준을 두면 단일 status 안에서 상태 간 높고 낮음을 따지지 않아도 되고, 각 도메인 작업도 독립적으로 작게 나눌 수 있다.
 
-복구가 즉시 화면에 반영되어야 하는 기능이 아니라면 이 방식은 더 현실적이다. 삭제/복구 API 요청에서 모든 관계 row를 즉시 동기 갱신하지 않고, 별도 재계산 작업으로 최종 정합성을 맞출 수 있다. 이 경우 `status`는 실시간 원본 상태가 아니라 조회 최적화를 위한 노출 상태 스냅샷이며, 삭제/복구 직후 짧은 시간 동안 반영이 지연될 수 있다.
+복구 처리는 이번 범위에서 제외한다. 복구까지 포함하면 기존 삭제 원인을 다시 계산해야 하므로 작업 범위가 커진다.
 
-따라서 이 개선은 MongoDB Read Model로 바로 넘어가기 전 RDB에서 작게 검토할 수 있는 후보로 남긴다. 특히 `subscriptions`, `comment_likes`, `article_views`, `comments`처럼 카운트와 활동내역 조회에 반복 사용되는 관계 테이블부터 효과를 확인하는 것이 좋다.
+따라서 이 개선은 MongoDB 적용 없이도 RDB에서 작게 검토할 수 있는 후보로 남긴다. 특히 `subscriptions`, `comment_likes`, `article_views`, `comments`처럼 카운트와 활동내역 조회에 반복 사용되는 관계 테이블부터 효과를 확인하는 것이 좋다.
 
 ### 4. 삭제/취소 데이터가 많으면 오래 버티는 구간에서 흔들림
 
