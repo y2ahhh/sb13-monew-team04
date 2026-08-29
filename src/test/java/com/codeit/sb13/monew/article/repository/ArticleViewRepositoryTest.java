@@ -47,6 +47,27 @@ class ArticleViewRepositoryTest {
     private TestEntityManager em;
 
     @Test
+    @DisplayName("기사 조회수는 ACTIVE 조회 기록만 집계한다")
+    void countsOnlyActiveArticleViews() {
+        // given
+        Article article = saveArticle("count", LocalDateTime.of(2026, 8, 22, 10, 0));
+        saveArticleView(article, saveUser("active-viewer"), LocalDateTime.of(2026, 8, 22, 11, 0));
+        ArticleView hiddenView = saveArticleView(
+                article,
+                saveUser("hidden-viewer"),
+                LocalDateTime.of(2026, 8, 22, 12, 0)
+        );
+        updateArticleViewVisibilityStatus(hiddenView.getId(), ActivityVisibilityStatus.USER_DELETED);
+        flushAndClear();
+
+        // when
+        long result = articleViewRepository.countActiveByArticleId(article.getId());
+
+        // then
+        assertThat(result).isEqualTo(1L);
+    }
+
+    @Test
     @DisplayName("조회한 뉴스 기사가 없으면 빈 목록을 반환한다")
     void returnsEmptyListWhenUserHasNoArticleViews() {
         // given

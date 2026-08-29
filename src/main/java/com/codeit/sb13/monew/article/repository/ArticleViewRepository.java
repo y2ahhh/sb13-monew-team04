@@ -22,14 +22,17 @@ public interface ArticleViewRepository extends JpaRepository<ArticleView, UUID> 
     @EntityGraph(attributePaths = {"article", "user"})
     Optional<ArticleView> findByArticleAndUser(Article article, User user);
 
-    // 특정 기사의 조회수 집계
-    long countByArticleAndUser_DeletedAtIsNull(Article article);
-
     // 요청자의 조회 여부 (viewedByMe)
     boolean existsByArticle_IdAndUser_Id(UUID articleId, UUID userId);
 
-    // 기사 조회수 집계 (탈퇴 사용자 조회 이력 제외)
-    long countByArticle_IdAndUser_DeletedAtIsNull(UUID articleId);
+    // 기사 조회수 집계 (활성 조회 기록만 포함)
+    @Query("""
+        SELECT COUNT(at)
+        FROM ArticleView at
+        WHERE at.article.id = :articleId
+           AND at.visibilityStatus = 'ACTIVE'
+    """)
+    long countActiveByArticleId(@Param("articleId") UUID articleId);
 
 
     void deleteByUser_Id(UUID userId);
