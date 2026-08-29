@@ -39,34 +39,29 @@ public interface ArticleViewRepository extends JpaRepository<ArticleView, UUID> 
 
     @Query("""
                 SELECT new com.codeit.sb13.monew.article.repository.dto.RecentArticleViewActivityProjection(
-                    AT.id,
-                    U.id,
-                    AT.viewedAt,
-                    A.id,
-                    A.source,
-                    A.link,
-                    A.title,
-                    A.date,
-                    A.summary,
-                    (SELECT COUNT(C)
-                     FROM Comment C
-                     JOIN C.user U2
-                     WHERE C.article.id = A.id
-                          AND C.deletedAt IS NULL
-                          AND U2.deletedAt IS NULL),
-                    (SELECT COUNT(AT2)
-                     FROM ArticleView AT2
-                     JOIN AT2.user U2
-                     WHERE AT2.article.id = A.id
-                           AND U2.deletedAt IS NULL)
+                    at.id,
+                    at.user.id,
+                    at.viewedAt,
+                    a.id,
+                    a.source,
+                    a.link,
+                    a.title,
+                    a.date,
+                    a.summary,
+                    (SELECT COUNT(c)
+                     FROM Comment c
+                     WHERE c.article.id = a.id
+                       AND c.visibilityStatus = 'ACTIVE'),
+                    (SELECT COUNT(at2)
+                     FROM ArticleView at2
+                     WHERE at2.article.id = a.id
+                       AND at2.visibilityStatus = 'ACTIVE')
                     )
-                FROM ArticleView AT
-                JOIN AT.article A
-                JOIN AT.user U
-                WHERE U.id = :userId
-                AND A.deletedAt IS NULL
-                AND U.deletedAt IS NULL
-                ORDER BY AT.viewedAt DESC, AT.id DESC
+                FROM ArticleView at
+                JOIN at.article a
+                WHERE at.user.id = :userId
+                AND at.visibilityStatus = 'ACTIVE'
+                ORDER BY at.viewedAt DESC, at.id DESC
                 LIMIT 10
             """)
     List<RecentArticleViewActivityProjection> findRecentArticleViewActivities(@Param("userId") UUID userId);
