@@ -8,7 +8,11 @@ WORKDIR /app/monew
 # 의존성 목록(gradlew, gradle 설정 파일)만 먼저 복사한다.
 # 소스 코드(src)가 바뀌어도 build.gradle이 그대로면 이 레이어는 캐시되어 재사용된다.
 # → 매번 전체 의존성을 새로 받지 않아 CI 빌드 시간이 크게 줄어든다.
-COPY gradlew gradle build.gradle settings.gradle ./
+# gradle 디렉터리는 다른 파일들과 한 줄에서 같이 복사하면 안 된다. COPY는 소스가 디렉터리면
+# 그 디렉터리 자체가 아니라 내용물만 복사하기 때문에, gradle/wrapper/gradle-wrapper.jar가
+# gradle/wrapper/... 경로를 잃어버리고 wrapper/...로 들어가 버린다. 그래서 별도 줄로 분리한다.
+COPY gradlew build.gradle settings.gradle ./
+COPY gradle gradle
 RUN chmod +x gradlew
 
 # 소스 코드는 의존성 레이어 다음에 복사한다.
