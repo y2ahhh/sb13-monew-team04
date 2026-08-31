@@ -725,10 +725,18 @@ class CommentRepositoryTest {
             "active-search-request@email.com", "요청자", "testPassword!"));
         User writer = userRepository.saveAndFlush(new User(
             "active-search-writer@email.com", "작성자", "testPassword!"));
+        User deletedWriter = userRepository.saveAndFlush(new User(
+            "active-search-deleted-writer@email.com", "삭제된 작성자", "testPassword!"));
         Article article = articleRepository.saveAndFlush(
             createArticle("ACTIVE 댓글 조회 기사", "기사 내용", "active-search-link"));
+        Article deletedArticle = articleRepository.saveAndFlush(
+            createArticle("삭제된 기사", "기사 내용", "active-search-deleted-article-link"));
 
         Comment active = commentRepository.saveAndFlush(new Comment(article, writer, "ACTIVE 댓글"));
+        Comment activeWithDeletedWriter = commentRepository.saveAndFlush(
+            new Comment(article, deletedWriter, "삭제된 작성자의 ACTIVE 댓글"));
+        Comment activeWithDeletedArticle = commentRepository.saveAndFlush(
+            new Comment(deletedArticle, writer, "삭제된 기사의 ACTIVE 댓글"));
         Comment commentDeleted = commentRepository.saveAndFlush(
             new Comment(article, writer, "COMMENT_DELETED 댓글"));
         Comment userDeleted = commentRepository.saveAndFlush(
@@ -736,20 +744,27 @@ class CommentRepositoryTest {
         Comment articleDeleted = commentRepository.saveAndFlush(
             new Comment(article, writer, "ARTICLE_DELETED 댓글"));
 
+        deletedWriter.softDelete();
+        userRepository.saveAndFlush(deletedWriter);
+        deletedArticle.softDelete();
+        articleRepository.saveAndFlush(deletedArticle);
         updateCommentVisibilityStatus(commentDeleted.getId(), COMMENT_DELETED);
         updateCommentVisibilityStatus(userDeleted.getId(), ActivityVisibilityStatus.USER_DELETED);
         updateCommentVisibilityStatus(articleDeleted.getId(), ARTICLE_DELETED);
         em.clear();
 
         CommentSearchResult result = commentRepository.search(new CommentSearchCondition(
-            article.getId(), CommentOrderBy.CREATED_AT, Direction.ASC,
+            null, CommentOrderBy.CREATED_AT, Direction.ASC,
             null, null, 10, requestUser.getId()));
 
         Assertions.assertAll(
             () -> assertThat(result.rows())
                 .extracting(CommentSearchProjection::id)
-                .containsExactly(active.getId()),
-            () -> assertThat(result.totalElements()).isEqualTo(1L),
+                .containsExactlyInAnyOrder(
+                    active.getId(),
+                    activeWithDeletedWriter.getId(),
+                    activeWithDeletedArticle.getId()),
+            () -> assertThat(result.totalElements()).isEqualTo(3L),
             () -> assertThat(result.hasNext()).isFalse()
         );
     }
@@ -787,10 +802,18 @@ class CommentRepositoryTest {
     void findActiveById_returnsOnlyActiveComment() {
         User writer = userRepository.saveAndFlush(new User(
             "find-active-writer@email.com", "작성자", "testPassword!"));
+        User deletedWriter = userRepository.saveAndFlush(new User(
+            "find-active-deleted-writer@email.com", "삭제된 작성자", "testPassword!"));
         Article article = articleRepository.saveAndFlush(
             createArticle("단건 ACTIVE 조회 기사", "기사 내용", "find-active-link"));
+        Article deletedArticle = articleRepository.saveAndFlush(
+            createArticle("삭제된 단건 조회 기사", "기사 내용", "find-active-deleted-article-link"));
 
         Comment active = commentRepository.saveAndFlush(new Comment(article, writer, "ACTIVE 댓글"));
+        Comment activeWithDeletedWriter = commentRepository.saveAndFlush(
+            new Comment(article, deletedWriter, "삭제된 작성자의 ACTIVE 댓글"));
+        Comment activeWithDeletedArticle = commentRepository.saveAndFlush(
+            new Comment(deletedArticle, writer, "삭제된 기사의 ACTIVE 댓글"));
         Comment commentDeleted = commentRepository.saveAndFlush(
             new Comment(article, writer, "COMMENT_DELETED 댓글"));
         Comment userDeleted = commentRepository.saveAndFlush(
@@ -798,6 +821,10 @@ class CommentRepositoryTest {
         Comment articleDeleted = commentRepository.saveAndFlush(
             new Comment(article, writer, "ARTICLE_DELETED 댓글"));
 
+        deletedWriter.softDelete();
+        userRepository.saveAndFlush(deletedWriter);
+        deletedArticle.softDelete();
+        articleRepository.saveAndFlush(deletedArticle);
         updateCommentVisibilityStatus(commentDeleted.getId(), COMMENT_DELETED);
         updateCommentVisibilityStatus(userDeleted.getId(), ActivityVisibilityStatus.USER_DELETED);
         updateCommentVisibilityStatus(articleDeleted.getId(), ARTICLE_DELETED);
@@ -805,6 +832,8 @@ class CommentRepositoryTest {
 
         Assertions.assertAll(
             () -> assertThat(commentRepository.findActiveById(active.getId())).isPresent(),
+            () -> assertThat(commentRepository.findActiveById(activeWithDeletedWriter.getId())).isPresent(),
+            () -> assertThat(commentRepository.findActiveById(activeWithDeletedArticle.getId())).isPresent(),
             () -> assertThat(commentRepository.findActiveById(commentDeleted.getId())).isEmpty(),
             () -> assertThat(commentRepository.findActiveById(userDeleted.getId())).isEmpty(),
             () -> assertThat(commentRepository.findActiveById(articleDeleted.getId())).isEmpty()
