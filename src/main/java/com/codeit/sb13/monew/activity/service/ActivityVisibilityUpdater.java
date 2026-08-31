@@ -48,6 +48,11 @@ public class ActivityVisibilityUpdater {
         return hideActiveForUser(ActivityDeletionTarget.deletedUser(userId));
     }
 
+    @Transactional
+    public long hideActiveByDeletedComment(UUID commentId) {
+        return hideActiveForComment(commentId);
+    }
+
     private ArticleActivityVisibilityUpdateResult hideActive(ActivityDeletionTarget target) {
         entityManager.flush();
 
@@ -79,6 +84,14 @@ public class ActivityVisibilityUpdater {
 
         entityManager.clear();
         return result;
+    }
+
+    private long hideActiveForComment(UUID commentId) {
+        entityManager.flush();
+        long commentLikeCount = hideCommentLikes(ActivityDeletionTarget.deletedComment(commentId));
+
+        entityManager.clear();
+        return commentLikeCount;
     }
 
     private long hideArticleViews(ActivityDeletionTarget target) {
@@ -129,23 +142,25 @@ public class ActivityVisibilityUpdater {
         return switch (target.cause()) {
             case ARTICLE -> articleView.article.id.eq(target.targetId());
             case USER -> articleView.user.id.eq(target.targetId());
+            case COMMENT -> throw new IllegalStateException(
+                    "댓글 삭제는 article_views에 영향을 주지 않습니다: " + target.cause());
         };
     }
 
     private BooleanExpression commentTargetCondition(ActivityDeletionTarget target) {
-        // TODO: COMMENT 삭제 작업 진행 시 comment 대상 조건 검토 필요.
         return switch (target.cause()) {
             case ARTICLE -> comment.article.id.eq(target.targetId());
             case USER -> comment.user.id.eq(target.targetId());
+            case COMMENT -> comment.id.eq(target.targetId());
         };
     }
 
     private BooleanExpression commentLikeTargetCondition(ActivityDeletionTarget target) {
-        // TODO: COMMENT 삭제 작업 진행 시 commentLike 대상 조건 검토 필요.
         return switch (target.cause()) {
             case ARTICLE -> commentLike.comment.article.id.eq(target.targetId());
             case USER -> commentLike.likedBy.id.eq(target.targetId())
                     .or(commentLike.comment.user.id.eq(target.targetId()));
+            case COMMENT -> commentLike.comment.id.eq(target.targetId());
         };
     }
 }
