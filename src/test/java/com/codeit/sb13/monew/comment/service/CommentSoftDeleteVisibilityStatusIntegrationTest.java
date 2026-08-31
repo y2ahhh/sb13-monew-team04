@@ -77,9 +77,28 @@ class CommentSoftDeleteVisibilityStatusIntegrationTest {
         assertThat(commentLikeStatus(like1.getId())).isEqualTo(COMMENT_DELETED);
         assertThat(commentLikeStatus(like2.getId())).isEqualTo(COMMENT_DELETED);
         assertThat(commentRepository.findActiveById(targetComment.getId())).isEmpty();
+        assertThat(commentStatus(targetComment.getId())).isEqualTo(COMMENT_DELETED);
 
         // 삭제되지 않은 댓글의 좋아요는 그대로 ACTIVE
         assertThat(commentLikeStatus(otherLike.getId())).isEqualTo(ACTIVE);
+    }
+
+    @Test
+    @DisplayName("softDelete marks the comment itself as COMMENT_DELETED even if it was already hidden by another cause")
+    void softDeleteMarksCommentItselfAsCommentDeletedEvenIfAlreadyArticleDeleted() {
+        Article article = saveArticle("self-status-article");
+        User author = saveUser("self-status-author");
+
+        Comment comment = saveComment(article, author, "self status comment");
+        flushAndClear();
+
+        setCommentStatus(comment.getId(), ARTICLE_DELETED);
+        flushAndClear();
+
+        commentService.softDelete(comment.getId());
+        flushAndClear();
+
+        assertThat(commentStatus(comment.getId())).isEqualTo(COMMENT_DELETED);
     }
 
     @Test
@@ -165,6 +184,16 @@ class CommentSoftDeleteVisibilityStatusIntegrationTest {
 
     private ActivityVisibilityStatus commentLikeStatus(UUID id) {
         return commentLikeRepository.findById(id).orElseThrow().getVisibilityStatus();
+    }
+
+    private void setCommentStatus(UUID id, ActivityVisibilityStatus status) {
+        jdbcTemplate.update(
+                "UPDATE comments SET visibility_status = ? WHERE id = ?",
+                status.name(), id);
+    }
+
+    private ActivityVisibilityStatus commentStatus(UUID id) {
+        return commentRepository.findById(id).orElseThrow().getVisibilityStatus();
     }
 
     private void flushAndClear() {
