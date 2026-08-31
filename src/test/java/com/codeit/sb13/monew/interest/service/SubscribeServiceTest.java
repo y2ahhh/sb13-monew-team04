@@ -70,7 +70,7 @@ class SubscribeServiceTest {
             ReflectionTestUtils.setField(saved, "createdAt", LocalDateTime.now());
             return saved;
         });
-        when(subscribeRepository.countByInterest_Id(interest.getId())).thenReturn(1L);
+        when(subscribeRepository.countActiveByInterestId(interest.getId())).thenReturn(1L);
 
         // when
         SubscribeResponse response = subscribeServiceImpl.subscribe(interest.getId(), userId);
@@ -94,7 +94,7 @@ class SubscribeServiceTest {
         when(interestRepository.findById(interest.getId())).thenReturn(Optional.of(interest));
         when(subscribeRepository.findByInterest_IdAndUserId(interest.getId(), userId))
                 .thenReturn(Optional.of(existing));
-        when(subscribeRepository.countByInterest_Id(interest.getId())).thenReturn(3L);
+        when(subscribeRepository.countActiveByInterestId(interest.getId())).thenReturn(3L);
 
         // when
         SubscribeResponse response = subscribeServiceImpl.subscribe(interest.getId(), userId);
@@ -135,7 +135,7 @@ class SubscribeServiceTest {
                 .thenReturn(Optional.of(savedByOtherRequest));
         when(subscribeSaver.save(any(Subscribe.class)))
                 .thenThrow(new DataIntegrityViolationException("uk_subscriptions_interest_user"));
-        when(subscribeRepository.countByInterest_Id(interest.getId())).thenReturn(1L);
+        when(subscribeRepository.countActiveByInterestId(interest.getId())).thenReturn(1L);
 
         // when
         SubscribeResponse response = subscribeServiceImpl.subscribe(interest.getId(), userId);
