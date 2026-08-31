@@ -152,9 +152,9 @@ class SubscribeRepositoryTest {
         void excludesUsersWithInactiveSubscriptions() {
             Interest interest = persistInterest("스포츠", "축구");
             User active = persistUser("활성사용자");
-            User deleted = persistDeletedUser("삭제사용자");
+            User inactive = persistUser("비활성구독자");
             persistSubscribe(interest, active);
-            Subscribe inactiveSubscribe = persistSubscribe(interest, deleted);
+            Subscribe inactiveSubscribe = persistSubscribe(interest, inactive);
             em.flush();
             updateSubscribeVisibilityStatus(
                     inactiveSubscribe.getId(),
@@ -235,7 +235,7 @@ class SubscribeRepositoryTest {
             Interest interest = persistInterest("스포츠", "축구");
             Subscribe inactiveSubscribe = persistSubscribe(
                     interest,
-                    persistDeletedUser("삭제사용자")
+                    persistUser("비활성구독자")
             );
             em.flush();
             updateSubscribeVisibilityStatus(

@@ -102,6 +102,7 @@ class SubscribeServiceTest {
         // then
         assertThat(response.id()).isEqualTo(existing.getId());
         assertThat(response.createdAt()).isEqualTo(existing.getCreatedAt());
+        assertThat(response.interestSubscriberCount()).isEqualTo(3L);
         verify(subscribeSaver, never()).save(any());
     }
 
@@ -142,6 +143,7 @@ class SubscribeServiceTest {
 
         // then
         assertThat(response.id()).isEqualTo(savedByOtherRequest.getId());
+        assertThat(response.interestSubscriberCount()).isEqualTo(1L);
     }
 
     @Test
