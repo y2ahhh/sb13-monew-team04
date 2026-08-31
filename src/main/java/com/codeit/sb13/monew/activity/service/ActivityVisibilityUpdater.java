@@ -50,7 +50,7 @@ public class ActivityVisibilityUpdater {
 
     @Transactional
     public long hideActiveByDeletedComment(UUID commentId) {
-        return hideActiveForComment(commentId);
+        return hideActiveForComment(ActivityDeletionTarget.deletedComment(commentId));
     }
 
     private ArticleActivityVisibilityUpdateResult hideActive(ActivityDeletionTarget target) {
@@ -86,9 +86,9 @@ public class ActivityVisibilityUpdater {
         return result;
     }
 
-    private long hideActiveForComment(UUID commentId) {
+    private long hideActiveForComment(ActivityDeletionTarget target) {
         entityManager.flush();
-        long commentLikeCount = hideCommentLikes(ActivityDeletionTarget.deletedComment(commentId));
+        long commentLikeCount = hideCommentLikes(target);
 
         entityManager.clear();
         return commentLikeCount;
