@@ -385,7 +385,7 @@ class CommentLikeRepositoryTest {
 
 
   @Test
-  @DisplayName("댓글 물리 삭제 시 해당 ID에 해당하는 모든 좋아요 삭제한다 - RED")
+  @DisplayName("댓글 물리 삭제 시 해당 ID에 해당하는 모든 좋아요 삭제한다 - GREEN")
   void deleteByCommentId_deletesOnlyTargetCommentLikes() {
     // given
     User writer = persistUser("writer");
@@ -420,4 +420,48 @@ class CommentLikeRepositoryTest {
         ()->assertThat(commentLikeRepository.countActiveLikesByCommentId(otherComment.getId())).isEqualTo(1L)
     );
   }
+
+
+  @Test
+  @DisplayName("댓글 좋아요 응답 projection은 응답에 필요한 필드와 활성 좋아요 수만 반환한다. - RED")
+  void findActiveResponseProjection_returnsResponseFieldsAndActiveLikeCount() {
+    // given
+    User writer = persistUser("writer");
+    User requester = persistUser("requester");
+    User activeLiker = persistUser("active-liker");
+    User deletedLiker = persistUser("deleted-liker");
+    Article article = persistArticle("projection article");
+    Comment comment = persistComment(article, writer, "projection comment");
+    CommentLike requesterLike = persistCommentLike(comment, requester);
+    persistCommentLike(comment, activeLiker);
+    persistCommentLike(comment, deletedLiker);
+    deletedLiker.softDelete();
+
+    LocalDateTime commentCreatedAt = LocalDateTime.of(2026, 7, 9, 8, 30);
+    LocalDateTime likeCreatedAt = LocalDateTime.of(2026, 8, 24, 10, 0);
+    em.flush();
+    updateCommentCreatedAt(comment, commentCreatedAt);
+    updateCommentLikeCreatedAt(requesterLike, likeCreatedAt);
+    em.clear();
+
+    // when
+    CommentLikeResponseProjection result = commentLikeRepository
+        .findWithCommentDetailsByCommentIdAndLikedById(comment.getId(), requester.getId())
+        .orElseThrow();
+
+    // then
+    Assertions.assertAll(
+        () -> assertThat(result.id()).isEqualTo(requesterLike.getId()),
+        () -> assertThat(result.likedBy()).isEqualTo(requester.getId()),
+        () -> assertThat(result.createdAt()).isEqualTo(likeCreatedAt),
+        () -> assertThat(result.commentId()).isEqualTo(comment.getId()),
+        () -> assertThat(result.articleId()).isEqualTo(article.getId()),
+        () -> assertThat(result.commentUserId()).isEqualTo(writer.getId()),
+        () -> assertThat(result.commentUserNickname()).isEqualTo("writer"),
+        () -> assertThat(result.commentContent()).isEqualTo("projection comment"),
+        () -> assertThat(result.commentLikeCount()).isEqualTo(2L),
+        () -> assertThat(result.commentCreatedAt()).isEqualTo(commentCreatedAt)
+    );
+  }
+
 }
