@@ -30,10 +30,17 @@ WORKDIR /app
 # 컨테이너 안에서도 root로 프로세스를 띄우지 않기 위해 전용 사용자를 만든다.
 # 컨테이너가 뚫려도 root 권한 탈취로 바로 이어지지 않도록 하는 최소한의 방어다.
 RUN addgroup --system spring && adduser --system --ingroup spring spring
+
+# 애플리케이션이 상대경로 .logs/monew.log에 로그 파일을 쓰는데, WORKDIR로 만들어진 /app은
+# 아직 root 소유라 non-root(spring) 사용자가 그 안에 새 디렉터리를 만들 권한이 없다.
+# USER 전환 전에 로그 디렉터리를 미리 만들고 소유권을 spring에게 넘겨준다.
+RUN mkdir -p /app/.logs && chown -R spring:spring /app
+
 USER spring:spring
 
 # 빌드 스테이지에서 만들어진 jar만 복사한다. (소스코드, gradle 캐시 등은 최종 이미지에 포함되지 않음)
-COPY --from=build /app/monew/build/libs/*-SNAPSHOT.jar app.jar
+# --chown을 명시해서 jar도 spring 소유로 복사되도록 한다.
+COPY --chown=spring:spring --from=build /app/monew/build/libs/*-SNAPSHOT.jar app.jar
 
 EXPOSE 8080
 
