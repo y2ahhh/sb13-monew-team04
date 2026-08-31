@@ -342,7 +342,7 @@ class CommentLikeRepositoryTest {
 
 
   @Test
-  @DisplayName("ACTIVE 좋아요만 집계하고 존재 여부와 상세 조회에 포함한다")
+  @DisplayName("ACTIVE 좋아요만 집계하고 존재 여부와 응답 projection에 포함한다")
   void activeQueriesUseVisibilityStatus() {
     User writer = persistUser("writer");
     User activeLiker = persistUser("active-liker");
@@ -373,13 +373,13 @@ class CommentLikeRepositoryTest {
         comment.getId(), commentDeletedLiker.getId())).isFalse();
     assertThat(commentLikeRepository.existsActiveByCommentIdAndLikedById(
         comment.getId(), articleDeletedLiker.getId())).isFalse();
-    assertThat(commentLikeRepository.findWithCommentDetailsByCommentIdAndLikedById(
+    assertThat(commentLikeRepository.findActiveResponseProjection(
         comment.getId(), activeLiker.getId())).isPresent();
-    assertThat(commentLikeRepository.findWithCommentDetailsByCommentIdAndLikedById(
+    assertThat(commentLikeRepository.findActiveResponseProjection(
         comment.getId(), userDeletedLiker.getId())).isEmpty();
-    assertThat(commentLikeRepository.findWithCommentDetailsByCommentIdAndLikedById(
+    assertThat(commentLikeRepository.findActiveResponseProjection(
         comment.getId(), commentDeletedLiker.getId())).isEmpty();
-    assertThat(commentLikeRepository.findWithCommentDetailsByCommentIdAndLikedById(
+    assertThat(commentLikeRepository.findActiveResponseProjection(
         comment.getId(), articleDeletedLiker.getId())).isEmpty();
   }
 
@@ -430,17 +430,18 @@ class CommentLikeRepositoryTest {
     User writer = persistUser("writer");
     User requester = persistUser("requester");
     User activeLiker = persistUser("active-liker");
-    User deletedLiker = persistUser("deleted-liker");
+    User inactiveLiker = persistUser("inactive-liker");
     Article article = persistArticle("projection article");
     Comment comment = persistComment(article, writer, "projection comment");
     CommentLike requesterLike = persistCommentLike(comment, requester);
     persistCommentLike(comment, activeLiker);
-    persistCommentLike(comment, deletedLiker);
-    deletedLiker.softDelete();
+    CommentLike inactiveLike = persistCommentLike(comment, inactiveLiker);
 
     LocalDateTime commentCreatedAt = LocalDateTime.of(2026, 7, 9, 8, 30);
     LocalDateTime likeCreatedAt = LocalDateTime.of(2026, 8, 24, 10, 0);
     em.flush();
+    updateCommentLikeVisibilityStatus(
+        inactiveLike.getId(), ActivityVisibilityStatus.USER_DELETED);
     updateCommentCreatedAt(comment, commentCreatedAt);
     updateCommentLikeCreatedAt(requesterLike, likeCreatedAt);
     em.clear();
@@ -473,9 +474,10 @@ class CommentLikeRepositoryTest {
     User requester = persistUser("requester");
     Article article = persistArticle("article");
     Comment comment = persistComment(article, writer, "comment");
-    persistCommentLike(comment, requester);
-    comment.softDelete();
+    CommentLike commentLike = persistCommentLike(comment, requester);
     em.flush();
+    updateCommentLikeVisibilityStatus(
+        commentLike.getId(), ActivityVisibilityStatus.COMMENT_DELETED);
     em.clear();
 
     assertThat(commentLikeRepository.findActiveResponseProjection(
