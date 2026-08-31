@@ -6,6 +6,7 @@ import com.codeit.sb13.monew.article.domain.Article;
 import com.codeit.sb13.monew.article.domain.ArticleSource;
 import com.codeit.sb13.monew.comment.domain.Comment;
 import com.codeit.sb13.monew.comment.domain.CommentLike;
+import com.codeit.sb13.monew.comment.repository.dto.CommentLikeResponseProjection;
 import com.codeit.sb13.monew.comment.repository.dto.RecentCommentLikeActivityProjection;
 import com.codeit.sb13.monew.global.config.JpaAuditingConfig;
 import com.codeit.sb13.monew.global.config.QueryDslConfig;
@@ -423,7 +424,7 @@ class CommentLikeRepositoryTest {
 
 
   @Test
-  @DisplayName("댓글 좋아요 응답 projection은 응답에 필요한 필드와 활성 좋아요 수만 반환한다. - RED")
+  @DisplayName("댓글 좋아요 응답 projection은 응답에 필요한 필드와 활성 좋아요 수만 반환한다. - GREEN")
   void findActiveResponseProjection_returnsResponseFieldsAndActiveLikeCount() {
     // given
     User writer = persistUser("writer");
@@ -446,7 +447,7 @@ class CommentLikeRepositoryTest {
 
     // when
     CommentLikeResponseProjection result = commentLikeRepository
-        .findWithCommentDetailsByCommentIdAndLikedById(comment.getId(), requester.getId())
+        .findActiveResponseProjection(comment.getId(), requester.getId())
         .orElseThrow();
 
     // then
@@ -463,5 +464,24 @@ class CommentLikeRepositoryTest {
         () -> assertThat(result.commentCreatedAt()).isEqualTo(commentCreatedAt)
     );
   }
+
+
+  @Test
+  @DisplayName("논리 삭제된 연관 데이터의 좋아요는 댓글 좋아요 응답 projection 조회 시 제외된다")
+  void findActiveResponseProjection_excludesSoftDeletedRows() {
+    User writer = persistUser("writer");
+    User requester = persistUser("requester");
+    Article article = persistArticle("article");
+    Comment comment = persistComment(article, writer, "comment");
+    persistCommentLike(comment, requester);
+    comment.softDelete();
+    em.flush();
+    em.clear();
+
+    assertThat(commentLikeRepository.findActiveResponseProjection(
+        comment.getId(), requester.getId())).isEmpty();
+  }
+
+
 
 }
