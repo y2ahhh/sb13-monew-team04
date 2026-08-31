@@ -138,7 +138,7 @@ public class ActivityVisibilityUpdater {
                 .execute();
     }
 
-    private BooleanExpression articleViewTargetCondition(ActivityDeletionTarget target) {
+    BooleanExpression articleViewTargetCondition(ActivityDeletionTarget target) {
         return switch (target.cause()) {
             case ARTICLE -> articleView.article.id.eq(target.targetId());
             case USER -> articleView.user.id.eq(target.targetId());
