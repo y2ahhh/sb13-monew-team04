@@ -147,7 +147,7 @@ public class ActivityVisibilityUpdater {
         };
     }
 
-    private BooleanExpression commentTargetCondition(ActivityDeletionTarget target) {
+    BooleanExpression commentTargetCondition(ActivityDeletionTarget target) {
         return switch (target.cause()) {
             case ARTICLE -> comment.article.id.eq(target.targetId());
             case USER -> comment.user.id.eq(target.targetId());
