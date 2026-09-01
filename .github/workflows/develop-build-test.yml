@@ -58,6 +58,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Test Jira PR status synchronization rules
+        shell: bash
+        run: bash .github/scripts/test-sync-jira-pr-status.sh
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
