@@ -94,7 +94,7 @@ public class CommentServiceTest {
     UUID commentId = UUID.randomUUID();
 
     CommentRegisterCommand command=new CommentRegisterCommand(article.getId(), user.getId(), "테스트 댓글");
-    given(userService.findById(user.getId())).willReturn(user);
+    given(userService.findActiveById(user.getId())).willReturn(user);
     given(articleRepository.findByIdAndDeletedAtIsNull(article.getId())).willReturn(java.util.Optional.of(article));
     given(commentRepository.save(any(Comment.class))).willAnswer(invocation -> {
       Comment comment = invocation.getArgument(0);
@@ -128,7 +128,7 @@ public class CommentServiceTest {
     articleUserSetUp();
     CommentRegisterCommand command = new CommentRegisterCommand(
         article.getId(), user.getId(), "테스트 댓글");
-    given(userService.findById(user.getId()))
+    given(userService.findActiveById(user.getId()))
         .willThrow(new UserNotFoundException(user.getId()));
 
     assertThatThrownBy(() -> commentService.create(command))
