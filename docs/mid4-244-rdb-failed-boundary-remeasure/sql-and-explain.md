@@ -4,7 +4,7 @@
 
 아래 SQL은 애플리케이션이 실행한 조회를 PostgreSQL 문법으로 옮긴 MID4-227 이후 SQL이다. 이번 작업에서는 SQL을 변경하지 않고 같은 SQL에 부분 커버링 인덱스(partial covering index)를 적용하기 전과 후를 비교했다.
 
-실행계획은 연결 데이터 2배 조건에서 워밍업 3회 뒤 출력한 원문이다. 표로 바꾸거나 일부 단계만 잘라내지 않았다. 실행계획을 저장하기 위한 실행은 `EXPLAIN (ANALYZE, BUFFERS, VERBOSE, SETTINGS, TIMING)`을 사용했다.
+1배 실행계획은 부분 커버링 인덱스를 적용한 상태이고, 2배 실행계획은 현재 인덱스와 부분 커버링 인덱스를 모두 기록했다. 각 계획은 워밍업 3회 뒤 PostgreSQL이 출력한 원문이며 표로 바꾸거나 일부 단계만 잘라내지 않았다. 실행계획을 저장하기 위한 실행은 `EXPLAIN (ANALYZE, BUFFERS, VERBOSE, SETTINGS, TIMING)`을 사용했다.
 
 ## 최근 작성 댓글
 
@@ -36,7 +36,54 @@ ORDER BY c.created_at DESC, c.id DESC
 FETCH FIRST 10 ROWS ONLY;
 ```
 
-### 현재 인덱스 실행계획
+### 1배 부분 커버링 인덱스 실행계획
+
+```text
+QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1.27..152.97 rows=10 width=138) (actual time=0.162..0.969 rows=10 loops=1)
+   Output: c.id, a.id, a.title, u.id, u.nickname, c.content, ((SubPlan 1)), c.created_at
+   Buffers: shared hit=158
+   ->  Nested Loop  (cost=1.27..139769.32 rows=9214 width=138) (actual time=0.161..0.967 rows=10 loops=1)
+         Output: c.id, a.id, a.title, u.id, u.nickname, c.content, (SubPlan 1), c.created_at
+         Inner Unique: true
+         Buffers: shared hit=158
+         ->  Nested Loop  (cost=0.85..37654.65 rows=9214 width=103) (actual time=0.038..0.045 rows=10 loops=1)
+               Output: c.id, c.content, c.created_at, c.article_id, u.id, u.nickname
+               Buffers: shared hit=8
+               ->  Index Scan using idx_comments_user_created_id on public.comments c  (cost=0.43..37531.04 rows=9214 width=88) (actual time=0.020..0.023 rows=10 loops=1)
+                     Output: c.id, c.content, c.created_at, c.user_id, c.article_id
+                     Index Cond: (c.user_id = '00000001-0000-4000-8000-000000000001'::uuid)
+                     Filter: ((c.visibility_status)::text = 'ACTIVE'::text)
+                     Buffers: shared hit=4
+               ->  Materialize  (cost=0.42..8.44 rows=1 width=31) (actual time=0.002..0.002 rows=1 loops=10)
+                     Output: u.id, u.nickname
+                     Buffers: shared hit=4
+                     ->  Index Scan using pk_users on public.users u  (cost=0.42..8.44 rows=1 width=31) (actual time=0.014..0.014 rows=1 loops=1)
+                           Output: u.id, u.nickname
+                           Index Cond: (u.id = '00000001-0000-4000-8000-000000000001'::uuid)
+                           Buffers: shared hit=4
+         ->  Index Scan using pk_articles on public.articles a  (cost=0.43..6.62 rows=1 width=43) (actual time=0.002..0.002 rows=1 loops=10)
+               Output: a.id, a.title, a.summary, a.link, a.date, a.source, a.created_at, a.updated_at, a.deleted_at
+               Index Cond: (a.id = c.article_id)
+               Buffers: shared hit=40
+         SubPlan 1
+           ->  Aggregate  (cost=4.45..4.46 rows=1 width=8) (actual time=0.090..0.090 rows=1 loops=10)
+                 Output: count(cl.id)
+                 Buffers: shared hit=110
+                 ->  Index Only Scan using idx_perf_comment_likes_active_comment_cover on public.comment_likes cl  (cost=0.43..4.45 rows=1 width=16) (actual time=0.005..0.059 rows=1001 loops=10)
+                       Output: cl.comment_id, cl.id
+                       Index Cond: (cl.comment_id = c.id)
+                       Heap Fetches: 0
+                       Buffers: shared hit=110
+ Planning:
+   Buffers: shared hit=404
+ Planning Time: 1.097 ms
+ Execution Time: 1.030 ms
+(39 rows)
+```
+
+### 2배 현재 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -83,7 +130,7 @@ QUERY PLAN
 (39 rows)
 ```
 
-### 부분 커버링 인덱스 실행계획
+### 2배 부분 커버링 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -163,7 +210,60 @@ ORDER BY cl.created_at DESC, cl.id DESC
 FETCH FIRST 10 ROWS ONLY;
 ```
 
-### 현재 인덱스 실행계획
+### 1배 부분 커버링 인덱스 실행계획
+
+```text
+QUERY PLAN
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1.70..167.56 rows=10 width=162) (actual time=0.082..0.123 rows=10 loops=1)
+   Output: cl.id, cl.created_at, c.id, a.id, a.title, u.id, u.nickname, c.content, ((SubPlan 1)), c.created_at
+   Buffers: shared hit=155
+   ->  Nested Loop  (cost=1.70..146914.67 rows=8858 width=162) (actual time=0.080..0.121 rows=10 loops=1)
+         Output: cl.id, cl.created_at, c.id, a.id, a.title, u.id, u.nickname, c.content, (SubPlan 1), c.created_at
+         Inner Unique: true
+         Buffers: shared hit=155
+         ->  Nested Loop  (cost=1.28..102939.03 rows=8858 width=127) (actual time=0.043..0.064 rows=10 loops=1)
+               Output: cl.id, cl.created_at, c.id, c.content, c.created_at, c.article_id, u.id, u.nickname
+               Inner Unique: true
+               Buffers: shared hit=84
+               ->  Nested Loop  (cost=0.86..99068.77 rows=8858 width=112) (actual time=0.035..0.048 rows=10 loops=1)
+                     Output: cl.id, cl.created_at, c.id, c.content, c.created_at, c.user_id, c.article_id
+                     Inner Unique: true
+                     Buffers: shared hit=44
+                     ->  Index Scan using idx_comment_likes_liked_by_created_id on public.comment_likes cl  (cost=0.43..34248.82 rows=8858 width=40) (actual time=0.024..0.026 rows=10 loops=1)
+                           Output: cl.id, cl.created_at, cl.comment_id
+                           Index Cond: (cl.liked_by = '00000001-0000-4000-8000-000000000001'::uuid)
+                           Filter: ((cl.visibility_status)::text = 'ACTIVE'::text)
+                           Buffers: shared hit=4
+                     ->  Index Scan using pk_comments on public.comments c  (cost=0.43..7.32 rows=1 width=88) (actual time=0.002..0.002 rows=1 loops=10)
+                           Output: c.id, c.content, c.created_at, c.user_id, c.article_id
+                           Index Cond: (c.id = cl.comment_id)
+                           Buffers: shared hit=40
+               ->  Index Scan using pk_users on public.users u  (cost=0.42..0.44 rows=1 width=31) (actual time=0.001..0.001 rows=1 loops=10)
+                     Output: u.id, u.email, u.nickname, u.password, u.created_at, u.updated_at, u.deleted_at
+                     Index Cond: (u.id = c.user_id)
+                     Buffers: shared hit=40
+         ->  Index Scan using pk_articles on public.articles a  (cost=0.43..0.50 rows=1 width=43) (actual time=0.002..0.002 rows=1 loops=10)
+               Output: a.id, a.title, a.summary, a.link, a.date, a.source, a.created_at, a.updated_at, a.deleted_at
+               Index Cond: (a.id = c.article_id)
+               Buffers: shared hit=40
+         SubPlan 1
+           ->  Aggregate  (cost=4.45..4.46 rows=1 width=8) (actual time=0.003..0.003 rows=1 loops=10)
+                 Output: count(cl2.id)
+                 Buffers: shared hit=31
+                 ->  Index Only Scan using idx_perf_comment_likes_active_comment_cover on public.comment_likes cl2  (cost=0.43..4.45 rows=1 width=16) (actual time=0.002..0.002 rows=2 loops=10)
+                       Output: cl2.comment_id, cl2.id
+                       Index Cond: (cl2.comment_id = c.id)
+                       Heap Fetches: 0
+                       Buffers: shared hit=31
+ Planning:
+   Buffers: shared hit=438
+ Planning Time: 1.213 ms
+ Execution Time: 0.177 ms
+(45 rows)
+```
+
+### 2배 현재 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -216,7 +316,7 @@ QUERY PLAN
 (45 rows)
 ```
 
-### 부분 커버링 인덱스 실행계획
+### 2배 부분 커버링 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -306,7 +406,53 @@ ORDER BY av.viewed_at DESC, av.id DESC
 FETCH FIRST 10 ROWS ONLY;
 ```
 
-### 현재 인덱스 실행계획
+### 1배 부분 커버링 인덱스 실행계획
+
+```text
+QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.86..176.63 rows=10 width=206) (actual time=1.067..10.025 rows=10 loops=1)
+   Output: av.id, av.user_id, av.viewed_at, a.id, a.source, a.link, a.title, a.date, a.summary, ((SubPlan 1)), ((SubPlan 2))
+   Buffers: shared hit=806
+   ->  Nested Loop  (cost=0.86..135413.31 rows=7704 width=206) (actual time=1.066..10.022 rows=10 loops=1)
+         Output: av.id, av.user_id, av.viewed_at, a.id, a.source, a.link, a.title, a.date, a.summary, (SubPlan 1), (SubPlan 2)
+         Inner Unique: true
+         Buffers: shared hit=806
+         ->  Index Scan using idx_article_views_user_viewed_id on public.article_views av  (cost=0.43..13258.95 rows=7704 width=56) (actual time=0.019..0.033 rows=10 loops=1)
+               Output: av.id, av.user_id, av.viewed_at, av.article_id
+               Index Cond: (av.user_id = '00000001-0000-4000-8000-000000000001'::uuid)
+               Filter: ((av.visibility_status)::text = 'ACTIVE'::text)
+               Buffers: shared hit=4
+         ->  Index Scan using pk_articles on public.articles a  (cost=0.43..6.84 rows=1 width=150) (actual time=0.005..0.005 rows=1 loops=10)
+               Output: a.id, a.title, a.summary, a.link, a.date, a.source, a.created_at, a.updated_at, a.deleted_at
+               Index Cond: (a.id = av.article_id)
+               Buffers: shared hit=40
+         SubPlan 1
+           ->  Aggregate  (cost=4.47..4.48 rows=1 width=8) (actual time=0.097..0.097 rows=1 loops=10)
+                 Output: count(c.id)
+                 Buffers: shared hit=110
+                 ->  Index Only Scan using idx_perf_comments_active_article_cover on public.comments c  (cost=0.43..4.46 rows=2 width=16) (actual time=0.008..0.066 rows=1002 loops=10)
+                       Output: c.article_id, c.id
+                       Index Cond: (c.article_id = a.id)
+                       Heap Fetches: 0
+                       Buffers: shared hit=110
+         SubPlan 2
+           ->  Aggregate  (cost=4.53..4.54 rows=1 width=8) (actual time=0.893..0.893 rows=1 loops=10)
+                 Output: count(av2.id)
+                 Buffers: shared hit=652
+                 ->  Index Only Scan using idx_perf_article_views_active_article_cover on public.article_views av2  (cost=0.43..4.52 rows=5 width=16) (actual time=0.005..0.591 rows=10003 loops=10)
+                       Output: av2.article_id, av2.id
+                       Index Cond: (av2.article_id = a.id)
+                       Heap Fetches: 0
+                       Buffers: shared hit=652
+ Planning:
+   Buffers: shared hit=391
+ Planning Time: 0.887 ms
+ Execution Time: 10.081 ms
+(38 rows)
+```
+
+### 2배 현재 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -352,7 +498,7 @@ QUERY PLAN
 (38 rows)
 ```
 
-### 부분 커버링 인덱스 실행계획
+### 2배 부분 커버링 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -425,7 +571,50 @@ WHERE s.user_id = '00000001-0000-4000-8000-000000000001'
 ORDER BY s.created_at DESC, s.id DESC;
 ```
 
-### 현재 인덱스 실행계획
+### 1배 부분 커버링 인덱스 실행계획
+
+```text
+QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=1690.15..1690.42 rows=109 width=78) (actual time=4.730..4.733 rows=50 loops=1)
+   Output: s.id, s.created_at, i.id, i.created_at, i.name, i.updated_at, ((SubPlan 1))
+   Sort Key: s.created_at DESC, s.id DESC
+   Sort Method: quicksort  Memory: 30kB
+   Buffers: shared hit=614
+   ->  Nested Loop  (cost=9.57..1686.46 rows=109 width=78) (actual time=0.135..4.694 rows=50 loops=1)
+         Output: s.id, s.created_at, i.id, i.created_at, i.name, i.updated_at, (SubPlan 1)
+         Inner Unique: true
+         Buffers: shared hit=608
+         ->  Bitmap Heap Scan on public.subscriptions s  (cost=9.28..407.37 rows=109 width=40) (actual time=0.020..0.034 rows=50 loops=1)
+               Output: s.id, s.created_at, s.interest_id
+               Recheck Cond: (s.user_id = '00000001-0000-4000-8000-000000000001'::uuid)
+               Filter: ((s.visibility_status)::text = 'ACTIVE'::text)
+               Heap Blocks: exact=1
+               Buffers: shared hit=4
+               ->  Bitmap Index Scan on idx_subscriptions_user_created_id  (cost=0.00..9.25 rows=110 width=0) (actual time=0.013..0.013 rows=50 loops=1)
+                     Index Cond: (s.user_id = '00000001-0000-4000-8000-000000000001'::uuid)
+                     Buffers: shared hit=3
+         ->  Index Scan using pk_interests on public.interests i  (cost=0.29..7.06 rows=1 width=46) (actual time=0.001..0.001 rows=1 loops=50)
+               Output: i.id, i.name, i.created_at, i.updated_at
+               Index Cond: (i.id = s.interest_id)
+               Buffers: shared hit=150
+         SubPlan 1
+           ->  Aggregate  (cost=4.67..4.67 rows=1 width=8) (actual time=0.091..0.091 rows=1 loops=50)
+                 Output: count(s2.id)
+                 Buffers: shared hit=454
+                 ->  Index Only Scan using idx_perf_subscriptions_active_interest_cover on public.subscriptions s2  (cost=0.42..4.63 rows=12 width=16) (actual time=0.002..0.061 rows=1011 loops=50)
+                       Output: s2.interest_id, s2.id
+                       Index Cond: (s2.interest_id = i.id)
+                       Heap Fetches: 0
+                       Buffers: shared hit=454
+ Planning:
+   Buffers: shared hit=259
+ Planning Time: 0.653 ms
+ Execution Time: 4.790 ms
+(35 rows)
+```
+
+### 2배 현재 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -460,7 +649,7 @@ QUERY PLAN
 (27 rows)
 ```
 
-### 부분 커버링 인덱스 실행계획
+### 2배 부분 커버링 인덱스 실행계획
 
 ```text
 QUERY PLAN
