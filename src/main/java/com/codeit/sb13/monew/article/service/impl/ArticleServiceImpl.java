@@ -1,0 +1,241 @@
+package com.codeit.sb13.monew.article.service.impl;
+
+import com.codeit.sb13.monew.activity.service.ActivityVisibilityUpdater;
+import com.codeit.sb13.monew.activity.service.ArticleActivityVisibilityUpdateResult;
+import com.codeit.sb13.monew.article.domain.Article;
+import com.codeit.sb13.monew.article.domain.ArticleSource;
+import com.codeit.sb13.monew.article.mapper.ArticleMapper;
+import com.codeit.sb13.monew.article.repository.ArticleRepository;
+import com.codeit.sb13.monew.article.repository.ArticleViewRepository;
+import com.codeit.sb13.monew.article.repository.dto.ArticleSearchCondition;
+import com.codeit.sb13.monew.article.repository.dto.ArticleSearchPage;
+import com.codeit.sb13.monew.article.repository.dto.ArticleSearchRow;
+import com.codeit.sb13.monew.article.s3.service.dto.ArticleBackupItem;
+import com.codeit.sb13.monew.article.service.ArticleService;
+import com.codeit.sb13.monew.article.service.dto.ArticleDto;
+import com.codeit.sb13.monew.article.service.dto.ArticleRequest;
+import com.codeit.sb13.monew.article.service.dto.ArticleSearchCommand;
+import com.codeit.sb13.monew.comment.repository.CommentLikeRepository;
+import com.codeit.sb13.monew.comment.repository.CommentRepository;
+import com.codeit.sb13.monew.global.dto.CursorPageResponseDto;
+import com.codeit.sb13.monew.global.exception.article.ArticleBackupDateInvalidException;
+import com.codeit.sb13.monew.global.exception.article.ArticleDuplicateException;
+import com.codeit.sb13.monew.global.exception.article.ArticleNotFoundException;
+import com.codeit.sb13.monew.user.service.UserService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional(readOnly = true)
+public class ArticleServiceImpl implements ArticleService {
+
+    private final ArticleRepository articleRepository;
+    private final ArticleViewRepository articleViewRepository;
+    private final CommentRepository commentRepository;
+    private final CommentLikeRepository commentLikeRepository;
+    private final ActivityVisibilityUpdater activityVisibilityUpdater;
+    private final ArticleMapper articleMapper;
+    private final UserService userService;
+
+    @Override
+    public List<Article> findAll() {
+        return articleRepository.findAllByDeletedAtIsNullOrderByDateDesc();
+    }
+
+    @Override
+    public Article findById(UUID id) {
+        return articleRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new ArticleNotFoundException(id));
+    }
+
+    @Override
+    public ArticleDto getArticle(UUID articleId, UUID requestUserId) {
+        userService.validateExists(requestUserId);
+
+        Article article = findById(articleId);
+
+        boolean viewedByMe = articleViewRepository
+                .existsByArticle_IdAndUser_Id(articleId, requestUserId);
+        long viewCount = articleViewRepository.countActiveByArticleId(articleId);
+
+        long commentCount = commentRepository.countActiveByArticleId(articleId);
+
+        return articleMapper.toDto(article, viewedByMe, commentCount, viewCount);
+    }
+
+    @Override
+    public List<ArticleSource> getSources() {
+        return List.of(ArticleSource.values());
+    }
+
+    @Override
+    public CursorPageResponseDto<ArticleDto> searchArticles(ArticleSearchCommand command) {
+        userService.validateExists(command.requestUserId());
+
+        ArticleSearchCondition condition = new ArticleSearchCondition(
+                command.keyword(),
+                command.interestId(),
+                command.sourceIn(),
+                command.publishDateFrom(),
+                command.publishDateTo(),
+                command.orderBy(),
+                command.direction(),
+                command.cursor(),
+                command.after(),
+                command.limit(),
+                command.requestUserId()
+        );
+
+        ArticleSearchPage page = articleRepository.search(condition);
+
+        List<ArticleDto> content = page.rows().stream()
+                .map(row -> articleMapper.toDto(
+                        row.article(), row.viewedByMe(), row.commentCount(), row.viewCount()))
+                .toList();
+
+        return new CursorPageResponseDto<>(
+                content,
+                nextCursor(page.rows()),
+                nextAfter(page.rows()),
+                null,
+                content.size(),
+                page.totalElements(),
+                page.hasNext()
+        );
+    }
+
+    /**
+     * 엔티티 저장 (내부용)
+     */
+    @Override
+    @Transactional
+    public Article save(Article article) {
+        return articleRepository.save(article);
+    }
+
+    /**
+     * DTO로 새로운 기사 생성
+     */
+    @Override
+    @Transactional
+    public Article create(ArticleRequest request) {
+        // link 중복 체크
+        if (articleRepository.findByLink(request.getLink()).isPresent()) {
+            throw new ArticleDuplicateException();
+        }
+
+        // Article 생성
+        Article article = Article.create(
+                request.getTitle(),
+                resolveSummary(request),
+                request.getLink(),
+                request.getDate(),
+                request.getSource()
+        );
+
+        // DataIntegrityViolationException 처리 (동시성 문제 대응)
+        try {
+            return articleRepository.saveAndFlush(article);
+        } catch (DataIntegrityViolationException e) {
+            if (isLinkUniqueViolation(e)) {
+                throw new ArticleDuplicateException();
+            }
+            throw e;
+        }
+    }
+
+    private String resolveSummary(ArticleRequest request) {
+        return request.getSummary() == null ? "" : request.getSummary();
+    }
+
+    @Override
+    @Transactional
+    public void softDelete(UUID id) {
+        Article article = findById(id);
+        article.softDelete();
+        articleRepository.save(article);
+
+        ArticleActivityVisibilityUpdateResult updateResult =
+                activityVisibilityUpdater.hideActiveByDeletedArticle(id);
+        log.info(
+                "기사 논리 삭제 완료 - articleId: {}, 숨김 처리된 조회 기록 수: {}, 댓글 수: {}, 댓글 좋아요 수: {}",
+                id,
+                updateResult.articleViewCount(),
+                updateResult.commentCount(),
+                updateResult.commentLikeCount()
+        );
+    }
+
+    @Override
+    @Transactional
+    public void hardDelete(UUID id) {
+        if (!articleRepository.existsById(id)) {
+            throw new ArticleNotFoundException(id);
+        }
+        // FK 제약 순서: CommentLike -> Comment -> ArticleView -> Article
+        commentLikeRepository.deleteByComment_Article_Id(id);
+        commentRepository.deleteByArticle_Id(id);
+        articleViewRepository.deleteByArticle_Id(id);
+        articleRepository.deleteById(id);
+    }
+
+    private boolean isLinkUniqueViolation(DataIntegrityViolationException e) {
+        String message = e.getMostSpecificCause().getMessage();
+        return message != null && message.contains("uk_articles_link");
+    }
+
+    @Override
+    public List<ArticleBackupItem> findArticleBackupItemsByDateRange(LocalDate from, LocalDate to) {
+        if (from == null || to == null) {
+            throw new ArticleBackupDateInvalidException(from, to, "백업 조회 날짜 범위는 필수입니다.");
+        }
+        if (!from.isBefore(to)) {
+            throw new ArticleBackupDateInvalidException(from, to, "백업 조회 시작일은 종료일보다 이전이어야 합니다.");
+        }
+        return articleRepository.findArticlesForBackup(from.atStartOfDay(), to.atStartOfDay())
+                .stream()
+                .map(ArticleBackupItem::from)
+                .toList();
+    }
+
+
+    /**
+     * 다음 페이지 조회 시 {@code cursor} 파라미터로 그대로 돌려보낼 값을 만든다.
+     *
+     * <p>이번 페이지 마지막 기사의 id다. 정렬 기준 값은 서버가 이 id로 앵커 행을 다시 조회해
+     * 얻는다({@code ArticleRepositoryCustomImpl#resolveAnchor} 참고). 이번 페이지가 비어
+     * 있으면 다음 페이지도 없다는 뜻이라 {@code null}을 돌려준다.</p>
+     */
+    private String nextCursor(List<ArticleSearchRow> rows) {
+        if (rows.isEmpty()) {
+            return null;
+        }
+
+        return rows.get(rows.size() - 1).article().getId().toString();
+    }
+
+    private String nextAfter(List<ArticleSearchRow> rows) {
+        if (rows.isEmpty()) {
+            return null;
+        }
+
+        return rows.get(rows.size() - 1).article().getCreatedAt().toString();
+    }
+
+    private String nextIdAfter(List<ArticleSearchRow> rows) {
+        if (rows.isEmpty()) {
+            return null;
+        }
+
+        return rows.get(rows.size() - 1).article().getId().toString();
+    }
+}

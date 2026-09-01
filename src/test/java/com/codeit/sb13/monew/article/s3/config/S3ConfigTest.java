@@ -1,0 +1,78 @@
+package com.codeit.sb13.monew.article.s3.config;
+
+import com.codeit.sb13.monew.global.exception.article.ArticleS3ConfigInvalidException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import software.amazon.awssdk.services.s3.S3Client;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DisplayName("S3 설정 단위 테스트")
+class S3ConfigTest {
+
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(S3Config.class);
+
+    @Test
+    @DisplayName("S3 설정 값을 바인딩한다")
+    void bindsS3Properties() {
+        contextRunner
+                .withPropertyValues(
+                        "monew.s3.bucket=monew-backup",
+                        "monew.s3.region=us-east-1",
+                        "monew.s3.endpoint=http://localhost:9090",
+                        "monew.s3.prefix=article-backups"
+                )
+                .run(context -> {
+                    S3Properties properties = context.getBean(S3Properties.class);
+
+                    assertThat(properties.bucket()).isEqualTo("monew-backup");
+                    assertThat(properties.region()).isEqualTo("us-east-1");
+                    assertThat(properties.endpoint()).isEqualTo("http://localhost:9090");
+                    assertThat(properties.prefix()).isEqualTo("article-backups");
+                });
+    }
+
+    @Test
+    @DisplayName("S3Client Bean을 생성한다")
+    void createsS3Client() {
+        contextRunner
+                .withPropertyValues(
+                        "monew.s3.bucket=monew-backup",
+                        "monew.s3.region=us-east-1",
+                        "monew.s3.endpoint=http://localhost:9090"
+                )
+                .run(context -> assertThat(context.getBean(S3Client.class)).isNotNull());
+    }
+
+    @Test
+    @DisplayName("S3 region이 비어 있으면 설정 예외가 발생한다")
+    void failsWhenRegionIsBlank() {
+        contextRunner
+                .withPropertyValues(
+                        "monew.s3.bucket=monew-backup",
+                        "monew.s3.region=",
+                        "monew.s3.endpoint=http://localhost:9090"
+                )
+                .run(context -> {
+                    Throwable startupFailure = context.getStartupFailure();
+                    assertThat(startupFailure).isNotNull();
+
+                    assertThat(rootCause(startupFailure))
+                            .isInstanceOfSatisfying(ArticleS3ConfigInvalidException.class, exception ->
+                                    assertThat(exception.getDetails())
+                                            .containsEntry("property", "monew.s3.region")
+                                            .containsEntry("reason", "S3 region 설정이 필요합니다"));
+                });
+    }
+
+    private Throwable rootCause(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+
+        return current;
+    }
+}

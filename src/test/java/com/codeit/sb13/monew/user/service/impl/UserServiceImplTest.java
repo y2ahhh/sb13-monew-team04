@@ -1,0 +1,507 @@
+package com.codeit.sb13.monew.user.service.impl;
+
+import com.codeit.sb13.monew.activity.service.ActivityVisibilityUpdater;
+import com.codeit.sb13.monew.activity.service.UserActivityVisibilityUpdateResult;
+import com.codeit.sb13.monew.global.exception.user.UserNotFoundException;
+import com.codeit.sb13.monew.user.domain.User;
+import com.codeit.sb13.monew.user.exception.AlreadyDeletedUserException;
+import com.codeit.sb13.monew.user.exception.DuplicateEmailException;
+import com.codeit.sb13.monew.user.exception.InvalidPasswordException;
+import com.codeit.sb13.monew.user.exception.LoginUserNotFoundException;
+import com.codeit.sb13.monew.user.mapper.UserMapper;
+import com.codeit.sb13.monew.user.repository.UserRepository;
+import com.codeit.sb13.monew.user.service.UserHardDeleteExecutor;
+import com.codeit.sb13.monew.user.service.dto.UserCreateCommand;
+import com.codeit.sb13.monew.user.service.dto.UserCreateResult;
+import com.codeit.sb13.monew.user.service.dto.UserLoginCommand;
+import com.codeit.sb13.monew.user.service.dto.UserLoginResult;
+import com.codeit.sb13.monew.user.service.dto.UserUpdateNicknameCommand;
+import com.codeit.sb13.monew.user.service.dto.UserUpdateNicknameResult;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
+
+
+@ExtendWith(MockitoExtension.class)
+public class UserServiceImplTest {
+
+  @Mock
+  UserRepository userRepository;
+
+  @Mock
+  UserHardDeleteExecutor userHardDeleteExecutor;
+
+  @Mock
+  private ActivityVisibilityUpdater activityVisibilityUpdater;
+
+  @Mock
+  PasswordEncoder passwordEncoder;
+  @Mock
+  UserMapper userMapper;
+  @Captor
+  ArgumentCaptor<User> userCaptor;
+
+  @InjectMocks
+  UserServiceImpl userServiceImpl;
+
+  @Test
+  @DisplayName("이메일 중복된 경우, 회원가입 시 DuplicateEmailException을 던진다")
+  void 회원가입_시_중복된_이메일이면_예외를_던진다() {
+    // given
+    UserCreateCommand command = new UserCreateCommand(
+        "duplicate@example.com",
+        "닉네임",
+        "PassWord123!"
+    );
+    when(userRepository.existsByEmail(command.email()))
+        .thenReturn(true);
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.signUp(command))
+        .isInstanceOf(DuplicateEmailException.class);
+
+    verify(passwordEncoder, never()).encode(any());
+    verify(userRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName("정상적인 요청 시에 사용자가 생성된다.")
+  void 정상_값으로_요청_시_사용자가_생성된다() {
+    // given
+    UserCreateCommand command = new UserCreateCommand(
+        "email@example.com",
+        "닉네임",
+        "PassWord123!"
+    );
+    UserCreateResult expectedResponse = new UserCreateResult(
+        UUID.randomUUID(), "email@example.com",
+        "닉네임", null);
+
+    when(userRepository.existsByEmail(command.email()))
+        .thenReturn(false);
+    when(passwordEncoder.encode(command.password()))
+        .thenReturn("encodedPassword123");
+    when(userRepository.saveAndFlush(any(User.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(userMapper.toResult(any(User.class)))
+        .thenReturn(expectedResponse);
+
+    // when
+    UserCreateResult actualResult = userServiceImpl.signUp(command);
+
+    // then
+    verify(userRepository).saveAndFlush(userCaptor.capture());
+    User capturedUser = userCaptor.getValue();
+    assertThat(capturedUser.getPassword()).isEqualTo("encodedPassword123");
+    assertThat(capturedUser.getPassword()).isNotEqualTo(command.password());
+    assertThat(actualResult).isEqualTo(expectedResponse);
+  }
+
+  @Test
+  @DisplayName("이메일 중복 검사를 통과했지만 저장 시점에 DB 제약 위반이 발생하면 DuplicateEmailException을 던진다")
+  void 저장_시점에_이메일_중복이_감지되면_예외를_던진다() {
+    // given
+    UserCreateCommand command = new UserCreateCommand(
+        "email@email",
+        "닉네임",
+        "PassWord123!"
+    );
+    when(userRepository.existsByEmail(command.email()))
+        .thenReturn(false);
+    when(passwordEncoder.encode(command.password()))
+        .thenReturn("encodedPassword123");
+    when(userRepository.saveAndFlush(any(User.class)))
+        .thenThrow(new DataIntegrityViolationException(
+            "duplicate key value violates unique constraint \"uk_users_email\""));
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.signUp(command))
+        .isInstanceOf(DuplicateEmailException.class);
+    verify(userRepository).existsByEmail(command.email());
+  }
+
+  @Test
+  @DisplayName("이메일과 무관한 DB 제약 위반이면 원래 예외를 그대로 던진다")
+  void 이메일과_무관한_제약_위반이면_원래_예외를_던진다() {
+    // given
+    UserCreateCommand command = new UserCreateCommand(
+        "email@example.com",
+        "닉네임",
+        "PassWord123!"
+    );
+    when(userRepository.existsByEmail(command.email()))
+        .thenReturn(false);
+    when(passwordEncoder.encode(command.password()))
+        .thenReturn("encodedPassword123");
+    when(userRepository.saveAndFlush(any(User.class)))
+        .thenThrow(new DataIntegrityViolationException(
+            "null value in column \"nickname\" violates not-null constraint"));
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.signUp(command))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .isNotInstanceOf(DuplicateEmailException.class);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 이메일로 로그인하면 LoginUserNotFoundException을 던진다.")
+  void 존재하지_않는_이메일로_로그인시_예외를_던진다() {
+    // given
+    UserLoginCommand command = new UserLoginCommand(
+        "email@email.com",
+        "PassWord123!"
+    );
+    when(userRepository.findByEmail(command.email()))
+        .thenReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.login(command))
+        .isInstanceOf(LoginUserNotFoundException.class);
+    verify(passwordEncoder, never()).matches(any(), any());
+    verify(userMapper, never()).toLoginResult(any());
+  }
+
+  @Test
+  @DisplayName("비밀번호가 일치하지 않으면 InvalidPasswordException을 던진다.")
+  void 비밀번호가_일치하지_않으면_예외를_던진다() {
+    // given
+    UserLoginCommand command = new UserLoginCommand(
+        "email@email.com",
+        "PassWord123!"
+    );
+    User user = User.builder()
+        .email("email@email.com")
+        .nickname("닉네임")
+        .password("encodedPassword123")
+        .build();
+    when(userRepository.findByEmail(command.email()))
+        .thenReturn(Optional.of(user));
+    when(passwordEncoder.matches(command.password(), user.getPassword()))
+        .thenReturn(false);
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.login(command))
+        .isInstanceOf(InvalidPasswordException.class);
+    verify(userMapper, never()).toLoginResult(any());
+  }
+
+  @Test
+  @DisplayName("삭제된 사용자가 로그인을 시도하면 LoginUserNotFoundException을 던진다")
+  void 삭제된_사용자가_로그인_시도시_예외를_던진다() {
+    // given
+    User user = User.builder()
+        .email("email@email.com")
+        .nickname("닉네임")
+        .password("PassWord123!")
+        .build();
+    user.softDelete();
+    UserLoginCommand command = new UserLoginCommand(
+        "email@email.com", "PassWord123!"
+    );
+    when(userRepository.findByEmail(command.email()))
+        .thenReturn(Optional.of(user));
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.login(command))
+    .isInstanceOf(LoginUserNotFoundException.class);
+    verify(passwordEncoder, never()).matches(any(), any());
+    verify(userMapper, never()).toLoginResult(any());
+
+  }
+
+  @Test
+  @DisplayName("이메일/비밀번호가 올바르면 로그인에 성공한다.")
+  void 올바른_이메일과_비밀번호라면_로그인_성공() {
+    // given
+    UserLoginCommand command = new UserLoginCommand(
+        "email@email.com",
+        "PassWord123!"
+    );
+    User user = User.builder()
+        .email("email@email.com")
+        .nickname("닉네임")
+        .password("encodedPassword123")
+        .build();
+    UserLoginResult expectedResult = new UserLoginResult(
+        UUID.randomUUID(), "email@email.com", "닉네임", LocalDateTime.now()
+    );
+    when(userMapper.toLoginResult(user))
+        .thenReturn(expectedResult);
+    when(userRepository.findByEmail(command.email()))
+        .thenReturn(Optional.of(user));
+    when(passwordEncoder.matches(command.password(), user.getPassword()))
+        .thenReturn(true);
+
+    // when
+    UserLoginResult actualResult = userServiceImpl.login(command);
+
+    // then
+    assertThat(actualResult).isEqualTo(expectedResult);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 userId로 요청하면 예외를 던진다.")
+  void 존재하지_않는_id로_요청하면_예외를_던진다() {
+    // given
+    UserUpdateNicknameCommand command = new UserUpdateNicknameCommand(
+        UUID.randomUUID(),
+        "닉네임"
+    );
+    when(userRepository.findById(command.userId()))
+        .thenReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.updateNickname(command))
+        .isInstanceOf(UserNotFoundException.class);
+    verify(userMapper, never()).toUpdateNicknameResult(any());
+    verify(userRepository, never()).saveAndFlush(any(User.class));
+
+  }
+
+  @Test
+  @DisplayName("올바른 요청을 보내면 닉네임 변경이 성공한다")
+  void 올바른_요청을_보내면_닉네임_변경이_성공한다() {
+    // given
+    UserUpdateNicknameCommand command = new UserUpdateNicknameCommand(
+        UUID.randomUUID(), "닉네임2");
+    User user = User.builder()
+        .email("email@email.com")
+        .nickname("닉네임")
+        .password("PassWord123!")
+        .build();
+
+    UserUpdateNicknameResult expectedResult = new UserUpdateNicknameResult(
+        command.userId(), "닉네임2", LocalDateTime.now(),
+        LocalDateTime.now(), "email@email.com");
+
+    when(userRepository.findById(command.userId()))
+        .thenReturn(Optional.of(user));
+    when(userRepository.saveAndFlush(user))
+        .thenReturn(user);
+    when(userMapper.toUpdateNicknameResult(user))
+        .thenReturn(expectedResult);
+
+    // when
+    UserUpdateNicknameResult actualResult = userServiceImpl.updateNickname(command);
+
+    // then
+    assertThat(actualResult).isEqualTo(expectedResult);
+    assertThat(user.getNickname()).isEqualTo("닉네임2");
+    verify(userRepository).saveAndFlush(user);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 userId로 findById 요청시 예외를 던진다.")
+  void 존재하지_않는_ID에는_예외를_던진다() {
+    // given
+    UUID userId = UUID.randomUUID();
+    when(userRepository.findById(userId))
+        .thenReturn(Optional.empty());
+
+    // when &  then
+    assertThatThrownBy(() -> userServiceImpl.findById(userId))
+        .isInstanceOf(UserNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("유효한 Id로 findById를 요청하면  user를 라턴한다.")
+  void 유효한_id로_요청시_user_반환() {
+    // given
+    UUID userId = UUID.randomUUID();
+    User user = User.builder()
+        .email("email@email.com")
+        .nickname("닉네임")
+        .password("PassWord123!")
+        .build();
+
+    when(userRepository.findById(userId))
+        .thenReturn(Optional.of(user));
+
+    // when
+    User actualUser = userServiceImpl.findById(userId);
+    // then
+    assertThat(actualUser).isEqualTo(user);
+
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 userId로 validateExists 요청시 예외를 던진다.")
+  void 존재하지_않는_id로_validateExists_요청시_예외를_던진다() {
+    // given
+    UUID userId = UUID.randomUUID();
+    when(userRepository.existsById(userId))
+        .thenReturn(false);
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.validateExists(userId))
+        .isInstanceOf(UserNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("존재하는 userId로 validateExists 요청시 예외 없이 통과한다.")
+  void 존재하는_id로_validateExists_요청시_정상_통과한다() {
+    // given
+    UUID userId = UUID.randomUUID();
+    when(userRepository.existsById(userId))
+        .thenReturn(true);
+
+    // when & then
+    assertThatCode(() -> userServiceImpl.validateExists(userId))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 userId로 deleteUser요청 시 예외를 던진다")
+  void 존재하지_않는_userId로_요청_시_예외를_던진다() {
+    // given
+    UUID userId = UUID.randomUUID();
+
+    when(userRepository.softDeleteIfNotDeleted(eq(userId),
+        any(LocalDateTime.class)))
+        .thenReturn(0);
+    when(userRepository.existsById(userId))
+        .thenReturn(false);
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.deleteUser(userId))
+        .isInstanceOf(UserNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("정상적인 요청 시 사용자가 논리 삭제된다")
+  void 정상_요청_시_사용자가_논리_살제된다() {
+    // given
+    UUID userId = UUID.randomUUID();
+
+    when(userRepository.softDeleteIfNotDeleted(eq(userId),
+         any(LocalDateTime.class)))
+        .thenReturn(1);
+    when(activityVisibilityUpdater.hideActiveByDeletedUser(eq(userId)))
+            .thenReturn(new UserActivityVisibilityUpdateResult(0, 0, 0, 0));
+
+    // when & then
+    assertThatCode(() -> userServiceImpl.deleteUser(userId))
+        .doesNotThrowAnyException();
+    verify(userRepository).softDeleteIfNotDeleted(eq(userId),
+        any(LocalDateTime.class));
+    verify(activityVisibilityUpdater).hideActiveByDeletedUser(eq(userId));
+    verify(userRepository, never()).existsById(any());
+  }
+
+  @Test
+  @DisplayName("이미 논리 삭제된 user 조회시 예외를 던진다")
+  void 논리_삭제된_user_조회시_예외를_던진다() {
+    // given
+    UUID userId = UUID.randomUUID();
+    when(userRepository.softDeleteIfNotDeleted(eq(userId),
+        any(LocalDateTime.class)))
+        .thenReturn(0);
+    when(userRepository.existsById(userId))
+        .thenReturn(true);  // 여기가 다름
+
+    // when & then
+    assertThatThrownBy(() -> userServiceImpl.deleteUser(userId))
+        .isInstanceOf(AlreadyDeletedUserException.class);
+  }
+
+  @Test
+  @DisplayName("물리 삭제 요청 시 UserHardDeleteExecutor에게 위임한다")
+  void 물리_삭제_요청시_executor에게_위임한다() {
+    // given
+    UUID userId = UUID.randomUUID();
+
+    // when
+    userServiceImpl.hardDeleteUser(userId);
+    // then
+    verify(userHardDeleteExecutor).hardDeleteUser(userId);
+
+
+  }
+
+  @Test
+  @DisplayName("논리 삭제 후 1일이 지난 사용자를 찾아서 물리 삭제한다.")
+  void 논리삭제_후_1일이_지난_사용자는_물리_삭제한다() {
+    // given
+    User user = User.builder()
+        .email("email@email.com")
+        .nickname("닉네임")
+        .password("PassWord123!")
+        .build();
+    ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
+    user.softDelete();
+
+    when(userRepository.findByDeletedAtBefore(any(LocalDateTime.class)))
+        .thenReturn(List.of(user));
+
+    // when
+    userServiceImpl.autoDeleteExpiredUsers();
+
+    // then
+    verify(userHardDeleteExecutor).hardDeleteExpiredUser(eq(user.getId()), any(LocalDateTime.class));
+  }
+
+  @Test
+  @DisplayName("논리 삭제 후 1일이 지나지 않은 사용자는 물리 삭제되지 않는다.")
+  void 논리_삭제_후_1일이_지나지_않으면_물리_삭제되지_않는다() {
+    // given
+    when(userRepository.findByDeletedAtBefore(any(LocalDateTime.class)))
+        .thenReturn(List.of());
+
+    // when
+    userServiceImpl.autoDeleteExpiredUsers();
+
+    // then
+    verify(userHardDeleteExecutor, never()).hardDeleteUser(any());
+  }
+
+
+
+  @Test
+  @DisplayName("논리 삭제되지 않은 사용자 ID로 findActiveById 요청 시 해당 사용자를 반환한다.")
+  void 활성_사용자_ID로_findActiveById_요청시_user_반환() {
+    UUID userId = UUID.randomUUID();
+    User user = User.builder()
+        .email("active@email.com")
+        .nickname("활성 사용자")
+        .password("PassWord123!")
+        .build();
+    when(userRepository.findByIdAndDeletedAtIsNull(userId)).thenReturn(Optional.of(user));
+
+    User actualUser = userServiceImpl.findActiveById(userId);
+
+    assertThat(actualUser).isEqualTo(user);
+  }
+
+  @Test
+  @DisplayName("삭제되었거나 존재하지 않는 사용자 ID로 findActiveById 요청 시 UserNotFoundException 예외를 던진다.")
+  void 비활성_사용자_ID로_findActiveById_요청시_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    when(userRepository.findByIdAndDeletedAtIsNull(userId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> userServiceImpl.findActiveById(userId))
+        .isInstanceOf(UserNotFoundException.class);
+  }
+
+}

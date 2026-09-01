@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.1.0'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'jacoco'
 }
 
 group = 'com.codeit'
@@ -35,7 +36,7 @@ dependencies {
     implementation 'org.flywaydb:flyway-database-postgresql'
 
     // Security
-    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.security:spring-security-crypto'
 
     // Validation
     implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -55,11 +56,31 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
 
+    // LevenshteinDistance
+    implementation 'org.apache.commons:commons-text:1.11.0'
+
+    // Docker Compose
+    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+
+    // Swagger
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
+
+    // RSS
+    implementation 'com.rometools:rome:2.1.0'
+    implementation 'com.rometools:rome-modules:2.1.0'
+
+    // S3
+    implementation platform('software.amazon.awssdk:bom:2.46.7')
+    implementation 'software.amazon.awssdk:s3'
+
+    // Adobe S3Mock - 로컬에서 진짜 S3 API 를 흉내내는 컨테이너.
+    //   계정/토큰 불필요(LocalStack 은 2026-03 부터 토큰 필요) → S3 연동을 격리·재현 가능하게 테스트.
+    testImplementation 'com.adobe.testing:s3mock-testcontainers:4.11.0'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-flyway-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
@@ -68,5 +89,88 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'migration', 'external'
+    }
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.register('rssExternalTest', Test) {
+    description = 'Runs external RSS smoke tests against live RSS feeds.'
+    group = 'verification'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform {
+        includeTags 'external'
+    }
+    filter {
+        includeTestsMatching 'com.codeit.sb13.monew.article.service.rss.RssExternalSmokeTest'
+    }
+
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.register('naverExternalTest', Test) {
+    description = 'Runs external NAVER news smoke tests against the live NAVER API.'
+    group = 'verification'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform {
+        includeTags 'external'
+    }
+    filter {
+        includeTestsMatching 'com.codeit.sb13.monew.article.service.naver.NaverExternalSmokeTest'
+    }
+
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.register('s3DevExternalTest', Test) {
+    description = 'Runs dev-profile S3 backup/restore smoke tests against configured AWS S3 and dev DB.'
+    group = 'verification'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform {
+        includeTags 's3-dev-external'
+    }
+
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.register('migrationTest', Test) {
+    description = 'Runs Flyway migration tests against PostgreSQL.'
+    group = 'verification'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform {
+        includeTags 'migration'
+    }
+
+    shouldRunAfter tasks.named('test')
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    classDirectories.setFrom(files(classDirectories.files.collect {
+        fileTree(dir: it, exclude: [
+                '**/domain/Q*.class',
+                '**/*MapperImpl.class'
+        ])
+    }))
+}
+
+tasks.named('build') {
+    finalizedBy tasks.named('jacocoTestReport')
 }

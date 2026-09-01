@@ -1,0 +1,125 @@
+package com.codeit.sb13.monew.comment.repository;
+
+import com.codeit.sb13.monew.comment.domain.CommentLike;
+import com.codeit.sb13.monew.comment.repository.dto.CommentLikeResponseProjection;
+import com.codeit.sb13.monew.comment.repository.dto.RecentCommentLikeActivityProjection;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface CommentLikeRepository extends JpaRepository<CommentLike, UUID> {
+
+  @Query("""
+  SELECT COUNT(CL)
+      FROM CommentLike CL
+      WHERE CL.comment.id = :commentId
+        AND CL.visibilityStatus = 'ACTIVE'
+  """) // ACTIVE 상태의 좋아요만 카운트
+  Long countActiveLikesByCommentId(@Param("commentId") UUID commentId);
+
+  @Query("""
+      SELECT CASE WHEN COUNT(CL) > 0 THEN TRUE ELSE FALSE END
+      FROM CommentLike CL
+      WHERE CL.comment.id = :commentId
+          AND CL.likedBy.id = :likedById
+          AND CL.visibilityStatus = 'ACTIVE'
+      """) // 조건에 맞는 데이터가 0개 이상이면 true, 없으면 false 반환
+  boolean existsActiveByCommentIdAndLikedById(
+      @Param("commentId") UUID commentId,
+      @Param("likedById") UUID likedById
+  );
+
+  // 등록 응답에는 필요한 스칼라 값과 활성 좋아요 수만 projection으로 조회한다.
+  @Query("""
+      SELECT new com.codeit.sb13.monew.comment.repository.dto.CommentLikeResponseProjection(
+          CL.id,
+          LB.id,
+          CL.createdAt,
+          C.id,
+          A.id,
+          U.id,
+          U.nickname,
+          C.content,
+          (SELECT COUNT(CL2)
+           FROM CommentLike CL2
+           WHERE CL2.comment.id = C.id
+             AND CL2.visibilityStatus = 'ACTIVE'),
+          C.createdAt
+      )
+      FROM CommentLike CL
+      JOIN CL.comment C
+      JOIN C.article A
+      JOIN C.user U
+      JOIN CL.likedBy LB
+      WHERE C.id = :commentId
+          AND CL.likedBy.id = :likedById
+          AND CL.visibilityStatus = 'ACTIVE'
+      """)
+  Optional<CommentLikeResponseProjection> findActiveResponseProjection(
+      @Param("commentId") UUID commentId,
+      @Param("likedById") UUID likedById
+  );
+
+  void deleteByComment_User_Id(UUID userId);
+  void deleteByLikedBy_Id(UUID userId);
+
+  // 기사 물리 삭제 시 해당 기사 댓글의 좋아요 정리 (MID4-146)
+  void deleteByComment_Article_Id(UUID articleId);
+
+
+  @Query("""
+    SELECT new com.codeit.sb13.monew.comment.repository.dto.RecentCommentLikeActivityProjection(
+        CL.id,
+        CL.createdAt,
+        C.id,
+        A.id,
+        A.title,
+        U.id,
+        U.nickname,
+        C.content,
+         (SELECT COUNT(CL2)
+          FROM CommentLike CL2
+          WHERE CL2.comment.id = C.id
+              AND CL2.visibilityStatus = 'ACTIVE'),
+          C.createdAt
+        )
+    FROM CommentLike CL
+    JOIN CL.comment C
+    JOIN C.user U
+    JOIN C.article A
+    WHERE CL.likedBy.id = :userId
+        AND CL.visibilityStatus = 'ACTIVE'
+    ORDER BY CL.createdAt DESC, CL.id DESC
+    LIMIT 10
+    """)
+  List<RecentCommentLikeActivityProjection> findRecentCommentLikeActivity(@Param("userId") UUID userId);
+
+
+  // 쿼리 실행 전 쓰기 지연 저장소 남아 있는 쿼리 미리 flush
+  @Modifying(flushAutomatically = true)
+  @Query("""
+      DELETE FROM CommentLike CL
+      WHERE CL.comment.id = :commentId
+        AND CL.likedBy.id = :likedById
+      """)
+  Long deleteByCommentIdAndLikedById(
+      @Param("commentId") UUID commentId,
+      @Param("likedById") UUID likedById
+  );
+
+
+  // 쿼리 실행 전 지연 저장소 쿼리 flush
+  @Modifying(flushAutomatically = true)
+  @Query("""
+      DELETE FROM CommentLike CL
+      WHERE CL.comment.id = :commentId
+      """)
+  Long deleteByCommentId(@Param("commentId") UUID commentId);
+
+}

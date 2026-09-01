@@ -1,0 +1,92 @@
+name: develop-build-test
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  push:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: develop-build-test-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  develop-build-test:
+    name: develop-build-test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: monew
+          POSTGRES_USER: monew
+          POSTGRES_PASSWORD: change-me
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U monew -d monew"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Reject main to develop PR
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        shell: bash
+        run: |
+          if [ "$BASE_REF" = "develop" ] && [ "$HEAD_REF" = "main" ]; then
+            echo "::error::develop 브랜치 PR은 main 외의 작업 브랜치에서만 생성할 수 있습니다."
+            exit 1
+          fi
+
+          echo "develop PR source branch guard passed."
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Ensure Gradle wrapper is executable
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Build, test, and generate coverage report
+        run: ./gradlew clean build jacocoTestReport
+
+      - name: Run Flyway migration test
+        env:
+          MONEW_MIGRATION_DB_URL: jdbc:postgresql://localhost:5432/monew
+          MONEW_MIGRATION_DB_USERNAME: monew
+          MONEW_MIGRATION_DB_PASSWORD: change-me
+        run: ./gradlew migrationTest
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./build/reports/jacoco/test/jacocoTestReport.xml
+          flags: backend
+          name: monew-backend
+          disable_search: true
+          fail_ci_if_error: true

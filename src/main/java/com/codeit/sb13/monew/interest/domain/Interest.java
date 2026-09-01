@@ -1,0 +1,180 @@
+package com.codeit.sb13.monew.interest.domain;
+
+import com.codeit.sb13.monew.global.domain.UpdatedAtEntity;
+import com.codeit.sb13.monew.global.exception.interest.InterestKeywordRequiredException;
+import com.codeit.sb13.monew.global.exception.interest.InterestNameInvalidException;
+import jakarta.persistence.*;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
+import org.springframework.util.StringUtils;
+
+/**
+ * 관심사(Interest) 애그리거트 루트.
+ *
+ * <p>이름과 키워드 목록을 가지며, {@link Keyword}와의 양방향 연관관계를
+ * 스스로 관리한다. 키워드는 이 클래스가 제공하는 {@link #addKeyword(String)},
+ * {@link #removeKeyword(Keyword)}를 통해서만 추가/제거되어야 하며,
+ * 관심사는 항상 최소 1개의 키워드를 유지해야 한다는 불변조건을 가진다.</p>
+ */
+@Entity
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Getter
+@Table(name = "interests",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_interests_name",
+                columnNames = {"name"}
+        )
+)
+public class Interest extends UpdatedAtEntity {
+
+    @Column(nullable = false, length = 50)
+    private String name;
+
+    /**
+     * 목록 조회처럼 관심사를 여러 건 한 번에 불러온 뒤 각각의 키워드를 지연 로딩할 때,
+     * 관심사 하나당 쿼리 한 번씩 날리는 N+1 대신 지금까지 로딩된 관심사들의 id를 묶어
+     * {@code IN} 쿼리 하나로 가져오도록 배치 크기를 지정한다.
+     */
+    @BatchSize(size = 100)
+    @OneToMany(mappedBy = "interest", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Keyword> keywords = new ArrayList<>();
+
+    @Builder
+    private Interest(String name) {
+        this.name = validateName(name);
+    }
+
+    /**
+     * 이름을 받아 새로운 관심사를 생성한다.
+     *
+     * <p>생성 직후에는 키워드 목록이 비어 있으므로, 키워드는 별도로
+     * {@link #addKeyword(String)}를 호출해 추가해야 한다.</p>
+     *
+     * @param name 관심사 이름
+     * @return 생성된 {@link Interest} 인스턴스
+     */
+    public static Interest create(String name) {
+        return Interest.builder()
+                .name(name)
+                .build();
+    }
+
+    private static String validateName(String name) {
+        if (!StringUtils.hasText(name)) {
+            throw new InterestNameInvalidException(name);
+        }
+        if (name.length() > 50) {
+            throw new InterestNameInvalidException(name);
+        }
+
+        return name;
+    }
+
+    /**
+     * 새 키워드를 추가하고, 추가된 키워드가 이 관심사를 양방향으로
+     * 참조하도록 연관관계를 설정한다.
+     *
+     * @param keywordText 추가할 키워드 텍스트
+     * @return 새로 생성되어 이 관심사에 추가된 {@link Keyword} 인스턴스
+     */
+    public Keyword addKeyword(String keywordText) {
+        Keyword keyword = new Keyword(this, keywordText);
+        this.keywords.add(keyword);
+        return keyword;
+    }
+
+    /**
+     * 지정한 키워드를 관심사의 키워드 목록에서 제거한다.
+     *
+     * <p>컬렉션에서 실제로 제거가 일어난 경우에만 해당 키워드의
+     * {@code interest} 참조를 끊어({@link Keyword#detachInterest()}) 양방향
+     * 연관관계의 정합성을 맞춘다. 이 관심사에 속하지 않은 키워드가 인자로
+     * 들어오면 아무 일도 일어나지 않고 조용히 무시된다.</p>
+     *
+     * <p>관심사는 항상 최소 1개의 키워드를 유지해야 하므로, 남은 키워드가
+     * 1개뿐인 상태에서 그 키워드를 제거하려 하면 예외를 던지고 제거를
+     * 거부한다.</p>
+     *
+     * @param keyword 제거할 키워드
+     * @throws InterestKeywordRequiredException 제거하려는 키워드가
+     *                                          이 관심사에 남은 마지막 키워드인 경우
+     */
+    public void removeKeyword(Keyword keyword) {
+        if (this.keywords.size() <= 1 && this.keywords.contains(keyword)) {
+            throw new InterestKeywordRequiredException(this.getId());
+        }
+
+        boolean removed = this.keywords.remove(keyword);
+        if (removed) {
+            keyword.detachInterest();
+        }
+    }
+
+    /**
+     * 관심사 이름을 새 이름으로 변경한다.
+     *
+     * @param name 변경할 새 이름
+     */
+    public void changeName(String name) {
+        this.name = validateName(name);
+    }
+
+    /**
+     * 키워드 목록을 새 목록과 비교해 달라진 부분만 갱신한다.
+     *
+     * <p>새 목록에 없는 기존 키워드만 제거하고, 기존에 없던 새 키워드만
+     * 추가한다. 두 목록에 공통으로 존재하는 키워드는 건드리지 않고 그대로
+     * 유지되므로, 같은 트랜잭션 안에서 동일한 키워드가 삭제와 동시에
+     * 재삽입되며 {@code uk_keywords_interest_keyword} 유니크 제약을
+     * 일시적으로 위반하는 상황이 생기지 않는다.</p>
+     *
+     * <p>새 키워드는 기존 키워드를 지우거나 추가하기 전에 먼저 전부
+     * 검증한다. 하나라도 공백이거나 50자를 넘어 {@link Keyword}의 생성자가
+     * 예외를 던지면 기존 키워드는 전혀 건드리지 않은 채 그대로 전파한다.
+     * 그렇지 않고 검증 없이 기존 키워드를 먼저 지운 뒤 새 키워드를 하나씩
+     * 추가하다 중간에 실패하면, 관심사가 새 키워드도 옛 키워드도 아닌
+     * 어중간한 상태로 남는다.</p>
+     *
+     * <p>관심사는 항상 최소 1개의 키워드를 유지해야 하므로, 빈 목록이
+     * 전달되면 예외를 던지고 교체를 거부한다.</p>
+     *
+     * @param keywords 교체할 새 키워드 텍스트 목록
+     * @throws InterestKeywordRequiredException 전달받은 목록이 비어 있는 경우
+     */
+    public void changeKeywords(List<String> keywords) {
+        if (keywords == null || keywords.isEmpty()) {
+            throw new InterestKeywordRequiredException(this.getId());
+        }
+
+        LinkedHashSet<String> newTexts = keywords.stream()
+                .map(Keyword::validateKeyword)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        Set<String> existingTexts = this.keywords.stream()
+                .map(Keyword::getKeyword)
+                .collect(Collectors.toSet());
+
+        List<Keyword> toRemove = this.keywords.stream()
+                .filter(k -> !newTexts.contains(k.getKeyword()))
+                .toList();
+        toRemove.forEach(k -> {
+            this.keywords.remove(k);
+            k.detachInterest();
+        });
+
+        // 기존에 없던 텍스트만 새로 추가한다.
+        newTexts.stream()
+                .filter(text -> !existingTexts.contains(text))
+                .forEach(this::addKeyword);
+    }
+}

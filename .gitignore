@@ -1,4 +1,4 @@
-README.md
+
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
@@ -35,3 +35,16 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Environment ###
+.env
+.env.*
+!.env.example
+
+### Logs ###
+.logs/
+logs/
+*.log
+
+### Performance ###
+scripts/performance/**/k6/results/

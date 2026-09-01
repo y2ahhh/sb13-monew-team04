@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: 'postgres:16'
+    environment:
+      POSTGRES_DB: ${MONEW_DB_NAME:-monew}
+      POSTGRES_USER: ${MONEW_DB_USERNAME:-monew}
+      POSTGRES_PASSWORD: ${MONEW_DB_PASSWORD:-change-me}
+    ports:
+      - '${MONEW_DB_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${MONEW_DB_USERNAME:-monew} -d ${MONEW_DB_NAME:-monew}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-seed:
+    image: 'postgres:16'
+    profiles:
+      - perf-seed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${MONEW_DB_PASSWORD:-change-me}
+      MONEW_DB_NAME: ${MONEW_DB_NAME:-monew}
+      MONEW_DB_USERNAME: ${MONEW_DB_USERNAME:-monew}
+      SEED_SCALE: ${SEED_SCALE:-100k}
+    volumes:
+      - ./scripts/performance/activity-history:/seed:ro
+    command: >
+      sh -c '
+        case "$$SEED_SCALE" in
+          100k|1m|10m) ;;
+          *) echo "SEED_SCALE must be one of: 100k, 1m, 10m" >&2; exit 1 ;;
+        esac;
+        cat "/seed/seed-common.sql" "/seed/seed-$$SEED_SCALE.sql" |
+          psql -h postgres -U "$$MONEW_DB_USERNAME" -d "$$MONEW_DB_NAME" -v ON_ERROR_STOP=1
+      '
+
+volumes:
+  postgres-data:

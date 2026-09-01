@@ -1,0 +1,66 @@
+package com.codeit.sb13.monew.global.exception;
+
+import lombok.Getter;
+import org.springframework.http.HttpStatus;
+
+@Getter
+public enum ApiErrorCode {
+
+    // USER USR
+    USER_NOT_FOUND("USR_001", HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    DUPLICATE_EMAIL("USR_002", HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
+    LOGIN_FAILED("USR_003", HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 일치하지 않습니다."),
+    USER_ALREADY_DELETED("USR_004", HttpStatus.CONFLICT, "이미 삭제된 사용자입니다."),
+
+    // ARTICLE ART
+    ARTICLE_NOT_FOUND("ART_001", HttpStatus.NOT_FOUND, "뉴스를 찾을 수 없습니다."),
+    ARTICLE_DUPLICATE("ART_002", HttpStatus.CONFLICT, "이미 등록된 기사입니다."),
+    ARTICLE_FETCH_REQUEST_INVALID("ART_003", HttpStatus.BAD_REQUEST, "기사 수집 요청 값이 올바르지 않습니다."),
+    ARTICLE_FETCH_FAILED("ART_004", HttpStatus.BAD_GATEWAY, "기사 수집 중 외부 API 호출에 실패했습니다."),
+    ARTICLE_FETCH_PARSE_FAILED("ART_005", HttpStatus.BAD_GATEWAY, "기사 수집 응답 파싱에 실패했습니다."),
+    ARTICLE_VIEW_CONFLICT("ART_006", HttpStatus.CONFLICT, "조회 기록 등록이 동시에 요청되었습니다. 다시 시도해 주세요."),
+    ARTICLE_S3_CONFIG_INVALID("ART_007", HttpStatus.INTERNAL_SERVER_ERROR, "기사 백업 S3 설정이 올바르지 않습니다."),
+    ARTICLE_S3_STORAGE_FAILED("ART_008", HttpStatus.BAD_GATEWAY, "기사 백업 S3 저장소 호출에 실패했습니다."),
+    ARTICLE_BACKUP_FILE_INVALID("ART_009", HttpStatus.INTERNAL_SERVER_ERROR, "기사 백업 파일 데이터가 올바르지 않습니다."),
+    ARTICLE_BACKUP_FILE_JSON_FAILED("ART_010", HttpStatus.BAD_GATEWAY, "기사 백업 파일 JSON 처리에 실패했습니다."),
+    ARTICLE_BACKUP_DATE_INVALID("ART_011", HttpStatus.BAD_REQUEST, "기사 백업 날짜 조건이 올바르지 않습니다."),
+    ARTICLE_BACKUP_FAILED("ART_012", HttpStatus.INTERNAL_SERVER_ERROR, "기사 백업 처리에 실패했습니다."),
+    ARTICLE_RESTORE_DATE_INVALID("ART_014", HttpStatus.BAD_REQUEST, "기사 복구 날짜 조건이 올바르지 않습니다."),
+    ARTICLE_RESTORE_FAILED("ART_015", HttpStatus.INTERNAL_SERVER_ERROR, "기사 복구 처리에 실패했습니다."),
+    ARTICLE_SEARCH_CONDITION_INVALID("ART_016", HttpStatus.BAD_REQUEST, "기사 목록 조회 조건이 올바르지 않습니다."),
+
+    // INTEREST INT
+    INTEREST_NOT_FOUND("INT_001", HttpStatus.NOT_FOUND, "관심사를 찾을 수 없습니다."),
+    INTEREST_NAME_INVALID("INT_002", HttpStatus.BAD_REQUEST, "이름은 비어있을 수 없고 50자를 넘을 수 없습니다."),
+    INTEREST_KEYWORD_REQUIRED("INT_003", HttpStatus.BAD_REQUEST, "관심사에는 최소 1개의 키워드가 있어야 합니다."),
+    INTEREST_KEYWORD_INVALID("INT_004", HttpStatus.BAD_REQUEST, "키워드는 비어있을 수 없고 50자를 넘을 수 없습니다."),
+    INTEREST_NAME_DUPLICATED("INT_005", HttpStatus.CONFLICT, "이미 존재하는 관심사입니다."),
+    INTEREST_SEARCH_CONDITION_INVALID("INT_006", HttpStatus.BAD_REQUEST, "관심사 목록 조회 조건이 올바르지 않습니다."),
+
+    // NOTIFICATION NTF
+    NOTIFICATION_NOT_FOUND("NTF_001", HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+    NOTIFICATION_INVALID_LIMIT("NTF_002", HttpStatus.BAD_REQUEST, "페이지 크기(limit)가 올바르지 않습니다."),
+    NOTIFICATION_INVALID_CURSOR("NTF_003", HttpStatus.BAD_REQUEST, "커서 값이 올바르지 않습니다."),
+
+    // COMMENT CMT
+    COMMENT_NOT_FOUND("CMT_001", HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
+    COMMENT_LIKE_NOT_FOUND("CMT_002", HttpStatus.NOT_FOUND, "댓글 좋아요를 찾을 수 없습니다."),
+    COMMENT_SEARCH_CONDITION_INVALID("CMT_003", HttpStatus.BAD_REQUEST, "댓글 목록 조회 조건이 올바르지 않습니다."),
+    COMMENT_INVALID("CMT_004", HttpStatus.BAD_REQUEST, "댓글 내용이 올바르지 않습니다."),
+    COMMENT_PERMISSION_DENIED("CMT_005", HttpStatus.FORBIDDEN, "댓글 수정 권한이 없습니다."),
+
+    // GLOBAL/COMMON GLB
+    INVALID_REQUEST("GLB_001", HttpStatus.BAD_REQUEST, "요청 데이터가 올바르지 않습니다."),
+    ADVISORY_LOCK_FAILED("GLB_002", HttpStatus.INTERNAL_SERVER_ERROR, "DB락 처리에 실패했습니다."),
+    INTERNAL_SERVER_ERROR("GLB_999", HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류");
+
+    private final String code;
+    private final HttpStatus status;
+    private final String message;
+
+    ApiErrorCode(String code, HttpStatus status, String message) {
+        this.code = code;
+        this.status = status;
+        this.message = message;
+    }
+}
