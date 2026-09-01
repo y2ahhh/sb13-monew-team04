@@ -97,14 +97,14 @@ JIRA_STATUS_DONE=완료
 JIRA_DRY_RUN=false
 ```
 
-`JIRA_TARGET_BASE_REFS`는 Jira 상태를 동기화할 PR 대상 branch를 JSON 문자열 배열로 설정합니다. 기본값은 `["develop","main"]`이며 빈 배열이나 문자열이 아닌 값을 포함한 배열은 사용할 수 없습니다. `main` 대상 PR의 source branch는 기존 `main-source-guard` 규칙에 따라 같은 저장소의 `develop`만 허용합니다.
+`JIRA_TARGET_BASE_REFS`는 Jira 상태를 동기화할 PR 대상 branch를 비어 있지 않은 문자열로만 구성된 JSON 배열로 설정합니다. 기본값은 `["develop","main"]`이며 빈 배열, 빈 문자열 원소 또는 문자열이 아닌 값을 포함한 배열은 사용할 수 없습니다. `main` 대상 PR의 source branch는 기존 `main-source-guard` 규칙에 따라 같은 저장소의 `develop`만 허용합니다.
 
 PR event와 Jira 상태의 기본 매핑은 다음과 같습니다. `develop`과 `main`에 같은 규칙을 적용합니다.
 
 | PR event | Jira 상태 |
 | --- | --- |
 | Draft PR 생성·전환, 수정 요청 | `코드 리뷰` |
-| Ready 전환, 리뷰 요청, 일반 PR 생성·갱신 | `검증 중` |
+| Ready 전환(`ready_for_review`), 리뷰 요청(`review_requested`), PR 생성·재오픈·새 commit 반영(`opened`, `reopened`, `synchronize`) | `검증 중` |
 | PR 병합 | `완료` |
 | 병합하지 않고 PR 종료 | `진행 중` 및 Jira 댓글 |
 

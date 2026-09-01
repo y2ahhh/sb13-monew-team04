@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   sync-jira-status:
-    if: ${{ contains(fromJSON(vars.JIRA_TARGET_BASE_REFS || '["develop","main"]'), github.event.pull_request.base.ref) && (github.event_name == 'pull_request_target' || github.event.review.state == 'changes_requested') }}
+    if: ${{ github.event_name == 'pull_request_target' || github.event.review.state == 'changes_requested' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout trusted base commit scripts

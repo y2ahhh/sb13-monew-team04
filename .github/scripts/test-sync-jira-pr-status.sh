@@ -60,13 +60,15 @@ run_case() {
 }
 
 run_invalid_config_case() {
+  local name="$1"
+  local target_base_refs="$2"
   local output
   local exit_code
 
   set +e
   output="$(
     JIRA_DRY_RUN=true \
-    JIRA_TARGET_BASE_REFS='not-json' \
+    JIRA_TARGET_BASE_REFS="$target_base_refs" \
     EVENT_NAME='pull_request_target' \
     PR_ACTION='opened' \
     PR_NUMBER=242 \
@@ -80,18 +82,18 @@ run_invalid_config_case() {
   set -e
 
   if [ "$exit_code" -eq 0 ]; then
-    echo 'FAIL: invalid target branch configuration succeeded' >&2
+    echo "FAIL: ${name} succeeded" >&2
     echo "$output" >&2
     exit 1
   fi
   if [[ "$output" != *'JIRA_TARGET_BASE_REFS must be a non-empty JSON string array'* ]]; then
-    echo 'FAIL: invalid target branch configuration did not report the expected error' >&2
+    echo "FAIL: ${name} did not report the expected error" >&2
     echo "$output" >&2
     exit 1
   fi
 
   PASSED=$((PASSED + 1))
-  echo 'PASS: invalid target branch configuration'
+  echo "PASS: ${name}"
 }
 
 for base_ref in develop main; do
@@ -103,6 +105,8 @@ for base_ref in develop main; do
 done
 
 run_case 'non-target branch' release pull_request_target opened false false '' '동기화 대상이 아니므로 건너뜁니다'
-run_invalid_config_case
+run_invalid_config_case 'invalid JSON target branch configuration' 'not-json'
+run_invalid_config_case 'empty target branch array' '[]'
+run_invalid_config_case 'empty target branch name' '[""]'
 
 echo "All ${PASSED} Jira PR status synchronization tests passed."
