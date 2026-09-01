@@ -108,7 +108,7 @@ PR event와 Jira 상태의 기본 매핑은 다음과 같습니다. `develop`과
 | PR 병합 | `완료` |
 | 병합하지 않고 PR 종료 | `진행 중` 및 Jira 댓글 |
 
-`JIRA_DRY_RUN=true`로 설정하면 실제 Jira 상태 변경 없이 대상 branch와 상태 매핑을 확인합니다. 자동 회귀 테스트는 `.github/scripts/test-sync-jira-pr-status.sh`를 실행합니다.
+`JIRA_DRY_RUN=true`로 설정하면 실제 Jira 상태 변경 없이 대상 branch와 상태 매핑을 확인합니다. 필요할 때 `.github/scripts/test-sync-jira-pr-status.sh`를 수동으로 실행하며, 이 테스트 결과는 `develop-build-test`의 성공 여부에 영향을 주지 않습니다.
 
 `pull_request_target`과 `pull_request_review`에서는 Jira 인증정보를 사용하므로 PR head 코드를 checkout하거나 실행하지 않습니다. workflow는 PR 대상 branch의 commit만 checkout해 동기화 스크립트를 실행합니다.
 
