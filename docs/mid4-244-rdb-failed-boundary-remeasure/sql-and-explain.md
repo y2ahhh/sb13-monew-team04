@@ -2,16 +2,16 @@
 
 > [재측정 결과로 돌아가기](README.md)
 
-아래 SQL은 애플리케이션이 실행한 조회를 PostgreSQL 문법으로 옮긴 MID4-227 이후 SQL이다. 이번 작업에서는 SQL을 변경하지 않고 같은 SQL에 부분 커버링 인덱스(partial covering index)를 적용하기 전과 후를 비교했다.
+아래 SQL은 애플리케이션이 실행한 조회를 PostgreSQL 문법으로 옮긴 것으로, MID4-227 변경 사항이 반영돼 있다. 이번 작업에서는 SQL을 변경하지 않고 같은 SQL에 부분 커버링 인덱스(partial covering index)를 적용하기 전과 후를 비교했다.
 
-1배 실행계획은 부분 커버링 인덱스를 적용한 상태이고, 2배 실행계획은 현재 인덱스와 부분 커버링 인덱스를 모두 기록했다. 각 계획은 워밍업 3회 뒤 PostgreSQL이 출력한 원문이며 표로 바꾸거나 일부 단계만 잘라내지 않았다. 실행계획을 저장하기 위한 실행은 `EXPLAIN (ANALYZE, BUFFERS, VERBOSE, SETTINGS, TIMING)`을 사용했다.
+데이터 몰림 조건은 후보 인덱스를 추가한 실행계획을 기록했다. 데이터 몰림 2배 조건은 기존 인덱스만 사용한 상태와 후보 인덱스를 추가한 상태를 모두 기록했다. 각 계획은 워밍업 3회 뒤 PostgreSQL이 출력한 원문이며 표로 바꾸거나 일부 단계만 잘라내지 않았다. 실행계획을 저장할 때는 `EXPLAIN (ANALYZE, BUFFERS, VERBOSE, SETTINGS, TIMING)`을 사용했다.
 
 ## 최근 작성 댓글
 
 ### 실제 실행 SQL
 
 ```sql
--- MID4-227 after: 최근 작성 댓글과 댓글별 활성 좋아요 수를 조회합니다.
+-- MID4-227 변경 반영 후: 최근 작성 댓글과 댓글별 활성 좋아요 수를 조회합니다.
 -- CommentRepository.findRecentCommentActivities의 PostgreSQL 대응 SQL입니다.
 SELECT
     c.id,
@@ -36,7 +36,7 @@ ORDER BY c.created_at DESC, c.id DESC
 FETCH FIRST 10 ROWS ONLY;
 ```
 
-### 1배 부분 커버링 인덱스 실행계획
+### 데이터 몰림 조건 · 후보 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -83,7 +83,7 @@ QUERY PLAN
 (39 rows)
 ```
 
-### 2배 현재 인덱스 실행계획
+### 데이터 몰림 2배 조건 · 기존 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -130,7 +130,7 @@ QUERY PLAN
 (39 rows)
 ```
 
-### 2배 부분 커버링 인덱스 실행계획
+### 데이터 몰림 2배 조건 · 후보 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -182,7 +182,7 @@ QUERY PLAN
 ### 실제 실행 SQL
 
 ```sql
--- MID4-227 after: 최근 좋아요한 댓글과 댓글별 활성 좋아요 수를 조회합니다.
+-- MID4-227 변경 반영 후: 최근 좋아요한 댓글과 댓글별 활성 좋아요 수를 조회합니다.
 -- CommentLikeRepository.findRecentCommentLikeActivity의 PostgreSQL 대응 SQL입니다.
 SELECT
     cl.id,
@@ -210,7 +210,7 @@ ORDER BY cl.created_at DESC, cl.id DESC
 FETCH FIRST 10 ROWS ONLY;
 ```
 
-### 1배 부분 커버링 인덱스 실행계획
+### 데이터 몰림 조건 · 후보 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -263,7 +263,7 @@ QUERY PLAN
 (45 rows)
 ```
 
-### 2배 현재 인덱스 실행계획
+### 데이터 몰림 2배 조건 · 기존 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -316,7 +316,7 @@ QUERY PLAN
 (45 rows)
 ```
 
-### 2배 부분 커버링 인덱스 실행계획
+### 데이터 몰림 2배 조건 · 후보 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -374,7 +374,7 @@ QUERY PLAN
 ### 실제 실행 SQL
 
 ```sql
--- MID4-227 after: 최근 조회 기사와 기사별 활성 댓글·조회 수를 조회합니다.
+-- MID4-227 변경 반영 후: 최근 조회 기사와 기사별 활성 댓글·조회 수를 조회합니다.
 -- ArticleViewRepository.findRecentArticleViewActivities의 PostgreSQL 대응 SQL입니다.
 SELECT
     av.id,
@@ -406,7 +406,7 @@ ORDER BY av.viewed_at DESC, av.id DESC
 FETCH FIRST 10 ROWS ONLY;
 ```
 
-### 1배 부분 커버링 인덱스 실행계획
+### 데이터 몰림 조건 · 후보 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -452,7 +452,7 @@ QUERY PLAN
 (38 rows)
 ```
 
-### 2배 현재 인덱스 실행계획
+### 데이터 몰림 2배 조건 · 기존 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -498,7 +498,7 @@ QUERY PLAN
 (38 rows)
 ```
 
-### 2배 부분 커버링 인덱스 실행계획
+### 데이터 몰림 2배 조건 · 후보 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -549,7 +549,7 @@ QUERY PLAN
 ### 실제 실행 SQL
 
 ```sql
--- MID4-227 after: 구독 관심사와 관심사별 활성 구독자 수를 조회합니다.
+-- MID4-227 변경 반영 후: 구독 관심사와 관심사별 활성 구독자 수를 조회합니다.
 -- SubscribeRepository.findSubscribedInterestActivities의 PostgreSQL 대응 SQL입니다.
 SELECT
     s.id,
@@ -571,7 +571,7 @@ WHERE s.user_id = '00000001-0000-4000-8000-000000000001'
 ORDER BY s.created_at DESC, s.id DESC;
 ```
 
-### 1배 부분 커버링 인덱스 실행계획
+### 데이터 몰림 조건 · 후보 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -614,7 +614,7 @@ QUERY PLAN
 (35 rows)
 ```
 
-### 2배 현재 인덱스 실행계획
+### 데이터 몰림 2배 조건 · 기존 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -649,7 +649,7 @@ QUERY PLAN
 (27 rows)
 ```
 
-### 2배 부분 커버링 인덱스 실행계획
+### 데이터 몰림 2배 조건 · 후보 인덱스 실행계획
 
 ```text
 QUERY PLAN
@@ -685,7 +685,7 @@ QUERY PLAN
 
 ## 실행계획에서 확인한 공통점
 
-- 부분 인덱스 적용 후 집계 경로가 인덱스만 읽는 방식(Index Only Scan)으로 바뀌었다.
+- 후보 인덱스 추가 후 집계 경로가 인덱스만 읽는 방식(Index Only Scan)으로 바뀌었다.
 - `Heap Fetches`는 대부분 `0`이었다. 최근 조회 기사의 댓글 집계 원문에서는 가시성 지도(visibility map) 상태 때문에 `10`이 기록됐다.
-- 워밍업 뒤 대표 실행계획의 디스크 읽기(`shared read`)는 `0`이므로 최초 디스크 읽기 시간은 비교값에 포함되지 않았다.
+- 워밍업 뒤 대표 실행계획의 디스크 읽기(`shared read`)는 `0`이므로 처음 디스크에서 읽는 시간은 비교값에 포함되지 않았다.
 - 커버링 인덱스는 실제 테이블 방문을 줄이지만, 조건에 맞는 인덱스 항목의 개수를 세는 작업과 결과별 하위 조회 반복은 그대로 유지된다.
