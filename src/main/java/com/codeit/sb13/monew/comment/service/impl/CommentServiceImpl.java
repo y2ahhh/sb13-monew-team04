@@ -45,7 +45,7 @@ public class CommentServiceImpl implements CommentService {
   @Override
   public CommentDto create(CommentRegisterCommand command) { // 서비스 전용객체를 사용
     log.debug("댓글 생성 시작 - 기사 아이디: {}", command.articleId()); // 개인 정보 또는 민감한 정보는 로그에 남기지 않음
-    User user = userService.findById(command.userId()); // userRepository 대신 userService를 통해 User 엔티티 받아 연관관계 생성
+    User user = userService.findActiveById(command.userId()); // 활성화된 사용자만 조회(논리 삭제된 사용자 댓글 생성 방지)
     Article article = articleRepository.findByIdAndDeletedAtIsNull(command.articleId())
         .orElseThrow(()->new ArticleNotFoundException(command.articleId()));
     Comment comment= Comment.builder()

@@ -43,7 +43,7 @@ public class CommentLikeServiceImpl implements CommentLikeService {
 
     Comment comment = commentRepository.findActiveById(commentId)
             .orElseThrow(() -> new CommentNotFoundException(commentId));
-    User likedByUser = userService.findById(likedById);// 존재하지 않는 사용자일 경우 예외 발생
+    User likedByUser = userService.findActiveById(likedById); // 활성 사용자만 댓글 등록 허용
     return commentLikeRepository.findActiveResponseProjection(commentId, likedById)
         .map(CommentLikeDto::from)
         .orElseGet(() -> createOrReturnExisting(comment, likedByUser));
@@ -104,7 +104,7 @@ public class CommentLikeServiceImpl implements CommentLikeService {
     log.debug("댓글 좋아요 취소 시작 - 댓글 아이디: {}", commentId);
 
     commentRepository.findActiveById(commentId).orElseThrow(()-> new CommentNotFoundException(commentId));
-    userService.validateExists(requestUserId); // 엔티티 필요 없이 validateExists만 확인
+    userService.findActiveById(requestUserId); // 활성화된 사용자만 댓글 취소 가능
 
     Long deletedCount = commentLikeRepository.deleteByCommentIdAndLikedById(commentId, requestUserId);
     if (deletedCount == 0L) {
