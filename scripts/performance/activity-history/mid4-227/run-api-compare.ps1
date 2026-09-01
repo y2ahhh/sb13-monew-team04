@@ -12,6 +12,15 @@ param(
     [string] $AppCommit,
     [int] $DbPort = 15428,
     [int] $AppPort = 8080,
+    [ValidatePattern('^MID4-[0-9]+$')]
+    [string] $Ticket = 'MID4-227',
+    [ValidatePattern('^[a-z0-9][a-z0-9-]*$')]
+    [string] $ProjectNameOverride,
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]*$')]
+    [string] $ResultSetOverride,
+    [string] $PostOverlaySql,
+    [int[]] $ThroughputRates = @(),
+    [switch] $SkipSoak,
     [ValidateRange(1, 10)]
     [int] $ThroughputRepeatCount = 3,
     [ValidateRange(0, 300)]
@@ -22,9 +31,17 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..')).Path
 $appJarPath = (Resolve-Path -LiteralPath $AppJar).Path
-$projectName = "monew-perf-227-api-$BuildLabel-$Overlay"
+$projectName = if ([string]::IsNullOrWhiteSpace($ProjectNameOverride)) {
+    "monew-perf-227-api-$BuildLabel-$Overlay"
+} else {
+    $ProjectNameOverride
+}
 $pgContainer = "$projectName-postgres-1"
-$resultSet = "mid4-227-rdb-$BuildLabel-$Overlay"
+$resultSet = if ([string]::IsNullOrWhiteSpace($ResultSetOverride)) {
+    "mid4-227-rdb-$BuildLabel-$Overlay"
+} else {
+    $ResultSetOverride
+}
 $resultRoot = Join-Path $repoRoot "scripts\performance\activity-history\k6\results\$resultSet"
 $appLogRoot = Join-Path $resultRoot 'app'
 $envFile = Join-Path $repoRoot '.env.perf.local'
@@ -35,8 +52,13 @@ $localBaseUrl = "http://localhost:$AppPort"
 $targetUserId = '00000001-0000-4000-8000-000000000001'
 $appProcess = $null
 
-if (-not $projectName.StartsWith('monew-perf-227-api-')) {
+if (-not $projectName.StartsWith('monew-perf-')) {
     throw "Unexpected compose project name: $projectName"
+}
+
+$postOverlaySqlPath = $null
+if (-not [string]::IsNullOrWhiteSpace($PostOverlaySql)) {
+    $postOverlaySqlPath = (Resolve-Path -LiteralPath $PostOverlaySql).Path
 }
 
 New-Item -ItemType Directory -Path $appLogRoot -Force | Out-Null
@@ -142,7 +164,7 @@ function Start-App {
 function Invoke-K6Matrix {
     Write-Host "k6 smoke warm-up: build=$BuildLabel overlay=$Overlay"
     & $k6Runner `
-        -Ticket MID4-227 `
+        -Ticket $Ticket `
         -Variant rdb `
         -Scenario smoke `
         -Duration 1m `
@@ -151,7 +173,9 @@ function Invoke-K6Matrix {
         -ResultSet $resultSet
     if ($LASTEXITCODE -ne 0) { throw 'k6 smoke warm-up failed.' }
 
-    $rates = if ($Overlay -eq 'fanout') {
+    $rates = if ($ThroughputRates.Count -gt 0) {
+        $ThroughputRates
+    } elseif ($Overlay -eq 'fanout') {
         @(10, 20, 30, 40, 50, 100, 150, 200)
     } else {
         @(10, 20, 30, 40, 50)
@@ -159,7 +183,7 @@ function Invoke-K6Matrix {
 
     Write-Host "k6 1m matrix: build=$BuildLabel overlay=$Overlay rates=$($rates -join ',') repeats=$ThroughputRepeatCount"
     & $k6Runner `
-        -Ticket MID4-227 `
+        -Ticket $Ticket `
         -Variant rdb `
         -Scenario throughput `
         -Rates $rates `
@@ -174,10 +198,15 @@ function Invoke-K6Matrix {
         -AllowFailure
     if ($LASTEXITCODE -ne 0) { throw 'k6 1m matrix runner failed.' }
 
+    if ($SkipSoak) {
+        Write-Host 'skip 10m soak: requested by caller'
+        return
+    }
+
     $soakRates = if ($Overlay -eq 'fanout') { @(10, 20) } else { @(50) }
     Write-Host "k6 10m soak: build=$BuildLabel overlay=$Overlay rates=$($soakRates -join ',')"
     & $k6Runner `
-        -Ticket MID4-227 `
+        -Ticket $Ticket `
         -Variant rdb `
         -Scenario throughput `
         -Rates $soakRates `
@@ -194,7 +223,7 @@ function Invoke-K6Matrix {
 }
 
 $metadata = [ordered]@{
-    ticket = 'MID4-227'
+    ticket = $Ticket
     buildLabel = $BuildLabel
     commit = $AppCommit
     overlay = $Overlay
@@ -207,6 +236,9 @@ $metadata = [ordered]@{
     maxVUs = 500
     throughputRepeatCount = $ThroughputRepeatCount
     stabilizationSeconds = $StabilizationSeconds
+    throughputRates = $ThroughputRates
+    postOverlaySql = if ($null -eq $postOverlaySqlPath) { $null } else { Split-Path -Leaf $postOverlaySqlPath }
+    skipSoak = [bool] $SkipSoak
     startedAt = (Get-Date).ToString('o')
 }
 $metadata | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $resultRoot 'metadata.json') -Encoding UTF8
@@ -227,6 +259,13 @@ try {
     Get-Content -LiteralPath $overlayFile -Raw -Encoding UTF8 |
         docker exec -i $pgContainer psql -X -U monew -d monew -v ON_ERROR_STOP=1
     if ($LASTEXITCODE -ne 0) { throw "Failed to apply overlay: $Overlay" }
+
+    if ($null -ne $postOverlaySqlPath) {
+        Write-Host "apply post-overlay SQL: $postOverlaySqlPath"
+        Get-Content -LiteralPath $postOverlaySqlPath -Raw -Encoding UTF8 |
+            docker exec -i $pgContainer psql -X -U monew -d monew -v ON_ERROR_STOP=1
+        if ($LASTEXITCODE -ne 0) { throw "Failed to apply post-overlay SQL: $postOverlaySqlPath" }
+    }
 
     Start-App -Mode debug
     $activityResponse = Invoke-WebRequest `
