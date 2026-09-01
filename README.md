@@ -5,7 +5,7 @@
 
 > 마음대로 골라 보는 모든 뉴스
 
-Monew는 여러 뉴스 제공처의 기사를 한곳에 모으고, 사용자가 관심 있는 주제의 뉴스와 활동을 쉽게 확인할 수 있도록 만든 서비스입니다. 관심사 구독, 기사 조회, 댓글과 좋아요, 알림, 활동내역을 함께 제공합니다.
+Monew는 NAVER 뉴스 검색 API와 RSS 등 여러 뉴스 제공처의 기사를 한곳에 모으고, 사용자가 등록한 관심사와 키워드에 맞는 뉴스를 제공하는 서비스입니다. 관심사 구독부터 기사 조회, 댓글과 좋아요, 알림, 활동내역까지 하나의 흐름으로 이용할 수 있으며 실제 운영 환경에 배포했습니다.
 
 <p align="center">
   <img src="docs/images/readme/overview.png" alt="관심사 등록, 맞춤 뉴스 알림, 댓글과 좋아요 기능을 소개하는 Monew 시작 화면" width="1200">
@@ -15,6 +15,7 @@ Monew는 여러 뉴스 제공처의 기사를 한곳에 모으고, 사용자가 
   <a href="#프로젝트-소개">프로젝트 소개</a> ·
   <a href="#서비스-이용-흐름">서비스 이용 흐름</a> ·
   <a href="#주요-기능">주요 기능</a> ·
+  <a href="#주요-화면">주요 화면</a> ·
   <a href="#로컬-실행">로컬 실행</a>
 </p>
 
@@ -30,6 +31,13 @@ Monew는 여러 뉴스 제공처의 기사를 한곳에 모으고, 사용자가 
 - 프로젝트 기간: 2026.08.12 ~ 2026.09.04
 - 팀 이름: Monew
 - 주요 목표: 여러 뉴스 제공처의 기사를 수집하고, 관심사에 맞는 뉴스와 사용자 활동을 하나의 서비스에서 제공
+
+| 구분 | 내용 |
+| --- | --- |
+| 서비스 가치 | 여러 제공처의 뉴스를 따로 찾아다니지 않고 관심사별로 모아 볼 수 있습니다. |
+| 핵심 경험 | 관심사 등록과 구독, 뉴스 검색, 댓글과 좋아요, 알림, 활동내역 확인을 이어서 사용할 수 있습니다. |
+| 외부 연동 | NAVER 뉴스 검색 API와 RSS로 기사를 수집하고 AWS S3에 기사 백업·복구 데이터를 보관합니다. |
+| 운영 상태 | AWS EC2와 Docker Compose로 배포했으며 운영 서비스와 Swagger API 문서를 공개합니다. |
 
 ## 서비스 이용 흐름
 
@@ -50,6 +58,47 @@ Monew는 여러 뉴스 제공처의 기사를 한곳에 모으고, 사용자가 
 | 댓글·좋아요 | 기사에 댓글을 작성·수정·삭제하고 댓글에 좋아요를 남길 수 있습니다. 같은 사용자의 중복 좋아요를 막습니다. |
 | 알림 | 구독한 관심사의 새 기사와 내 댓글의 좋아요 소식을 알려 줍니다. 읽지 않은 알림 조회, 확인, 오래된 알림 정리를 지원합니다. |
 | 활동내역 | 내가 구독한 관심사, 최근 작성한 댓글, 좋아요를 누른 댓글, 최근 본 기사를 한 번에 확인할 수 있습니다. |
+
+## 주요 화면
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/readme/user-signup.png" alt="Monew 회원가입 화면"><br>
+      <strong>사용자</strong><br>
+      회원가입과 입력값 검증
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/readme/interest-keyword.png" alt="Monew 관심사와 키워드 등록 화면"><br>
+      <strong>관심사</strong><br>
+      관심사와 뉴스 수집 키워드 등록
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/readme/article-search.png" alt="Monew 뉴스 기사 검색과 출처 필터 화면"><br>
+      <strong>뉴스 기사</strong><br>
+      관심사·출처·날짜별 기사 검색과 정렬
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/readme/comment-like.png" alt="Monew 기사 상세와 댓글 화면"><br>
+      <strong>댓글·좋아요</strong><br>
+      기사 상세 조회와 댓글·좋아요 참여
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/readme/activity-history.png" alt="Monew 사용자 활동내역 화면"><br>
+      <strong>활동내역</strong><br>
+      최근 댓글·좋아요·조회 기사 확인
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/readme/notifications.png" alt="Monew 알림 목록 화면"><br>
+      <strong>알림</strong><br>
+      관심사 새 기사와 댓글 좋아요 소식 확인
+    </td>
+  </tr>
+</table>
 
 ## 팀원과 담당 기능
 
