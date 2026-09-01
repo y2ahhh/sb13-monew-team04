@@ -7,8 +7,17 @@
 --
 -- 실행 예시:
 -- docker exec -i <postgres-container> psql -U <user> -d <database> -v ON_ERROR_STOP=1 < scripts/performance/activity-history/fanout-overlay.sql
+-- MID4-244 경계 측정에서는 -v FANOUT_MULTIPLIER=2 또는 5로 연결 데이터만 늘릴 수 있습니다.
+-- 값을 전달하지 않으면 기존 MID4-206/MID4-227과 같은 1배 조건을 사용합니다.
 
 \set ON_ERROR_STOP on
+
+\if :{?FANOUT_MULTIPLIER}
+\else
+\set FANOUT_MULTIPLIER 1
+\endif
+
+SELECT set_config('perf.fanout_multiplier', :'FANOUT_MULTIPLIER', false);
 
 BEGIN;
 
@@ -114,7 +123,7 @@ CROSS JOIN LATERAL (
                 AND cl.liked_by = u.id
           )
         ORDER BY u.id
-        LIMIT 1000
+        LIMIT (1000 * :FANOUT_MULTIPLIER)
     ) ordered
 ) candidate;
 
@@ -137,7 +146,7 @@ CROSS JOIN LATERAL (
         WHERE u.deleted_at IS NULL
           AND u.id <> target.id
         ORDER BY u.id
-        LIMIT 1000
+        LIMIT (1000 * :FANOUT_MULTIPLIER)
     ) ordered
 ) candidate;
 
@@ -166,7 +175,7 @@ CROSS JOIN LATERAL (
                 AND av.user_id = u.id
           )
         ORDER BY u.id
-        LIMIT 10000
+        LIMIT (10000 * :FANOUT_MULTIPLIER)
     ) ordered
 ) candidate;
 
@@ -195,7 +204,7 @@ CROSS JOIN LATERAL (
                 AND s.user_id = u.id
           )
         ORDER BY u.id
-        LIMIT 1000
+        LIMIT (1000 * :FANOUT_MULTIPLIER)
     ) ordered
 ) candidate;
 
@@ -211,19 +220,19 @@ BEGIN
     SELECT count(*) INTO article_view_user_count FROM fanout_article_view_users;
     SELECT count(*) INTO subscription_user_count FROM fanout_subscription_users;
 
-    IF comment_like_user_count <> 10000 THEN
+    IF comment_like_user_count <> (10000 * current_setting('perf.fanout_multiplier')::integer) THEN
         RAISE EXCEPTION '댓글 좋아요 overlay 대상이 10,000개가 아닙니다. count=%', comment_like_user_count;
     END IF;
 
-    IF article_comment_user_count <> 10000 THEN
+    IF article_comment_user_count <> (10000 * current_setting('perf.fanout_multiplier')::integer) THEN
         RAISE EXCEPTION '기사 댓글 overlay 대상이 10,000개가 아닙니다. count=%', article_comment_user_count;
     END IF;
 
-    IF article_view_user_count <> 100000 THEN
+    IF article_view_user_count <> (100000 * current_setting('perf.fanout_multiplier')::integer) THEN
         RAISE EXCEPTION '기사 조회 overlay 대상이 100,000개가 아닙니다. count=%', article_view_user_count;
     END IF;
 
-    IF subscription_user_count <> 50000 THEN
+    IF subscription_user_count <> (50000 * current_setting('perf.fanout_multiplier')::integer) THEN
         RAISE EXCEPTION '구독 overlay 대상이 50,000개가 아닙니다. count=%', subscription_user_count;
     END IF;
 END $$;
@@ -235,10 +244,10 @@ INSERT INTO comment_likes (
     created_at
 )
 SELECT
-    perf_uuid(92, ((clu.comment_rn - 1) * 1000) + clu.user_rn),
+    perf_uuid(92, ((clu.comment_rn - 1) * (1000 * :FANOUT_MULTIPLIER)) + clu.user_rn),
     clu.comment_id,
     clu.user_id,
-    fc.base_time - ((((clu.comment_rn - 1) * 1000) + clu.user_rn) * interval '1 millisecond')
+    fc.base_time - ((((clu.comment_rn - 1) * (1000 * :FANOUT_MULTIPLIER)) + clu.user_rn) * interval '1 millisecond')
 FROM fanout_comment_like_users clu
 CROSS JOIN fanout_clock fc
 ON CONFLICT DO NOTHING;
@@ -253,11 +262,11 @@ INSERT INTO comments (
     deleted_at
 )
 SELECT
-    perf_uuid(91, ((acu.article_rn - 1) * 1000) + acu.user_rn),
+    perf_uuid(91, ((acu.article_rn - 1) * (1000 * :FANOUT_MULTIPLIER)) + acu.user_rn),
     acu.article_id,
     acu.user_id,
     'MID4-206 fan-out comment article-' || acu.article_rn || '-user-' || acu.user_rn,
-    fc.base_time - ((((acu.article_rn - 1) * 1000) + acu.user_rn) * interval '1 millisecond'),
+    fc.base_time - ((((acu.article_rn - 1) * (1000 * :FANOUT_MULTIPLIER)) + acu.user_rn) * interval '1 millisecond'),
     NULL,
     NULL
 FROM fanout_article_comment_users acu
@@ -272,11 +281,11 @@ INSERT INTO article_views (
     created_at
 )
 SELECT
-    perf_uuid(93, ((avu.article_rn - 1) * 10000) + avu.user_rn),
+    perf_uuid(93, ((avu.article_rn - 1) * (10000 * :FANOUT_MULTIPLIER)) + avu.user_rn),
     avu.article_id,
     avu.user_id,
-    fc.base_time - ((((avu.article_rn - 1) * 10000) + avu.user_rn) * interval '1 millisecond'),
-    fc.base_time - ((((avu.article_rn - 1) * 10000) + avu.user_rn) * interval '1 millisecond')
+    fc.base_time - ((((avu.article_rn - 1) * (10000 * :FANOUT_MULTIPLIER)) + avu.user_rn) * interval '1 millisecond'),
+    fc.base_time - ((((avu.article_rn - 1) * (10000 * :FANOUT_MULTIPLIER)) + avu.user_rn) * interval '1 millisecond')
 FROM fanout_article_view_users avu
 CROSS JOIN fanout_clock fc
 ON CONFLICT DO NOTHING;
@@ -288,10 +297,10 @@ INSERT INTO subscriptions (
     created_at
 )
 SELECT
-    perf_uuid(94, ((su.interest_rn - 1) * 1000) + su.user_rn),
+    perf_uuid(94, ((su.interest_rn - 1) * (1000 * :FANOUT_MULTIPLIER)) + su.user_rn),
     su.interest_id,
     su.user_id,
-    fc.base_time - ((((su.interest_rn - 1) * 1000) + su.user_rn) * interval '1 millisecond')
+    fc.base_time - ((((su.interest_rn - 1) * (1000 * :FANOUT_MULTIPLIER)) + su.user_rn) * interval '1 millisecond')
 FROM fanout_subscription_users su
 CROSS JOIN fanout_clock fc
 ON CONFLICT DO NOTHING;
@@ -345,19 +354,19 @@ SELECT 'fanout_target_interests', count(*)::text FROM fanout_target_interests
 UNION ALL
 SELECT 'fanout_comment_likes_overlay_rows', count(*)::text
 FROM comment_likes
-WHERE id IN (SELECT perf_uuid(92, g) FROM generate_series(1, 10000) AS g)
+WHERE id IN (SELECT perf_uuid(92, g) FROM generate_series(1, 10000 * :FANOUT_MULTIPLIER) AS g)
 UNION ALL
 SELECT 'fanout_article_comments_overlay_rows', count(*)::text
 FROM comments
-WHERE id IN (SELECT perf_uuid(91, g) FROM generate_series(1, 10000) AS g)
+WHERE id IN (SELECT perf_uuid(91, g) FROM generate_series(1, 10000 * :FANOUT_MULTIPLIER) AS g)
 UNION ALL
 SELECT 'fanout_article_views_overlay_rows', count(*)::text
 FROM article_views
-WHERE id IN (SELECT perf_uuid(93, g) FROM generate_series(1, 100000) AS g)
+WHERE id IN (SELECT perf_uuid(93, g) FROM generate_series(1, 100000 * :FANOUT_MULTIPLIER) AS g)
 UNION ALL
 SELECT 'fanout_subscriptions_overlay_rows', count(*)::text
 FROM subscriptions
-WHERE id IN (SELECT perf_uuid(94, g) FROM generate_series(1, 50000) AS g)
+WHERE id IN (SELECT perf_uuid(94, g) FROM generate_series(1, 50000 * :FANOUT_MULTIPLIER) AS g)
 UNION ALL
 SELECT 'recent_comment_active_like_count_min', min(active_like_count)::text FROM recent_comment_counts
 UNION ALL
