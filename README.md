@@ -1,7 +1,8 @@
 # Monew
 
-[![codecov develop](https://codecov.io/gh/y2ahhh/sb13-monew-team04/branch/develop/graph/badge.svg?flag=backend)](https://codecov.io/gh/y2ahhh/sb13-monew-team04/tree/develop)
-[![codecov main](https://codecov.io/gh/y2ahhh/sb13-monew-team04/branch/main/graph/badge.svg?flag=backend)](https://codecov.io/gh/y2ahhh/sb13-monew-team04/tree/main)
+[![develop coverage](https://img.shields.io/codecov/c/github/y2ahhh/sb13-monew-team04/develop?flag=backend&label=develop&logo=codecov&style=flat-square)](https://codecov.io/gh/y2ahhh/sb13-monew-team04/tree/develop)
+
+[![main coverage](https://img.shields.io/codecov/c/github/y2ahhh/sb13-monew-team04/main?flag=backend&label=main&logo=codecov&style=flat-square)](https://codecov.io/gh/y2ahhh/sb13-monew-team04/tree/main)
 
 > 마음대로 골라 보는 모든 뉴스
 
@@ -105,7 +106,7 @@ Monew는 NAVER 뉴스 검색 API와 RSS 등 여러 뉴스 제공처의 기사를
 | 팀원 | 담당 영역 | 대표 구현 | GitHub |
 | --- | --- | --- | --- |
 | 장준서 | 사용자 관리 | 회원가입·로그인, 정보 수정, 회원 삭제와 요청 사용자 식별 | [jangjunseo518-collab](https://github.com/jangjunseo518-collab) |
-| 함지원 | 관심사 관리 | 관심사·키워드 관리, 비슷한 이름 검증, 검색과 구독·해제 | [HamJiWeon](https://github.com/HamJiWeon) |
+| 함지원 | 관심사 관리·기사 수집 배치 | 관심사·키워드 및 구독 관리, 기사 수집 스케줄러와 관심사 알림 연동 | [HamJiWeon](https://github.com/HamJiWeon) |
 | 김두호 | 뉴스 기사 관리 | 기사 검색·정렬·페이지 이동, 조회 기록과 기사 삭제 | [dooho9767](https://github.com/dooho9767) |
 | 최진희 | 댓글·좋아요 관리 | 댓글 작성·조회·수정·삭제, 좋아요·취소와 중복 방지 | [hisjeans](https://github.com/hisjeans) |
 | 정구영 | 활동내역·뉴스 수집 지원 | 활동내역 통합 조회와 관계형 데이터베이스(RDB) 성능 개선, RSS 수집 어댑터와 S3 백업·복구 | [KooYeoung](https://github.com/KooYeoung) |
