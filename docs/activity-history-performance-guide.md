@@ -13,6 +13,7 @@
 - 하지만 한 댓글·기사·관심사에 좋아요·조회·구독이 몰리거나 제외할 데이터가 많으면 반복 조회 비용이 다시 커졌다.
 - 활동 데이터에 노출 상태를 저장하고 직접 확인하도록 바꾸자 이 특수 조건도 크게 개선됐다.
 - 활성 데이터만 담고 집계용 ID를 포함한 실험용 부분 커버링 인덱스 4개는 테이블 재방문과 버퍼 사용량을 줄였다. 이 후보 인덱스들은 아직 Flyway와 운영 DB에 반영하지 않았다.
+- 기사 조회 수는 `COUNT(*)`를 사용하면 `INCLUDE(id)` 없는 ACTIVE 부분 인덱스도 `Index Only Scan`으로 동작했다. 이 인덱스는 `76 MB`로 `INCLUDE(id)`를 둔 `144 MB`보다 작았으며, 확인 결과는 코드와 Flyway에 반영하지 않았다.
 - 후보 인덱스를 사용한 데이터 몰림 조건의 `200 rps · 10분`은 통과했지만, 요청 한 번에 약 `17.1만 개`의 인덱스 항목을 직접 세는 구조는 남았다.
 - 같은 데이터 몰림 조건을 새로 준비하고 캐시를 워밍업한 뒤 요청량을 높이자 `250 rps`는 3회 모두 통과했고, `275 rps`는 가운데 값 기준으로 통과했지만 한 회차가 실패했으며, `300 rps`는 3회 모두 실패했다.
 - 특정 대상에 추가한 좋아요·댓글·조회·구독 건수를 데이터 몰림 조건의 2배로 늘린 `200 rps`에서는 확인 항목이 약 `34.1만 개`로 늘었고, 커버링 인덱스를 사용해도 첫 1분부터 응답 시간 기준을 넘었다.
@@ -88,7 +89,10 @@
 ### 실패 경계와 부분 커버링 인덱스
 
 - [실패 조건 재측정 결과](mid4-244-rdb-failed-boundary-remeasure/README.md)
-- [실제 SQL과 PostgreSQL 실행계획 원문](mid4-244-rdb-failed-boundary-remeasure/sql-and-explain.md)
+- [최근 작성 댓글 실행계획](mid4-244-rdb-failed-boundary-remeasure/recent-comments.md)
+- [최근 좋아요한 댓글 실행계획](mid4-244-rdb-failed-boundary-remeasure/recent-liked-comments.md)
+- [최근 조회 기사 실행계획](mid4-244-rdb-failed-boundary-remeasure/recent-article-views.md)
+- [구독 관심사 실행계획](mid4-244-rdb-failed-boundary-remeasure/subscribed-interests.md)
 
 ## 공통 용어 설명
 
