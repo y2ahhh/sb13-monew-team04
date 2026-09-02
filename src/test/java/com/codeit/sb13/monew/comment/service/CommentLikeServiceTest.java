@@ -313,7 +313,7 @@ public class CommentLikeServiceTest {
     // then
     then(commentLikeRepository).should(times(1))
         .deleteByCommentIdAndLikedById(comment.getId(), likedBy.getId());
-    then(commentService).should(times(1)).validateActive(comment.getId());
+    then(commentService).should(times(1)).validateActiveExists(comment.getId());
     then(userService).should(times(1)).findActiveById(likedBy.getId());
     then(notificationService).shouldHaveNoInteractions();
   }
@@ -331,7 +331,7 @@ public class CommentLikeServiceTest {
     assertThatThrownBy(() -> commentLikeService.unlikeComment(command))
         .isInstanceOf(CommentLikeNotFoundException.class);
 
-    then(commentService).should(times(1)).validateActive(comment.getId());
+    then(commentService).should(times(1)).validateActiveExists(comment.getId());
     then(userService).should(times(1)).findActiveById(likedBy.getId());
   }
 

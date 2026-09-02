@@ -148,7 +148,7 @@ public class CommentServiceImpl implements CommentService {
   }
 
   @Override
-  public void validateActive(UUID commentId) {
+  public void validateActiveExists(UUID commentId) {
     if (!commentRepository.existsActiveById(commentId)) {
       throw new CommentNotFoundException(commentId);
     }

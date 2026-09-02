@@ -19,7 +19,7 @@ public interface CommentService {
 
   Comment findActiveById(UUID commentId);
 
-  void validateActive(UUID commentId); // Active 존재 여부만 확인
+  void validateActiveExists(UUID commentId); // Active 존재 여부만 확인
 
   void softDelete(UUID commentId);
 

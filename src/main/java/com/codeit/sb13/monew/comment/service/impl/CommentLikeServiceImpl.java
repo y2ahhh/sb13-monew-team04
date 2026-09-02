@@ -32,7 +32,7 @@ public class CommentLikeServiceImpl implements CommentLikeService {
   private final CommentLikeSaveService commentLikeSaveService;
   private final NotificationService notificationService;
 
-  // 기존 좋아요가 없을 때만 사용자 엔티티를 조회해 새로운 좋아요를 등록한다.
+  // 댓글과 요청 사용자의 유효성을 검증하고 기존 좋아요를 반환하거나 새로운 좋아요를 등록한다.
   @Override
   public CommentLikeDto likeComment(CommentLikeRegisterCommand command) {
     UUID commentId = command.commentId();
@@ -101,7 +101,7 @@ public class CommentLikeServiceImpl implements CommentLikeService {
 
     log.debug("댓글 좋아요 취소 시작 - 댓글 아이디: {}", commentId);
 
-    commentService.validateActive(commentId);
+    commentService.validateActiveExists(commentId);
     userService.findActiveById(requestUserId); // 활성화된 사용자만 댓글 취소 가능
 
     Long deletedCount = commentLikeRepository.deleteByCommentIdAndLikedById(commentId, requestUserId);

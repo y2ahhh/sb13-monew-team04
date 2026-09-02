@@ -168,7 +168,7 @@ public class CommentServiceTest {
     UUID commentId = UUID.randomUUID();
     given(commentRepository.existsActiveById(commentId)).willReturn(true);
 
-    commentService.validateActive(commentId);
+    commentService.validateActiveExists(commentId);
 
     then(commentRepository).should().existsActiveById(commentId);
   }
@@ -179,7 +179,7 @@ public class CommentServiceTest {
     UUID commentId = UUID.randomUUID();
     given(commentRepository.existsActiveById(commentId)).willReturn(false);
 
-    assertThatThrownBy(() -> commentService.validateActive(commentId))
+    assertThatThrownBy(() -> commentService.validateActiveExists(commentId))
         .isInstanceOf(CommentNotFoundException.class);
   }
 
